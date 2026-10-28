@@ -1,0 +1,30 @@
+name: definitive_downloader
+description: Aplicativo desktop e mobile para organizar, transferir e baixar coleções musicais.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  file_selector: ^1.0.4
+  html: ^0.15.6
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  sqlite3: ^2.9.4
+  url_launcher: ^6.3.2
+  crypto: ^3.0.8
+  flutter_secure_storage: ^11.2.0
+  ffi: ^2.2.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/demo/
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf
