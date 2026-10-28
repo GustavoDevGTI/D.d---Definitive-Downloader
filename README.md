@@ -17,3 +17,7 @@ Validação: `dart format`, `flutter analyze`, `flutter test` e testes do worker
 ## Componentes de terceiros
 
 As dependências mantêm suas próprias licenças. O pacote Windows inclui FFmpeg 7.1 essentials da Gyan, GPL-3.0-or-later, e o respectivo texto de licença. Fonte e build: https://github.com/GyanD/codexffmpeg/releases/tag/7.1 ; commit FFmpeg indicado pelo fornecedor: https://github.com/FFmpeg/FFmpeg/commit/b08d7969c5 . Fonte Manrope: `assets/fonts/OFL.txt`.
+
+## Instalador e versões
+
+Baixe o instalador Windows da release e siga as instruções. O instalador é por usuário e oferece atalho no menu Iniciar. A desinstalação preserva a biblioteca e as sessões. A versão é mantida em `pubspec.yaml` e compartilhada pela tag, notas e instalador. Para gerar o instalador, execute `tools/build_installer.ps1` com os caminhos do ISCC, pacote Windows completo e diretório de saída.
