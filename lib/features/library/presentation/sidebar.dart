@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
-import '../../../core/app_identity.dart';
+import '../../../app/brand.dart';
 import '../../workspace/domain/workspace_models.dart';
 
 const appDestinations = <(AppSection, String, IconData)>[
@@ -25,22 +25,7 @@ class LibrarySidebar extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Padding(
             padding: EdgeInsets.fromLTRB(22, 24, 18, 28),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppIdentity.abbreviation,
-                  style: TextStyle(
-                      fontSize: 34,
-                      letterSpacing: -2,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
-                      color: AppColors.accent)),
-              SizedBox(height: 8),
-              Text(AppIdentity.name,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w500)),
-            ])),
+            child: BrandLockup(stacked: true, markSize: 44, fontSize: 14)),
         Expanded(
             child: ListView(padding: EdgeInsets.zero, children: [
           for (final (section, label, icon) in appDestinations)
@@ -79,7 +64,7 @@ class LibrarySidebar extends StatelessWidget {
         ])),
         const Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Versão 0.1.6\nDesktop e mobile',
+            child: Text('Versão 0.1.7\nDesktop e mobile',
                 style: TextStyle(
                     fontSize: 11, height: 1.8, color: AppColors.muted))),
       ]));

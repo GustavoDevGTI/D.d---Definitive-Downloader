@@ -1,6 +1,6 @@
-﻿param([switch]$SkipTests)
+﻿param([switch]$SkipTests, [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
-$workspace = [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
+$workspace = [IO.Path]::GetFullPath($WorkspaceRoot)
 $flutter = Join-Path $env:LOCALAPPDATA 'DownloaderDevTools\flutter\bin\flutter.bat'
 if (-not (Test-Path -LiteralPath $flutter)) {
     $command = Get-Command flutter -ErrorAction SilentlyContinue

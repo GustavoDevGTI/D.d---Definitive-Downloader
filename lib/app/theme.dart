@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const background = Color(0xFFF7F8FC);
+  static const background = Color(0xFFF8F9FB);
   static const surface = Colors.white;
-  static const ink = Color(0xFF25283D);
+  static const ink = Color(0xFF272B3D);
   static const muted = Color(0xFF677084);
-  static const line = Color(0xFFE5E7EF);
-  static const accent = Color(0xFFB93655);
-  static const accentSoft = Color(0xFFFBEFF2);
-  static const music = Color(0xFF3864A5);
-  static const musicSoft = Color(0xFFEDF3FD);
+  static const line = Color(0xFFE7E9EF);
+  static const accent = Color(0xFFB83657);
+  static const accentSoft = Color(0xFFFBEFF3);
+  static const music = ink;
+  static const musicSoft = Color(0xFFF2F3F7);
   static const success = Color(0xFF326B5D);
 }
 
@@ -39,7 +39,7 @@ ThemeData appTheme() {
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             textStyle: const TextStyle(
                 fontFamily: 'Manrope',
                 fontWeight: FontWeight.w600,
@@ -50,7 +50,7 @@ ThemeData appTheme() {
             foregroundColor: AppColors.ink,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)))),
+                borderRadius: BorderRadius.circular(12)))),
     textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
             textStyle: const TextStyle(
@@ -67,13 +67,13 @@ ThemeData appTheme() {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.line)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.line)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.accent, width: 1.4))),
     tooltipTheme:
         const TooltipThemeData(waitDuration: Duration(milliseconds: 500)),

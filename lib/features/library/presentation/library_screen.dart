@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
+import '../../../app/brand.dart';
 import '../../connections/application/spotify_connection_controller.dart';
 import '../../connections/presentation/connections_dialog.dart';
 import '../application/library_controller.dart';
@@ -117,35 +118,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.stretch,
                                           children: [
-                                            Row(children: [
-                                              Expanded(
-                                                  child: Text(
-                                                      appDestinations[
-                                                              _section.index]
-                                                          .$2,
-                                                      style: const TextStyle(
-                                                          fontSize: 22,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          letterSpacing: -.4))),
-                                              if (_section ==
-                                                      AppSection.music ||
-                                                  _section == AppSection.media)
-                                                Text(
-                                                    _section == AppSection.music
-                                                        ? 'Áudio'
-                                                        : 'Vídeo / Imagem',
-                                                    style: const TextStyle(
-                                                        fontSize: 11,
-                                                        color:
-                                                            AppColors.muted)),
-                                            ]),
+                                            _heading(mobile),
                                             const SizedBox(height: 20),
                                             Expanded(child: _sections()),
                                             _status(),
                                           ]))),
                             ])));
                   })));
+
+  Widget _heading(bool mobile) {
+    if (_section == AppSection.home) {
+      return LayoutBuilder(
+          builder: (context, constraints) => BrandLockup(
+              stacked: constraints.maxWidth < 420,
+              markSize: mobile ? 36 : 34,
+              fontSize: mobile ? 16 : 20));
+    }
+    return Row(children: [
+      if (mobile) ...[const BrandMark(size: 28), const SizedBox(width: 10)],
+      Expanded(
+          child: Text(appDestinations[_section.index].$2,
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.4))),
+      if (_section == AppSection.music || _section == AppSection.media)
+        Text(_section == AppSection.music ? 'Áudio' : 'Vídeo / Imagem',
+            style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+    ]);
+  }
 
   Widget _sections() => IndexedStack(index: _section.index, children: [
         HomeWorkspace(

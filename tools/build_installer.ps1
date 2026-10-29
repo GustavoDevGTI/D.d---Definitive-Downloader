@@ -1,10 +1,11 @@
 param(
     [Parameter(Mandatory=$true)][string]$Iscc,
     [Parameter(Mandatory=$true)][string]$PackageDir,
-    [Parameter(Mandatory=$true)][string]$OutputDir
+    [Parameter(Mandatory=$true)][string]$OutputDir,
+    [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent)
 )
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
+$root = [IO.Path]::GetFullPath($WorkspaceRoot)
 $pubspec = Get-Content -LiteralPath (Join-Path $root 'pubspec.yaml') -Raw
 $match = [regex]::Match($pubspec, '(?m)^version:\s*(\d+\.\d+\.\d+)\+\d+\s*$')
 if (-not $match.Success) { throw 'Versão inválida em pubspec.yaml.' }

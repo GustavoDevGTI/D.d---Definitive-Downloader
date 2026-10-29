@@ -58,7 +58,7 @@ class WorkspacePanel extends StatelessWidget {
       color: Colors.white,
       shape: RoundedRectangleBorder(
           side: const BorderSide(color: AppColors.line),
-          borderRadius: BorderRadius.circular(5)),
+          borderRadius: BorderRadius.circular(12)),
       child: Padding(padding: padding, child: child));
 }
 

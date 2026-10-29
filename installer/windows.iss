@@ -24,6 +24,7 @@ OutputBaseFilename=Definitive-Downloader-{#AppVersion}-Setup-Windows-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\definitive_downloader.exe
 CloseApplications=yes
 RestartApplications=no
@@ -38,8 +39,8 @@ Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; Flags:
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autoprograms}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"
+Name: "{autodesktop}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\definitive_downloader.exe"; Description: "Abrir o Definitive Downloader"; Flags: nowait postinstall skipifsilent
