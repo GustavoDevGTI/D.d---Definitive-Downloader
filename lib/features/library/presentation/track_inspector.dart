@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
+import '../../workspace/presentation/workspace_components.dart';
+import 'manual_source_input.dart';
 
 class TrackInspector extends StatefulWidget {
   const TrackInspector({super.key, required this.controller});
@@ -14,7 +16,8 @@ class TrackInspector extends StatefulWidget {
 class _TrackInspectorState extends State<TrackInspector> {
   final _query = TextEditingController();
   int? _trackId;
-  int? _candidateIndex;
+  Candidate? _candidate;
+  int _tab = 0;
   @override
   void dispose() {
     _query.dispose();
@@ -23,257 +26,260 @@ class _TrackInspectorState extends State<TrackInspector> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    final track = controller.focused;
-    if (_trackId != track?.id) {
-      _trackId = track?.id;
-      _query.text = track == null ? '' : '${track.artist} ${track.title}';
-      _candidateIndex = null;
+    final c = widget.controller, t = c.focused;
+    if (_trackId != t?.id) {
+      _trackId = t?.id;
+      _candidate = null;
+      _tab = 0;
+      _query.text = t == null ? '' : '${t.artist} ${t.title}';
     }
-    return Container(
-        decoration: const BoxDecoration(
-            color: Color(0xFFFAFBFC),
-            border: Border(left: BorderSide(color: AppColors.line))),
-        child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 25, 24, 24),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [
-                Icon(Icons.tune_outlined, size: 17, color: AppColors.accent),
-                SizedBox(width: 9),
-                Text('Conferência',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))
-              ]),
-              const SizedBox(height: 26),
-              if (track == null) ...[
-                const Text('A faixa certa importa.',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        height: 1.5)),
-                const SizedBox(height: 13),
-                const Text(
-                    'Escolha uma faixa da lista para comparar o título, o artista e a versão encontrada.',
-                    style: TextStyle(
-                        fontSize: 12, height: 1.9, color: AppColors.muted)),
-                const SizedBox(height: 28),
-                const Divider(),
-                const SizedBox(height: 17),
-                const Text(
-                    'Cada fonte fica identificada.\nA ordem da sua lista é preservada.',
-                    style: TextStyle(
-                        fontSize: 11, height: 1.9, color: AppColors.muted)),
-              ] else ...[
-                if (controller.isExample)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 19),
-                      child: Image.asset('assets/demo/cover.png',
-                          width: 72,
-                          height: 72,
-                          filterQuality: FilterQuality.medium)),
-                Text(track.title,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        height: 1.5)),
-                const SizedBox(height: 7),
-                Text(track.artist,
-                    style:
-                        const TextStyle(fontSize: 12, color: AppColors.muted)),
-                const SizedBox(height: 17),
-                _line('Posição', track.position.toString().padLeft(2, '0')),
-                _line(
-                    track.status == TrackStatus.completed
-                        ? 'Baixado de'
-                        : 'Fonte selecionada',
-                    track.sourceKind.musicProviderName ?? track.sourceLabel),
-                if (track.sourceKind.name == 'localExample')
-                  const Padding(
-                      padding: EdgeInsets.only(top: 7),
-                      child: Text(
-                          'Trecho sintético de 4 segundos, criado para testar o aplicativo.',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.muted,
-                              height: 1.8))),
-                if (track.error.isNotEmpty)
-                  Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Text(track.error,
-                          style: const TextStyle(
-                              color: Color(0xFF9C4141),
-                              fontSize: 11,
-                              height: 1.6))),
-                const SizedBox(height: 22),
-                const Divider(),
-                const SizedBox(height: 21),
-                const Text('Procurar uma correspondência',
-                    style:
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 11),
-                TextField(
-                    controller: _query,
-                    style: const TextStyle(fontSize: 11),
-                    decoration:
-                        const InputDecoration(hintText: 'Artista e título'),
-                    onSubmitted: (v) => unawaited(controller.search(v))),
-                const SizedBox(height: 9),
-                Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
-                        onPressed: controller.searching
-                            ? null
-                            : () => unawaited(controller.search(_query.text)),
-                        icon: const Icon(Icons.search, size: 15),
-                        label: Text(controller.searching
-                            ? 'Pesquisando…'
-                            : controller.music == null
-                                ? 'Pesquisar na Deezer'
-                                : 'Pesquisar faixas'))),
-                const SizedBox(height: 10),
-                Text(
-                    controller.music == null
-                        ? 'Catálogo e prévias. Não fornece a faixa completa.'
-                        : 'Deezer e YouTube Music. Apenas faixas de áudio; videoclipes são bloqueados.',
-                    style: const TextStyle(
-                        fontSize: 10, height: 1.7, color: AppColors.muted)),
-                if (controller.candidates.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  for (var i = 0; i < controller.candidates.length; i++)
-                    _candidate(i),
-                  const SizedBox(height: 12),
-                  if (controller.music != null)
-                    OutlinedButton(
-                        onPressed: _candidateIndex == null ||
-                                _candidateIndex! >=
-                                    controller.candidates.length ||
-                                controller.busy ||
-                                !controller.music!.canUse(
-                                    controller.candidates[_candidateIndex!])
-                            ? null
-                            : () => unawaited(controller.useMusicCandidate(
-                                controller.candidates[_candidateIndex!])),
-                        child: const Text('Vincular faixa escolhida'))
-                  else
-                    OutlinedButton(
-                        onPressed: _candidateIndex == null ||
-                                _candidateIndex! >=
-                                    controller.candidates.length ||
-                                controller.busy
-                            ? null
-                            : () => unawaited(controller.usePreview(
-                                controller.candidates[_candidateIndex!])),
-                        child: const Text('Vincular prévia selecionada')),
-                ],
-                const SizedBox(height: 18),
-                if (controller.music == null)
-                  TextButton.icon(
-                      onPressed: () => unawaited(controller.searchYoutube()),
-                      icon: const Icon(Icons.open_in_new, size: 14),
-                      label: const Text('Pesquisar no YouTube Music')),
-                const SizedBox(height: 2),
-                TextButton.icon(
-                    onPressed: controller.busy ? null : _linkMp3,
-                    icon: const Icon(Icons.link, size: 15),
-                    label: const Text('Vincular endereço de MP3')),
-                const SizedBox(height: 7),
-                const Text(
-                    'Use um arquivo disponibilizado para download pela fonte.',
-                    style: TextStyle(
-                        fontSize: 10, color: AppColors.muted, height: 1.7)),
-              ],
-            ])));
+    return Material(
+        color: Colors.white,
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(children: [
+                const Expanded(
+                    child: Text('Conferência',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600))),
+                if (Navigator.of(context).canPop())
+                  IconButton(
+                      tooltip: 'Fechar conferência',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, size: 20)),
+              ])),
+          if (t == null)
+            const Expanded(
+                child: WorkspaceNotice(
+                    title: 'Escolha uma faixa',
+                    message:
+                        'Clique na linha para comparar versões. O checkbox seleciona a faixa para download.'))
+          else ...[
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: CategoryTabs(
+                    labels: const ['Correspondência', 'Informações'],
+                    selected: _tab,
+                    onSelect: (v) => setState(() => _tab = v))),
+            Expanded(
+                child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(t.title,
+                              style: const TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 5),
+                          Text(t.artist,
+                              style: const TextStyle(color: AppColors.muted)),
+                          const SizedBox(height: 16),
+                          _line(
+                              'Duração esperada', formatDuration(t.durationMs)),
+                          _line('Correspondência', t.matchStatus.label),
+                          _line(
+                              'Fonte identificada',
+                              t.hasManualSource
+                                  ? 'Escolha manual'
+                                  : t.sourceLabel),
+                          _line(
+                              'Versão encontrada',
+                              t.resolvedTitle.isEmpty
+                                  ? 'Não informada'
+                                  : t.resolvedTitle),
+                          _line('Duração encontrada',
+                              formatDuration(t.resolvedDurationMs)),
+                          if (t.error.isNotEmpty)
+                            Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: Text(t.error,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF9C4141)))),
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 12),
+                          if (_tab == 1) ...[
+                            _line('Álbum original',
+                                t.album.isEmpty ? 'Não informado' : t.album),
+                            _line('ISRC',
+                                t.isrc.isEmpty ? 'Não informado' : t.isrc),
+                            _line('Coleção', c.current?.name ?? '—'),
+                            _line('Plataforma original',
+                                c.current?.source ?? '—'),
+                            _line('Posição', t.position.toString()),
+                            _line(
+                                'Artista da fonte',
+                                t.resolvedArtist.isEmpty
+                                    ? 'Não informado'
+                                    : t.resolvedArtist),
+                            _line(
+                                'Álbum da fonte',
+                                t.resolvedAlbum.isEmpty
+                                    ? 'Não informado'
+                                    : t.resolvedAlbum),
+                            _line(
+                                'Download',
+                                switch (t.status) {
+                                  TrackStatus.pending => 'Pendente',
+                                  TrackStatus.ready => 'Na fila',
+                                  TrackStatus.downloading => 'Em andamento',
+                                  TrackStatus.completed => 'Concluído',
+                                  TrackStatus.failed => 'Erro',
+                                }),
+                            if (t.localPath.isNotEmpty)
+                              _line('Último arquivo', t.localPath),
+                            if (t.hasManualSource)
+                              _line('Link manual', t.manualUrl),
+                          ] else ...[
+                            if (t.hasManualSource) ...[
+                              const Text('Fonte manual prioritária',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 8),
+                              SelectableText(t.manualUrl,
+                                  style: const TextStyle(fontSize: 12)),
+                              const SizedBox(height: 8),
+                              Text(
+                                  t.manualMode == ManualSourceMode.extractAudio
+                                      ? 'Vínculo salvo. A extração desta página ainda não está disponível.'
+                                      : 'MP3 direto. O conteúdo será validado durante a transferência.',
+                                  style: const TextStyle(
+                                      fontSize: 12, height: 1.6)),
+                              TextButton.icon(
+                                  onPressed: c.busy ? null : _manual,
+                                  icon:
+                                      const Icon(Icons.edit_outlined, size: 16),
+                                  label: const Text('Editar link manual')),
+                              TextButton(
+                                  onPressed: c.busy
+                                      ? null
+                                      : () => unawaited(c.removeManualSource()),
+                                  child: const Text('Remover vínculo manual')),
+                            ] else ...[
+                              TextField(
+                                  controller: _query,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Buscar outras versões'),
+                                  onSubmitted: c.searching || c.busy
+                                      ? null
+                                      : (v) => unawaited(c.search(v))),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                  onPressed: c.searching ||
+                                          c.busy ||
+                                          c.isExample ||
+                                          (c.music != null &&
+                                              !c.music!.available)
+                                      ? null
+                                      : () => unawaited(c.search(_query.text)),
+                                  icon: const Icon(Icons.search, size: 16),
+                                  label: Text(c.searching
+                                      ? 'Pesquisando…'
+                                      : 'Pesquisar faixas')),
+                              const SizedBox(height: 8),
+                              const Text(
+                                  'A busca automática exclui videoclipes.',
+                                  style: TextStyle(
+                                      fontSize: 11, color: AppColors.muted)),
+                              RadioGroup<Candidate>(
+                                  groupValue: _candidate,
+                                  onChanged: (value) =>
+                                      setState(() => _candidate = value),
+                                  child: Column(children: [
+                                    for (final candidate in c.candidates)
+                                      _option(candidate)
+                                  ])),
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                  onPressed: c.busy ||
+                                          (_candidate == null &&
+                                              t.sourceKind ==
+                                                  SourceKind.none) ||
+                                          (_candidate != null &&
+                                              c.music != null &&
+                                              !c.music!.canUse(_candidate!))
+                                      ? null
+                                      : () => unawaited(_confirm()),
+                                  child:
+                                      const Text('Confirmar correspondência')),
+                              TextButton(
+                                  onPressed:
+                                      c.busy || t.sourceKind == SourceKind.none
+                                          ? null
+                                          : () => unawaited(c.reviewSource()),
+                                  child: const Text('Marcar para revisão')),
+                              TextButton.icon(
+                                  onPressed: c.busy ? null : _manual,
+                                  icon: const Icon(Icons.link, size: 16),
+                                  label:
+                                      const Text('Informar link manualmente')),
+                            ],
+                            const SizedBox(height: 8),
+                            Tooltip(
+                                message:
+                                    'A reprodução de prévias ainda não está integrada.',
+                                child: TextButton.icon(
+                                    onPressed: null,
+                                    icon: Icon(Icons.play_arrow, size: 17),
+                                    label: Text('Ouvir prévia'))),
+                            if (c.isExample)
+                              const Text('Exemplo local com áudio sintético.',
+                                  style: TextStyle(
+                                      fontSize: 11, color: AppColors.muted)),
+                          ],
+                        ]))),
+          ],
+        ]));
   }
 
   Widget _line(String label, String value) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        SizedBox(
-            width: 63,
-            child: Text(label,
-                style: const TextStyle(fontSize: 10, color: AppColors.muted))),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 11))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+          flex: 5,
+          child: Text(label,
+              style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+            flex: 6, child: Text(value, style: const TextStyle(fontSize: 12))),
       ]));
-  Widget _candidate(int index) {
-    final c = widget.controller.candidates[index];
-    final assessment = widget.controller.assess(c);
-    final selected = _candidateIndex == index;
-    return InkWell(
-        onTap: () => setState(() => _candidateIndex = index),
-        child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 7),
-            decoration: BoxDecoration(
-                color: selected ? const Color(0xFFEAF0F4) : Colors.transparent,
-                border:
-                    const Border(bottom: BorderSide(color: AppColors.line))),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(c.title,
-                  maxLines: 2,
-                  style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 5),
-              Text(c.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: AppColors.muted)),
-              const SizedBox(height: 7),
-              Text(
-                  '${(assessment.score * 100).round()}% · ${c.kind.name == 'youtubeMusic' ? 'YouTube Music / áudio' : c.kind.name == 'deezerFull' ? 'Deezer / faixa' : 'prévia'}',
-                  style: const TextStyle(fontSize: 9, color: AppColors.accent)),
-              if (assessment.needsReview)
-                Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Text(assessment.reason,
-                        style: const TextStyle(
-                            fontSize: 9, color: AppColors.muted))),
-              if (c.kind.name == 'deezerFull' &&
-                  widget.controller.music?.connection.connected != true)
-                const Text(
-                    'Conecte a Deezer em Conexões para baixar esta fonte.',
-                    style: TextStyle(fontSize: 10)),
-            ])));
+  Widget _option(Candidate candidate) {
+    final assessment = widget.controller.assess(candidate);
+    return RadioListTile<Candidate>(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        value: candidate,
+        title: Text(candidate.title, style: const TextStyle(fontSize: 12)),
+        subtitle: Text(
+            '${candidate.artist}\n${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
+            style: const TextStyle(fontSize: 11)));
   }
 
-  Future<void> _linkMp3() async {
-    final input = TextEditingController();
-    final result = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6)),
-                title:
-                    const Text('Vincular MP3', style: TextStyle(fontSize: 18)),
-                content: SizedBox(
-                    width: 470,
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                              'Cole o endereço direto do arquivo. Páginas de streaming não são links de MP3.',
-                              style: TextStyle(fontSize: 12, height: 1.7)),
-                          const SizedBox(height: 18),
-                          TextField(
-                              controller: input,
-                              autofocus: true,
-                              decoration: const InputDecoration(
-                                  hintText: 'https://fonte.exemplo/faixa.mp3'),
-                              onSubmitted: (v) => Navigator.pop(context, v)),
-                        ])),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, input.text),
-                      child: const Text('Vincular'))
-                ]));
-    // A dialog exit transition may still reference its text controller.
-    if (result != null && result.trim().isNotEmpty) {
-      await widget.controller.linkMp3(result);
+  Future<void> _confirm() async {
+    if (_candidate case final candidate?) {
+      if (widget.controller.music == null) {
+        await widget.controller.usePreview(candidate);
+      } else {
+        await widget.controller.useMusicCandidate(candidate);
+      }
+    } else {
+      await widget.controller.confirmSource();
     }
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    input.dispose();
+  }
+
+  Future<void> _manual() async {
+    final track = widget.controller.focused;
+    if (track == null) return;
+    final choice = await showDialog<ManualSourceChoice>(
+        context: context, builder: (_) => ManualSourceInput(track: track));
+    if (choice != null &&
+        mounted &&
+        widget.controller.focused?.id == track.id) {
+      await widget.controller.setManualSource(choice.url, choice.mode);
+    }
   }
 }

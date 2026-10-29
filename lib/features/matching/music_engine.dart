@@ -39,6 +39,12 @@ class WindowsMusicEngine implements MusicEngine {
     final result = Completer<Map<String, dynamic>>();
     var bytes = 0;
     var terminating = false;
+    var timedOut = false;
+    var pauseSent = false;
+    var controlsOpen = request['operation'] == 'download';
+    var elapsed = Duration.zero;
+    final clock = Stopwatch()..start();
+    var lastTick = Duration.zero;
     Future<void> stop() async {
       if (terminating) return;
       terminating = true;
@@ -48,7 +54,32 @@ class WindowsMusicEngine implements MusicEngine {
     }
 
     final timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (cancellation?.cancelled == true) unawaited(stop());
+      final now = clock.elapsed;
+      if (cancellation?.pauseMode != true) elapsed += now - lastTick;
+      lastTick = now;
+      final limit = request['operation'] == 'download'
+          ? const Duration(minutes: 6)
+          : const Duration(seconds: 65);
+      if (elapsed >= limit) {
+        timedOut = true;
+        unawaited(stop());
+      }
+      if (cancellation?.cancelled == true) {
+        unawaited(stop());
+      } else if (controlsOpen &&
+          !terminating &&
+          pauseSent != (cancellation?.pauseMode == true)) {
+        pauseSent = cancellation?.pauseMode == true;
+        try {
+          process.stdin
+              .writeln(jsonEncode({'control': 'pause', 'enabled': pauseSent}));
+          unawaited(process.stdin.flush().catchError((Object _) {
+            controlsOpen = false;
+          }));
+        } catch (_) {
+          controlsOpen = false;
+        }
+      }
     });
     final errors = process.stderr.drain<void>();
     final streamDone = Completer<void>();
@@ -98,19 +129,14 @@ class WindowsMusicEngine implements MusicEngine {
     unawaited(pending.then<void>((_) {}, onError: (Object _) {}));
     try {
       process.stdin.writeln(payload);
-      await process.stdin.close();
-      final code = await process.exitCode.timeout(
-          request['operation'] == 'download'
-              ? const Duration(minutes: 6)
-              : const Duration(seconds: 65), onTimeout: () {
-        unawaited(stop());
-        return -1;
-      });
+      await process.stdin.flush();
+      if (!controlsOpen) await process.stdin.close();
+      final code = await process.exitCode;
       await streamDone.future.timeout(const Duration(seconds: 10));
       await errors.timeout(const Duration(seconds: 10));
       cancellation?.check();
       if (!result.isCompleted) {
-        throw FormatException(code == -1
+        throw FormatException(timedOut
             ? 'A fonte demorou demais. Tente novamente.'
             : 'O motor musical não concluiu a operação '
                 '(saída $code; $bytes bytes de resposta).');
@@ -122,6 +148,12 @@ class WindowsMusicEngine implements MusicEngine {
       return value;
     } finally {
       timer.cancel();
+      controlsOpen = false;
+      if (request['operation'] == 'download') {
+        try {
+          await process.stdin.close();
+        } catch (_) {/* Owned worker exited. */}
+      }
       await stream.cancel();
       if (!result.isCompleted) {
         result.completeError(

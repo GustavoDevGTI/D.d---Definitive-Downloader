@@ -82,6 +82,19 @@ void main() {
       // Simulate the actual v2 schema, not a current schema with a false version.
       db.execute('DROP TABLE music_candidates');
       db.execute('DROP TABLE music_source_attempts');
+      db.execute('DROP TABLE download_history');
+      db.execute('DROP INDEX tracks_transfer_status');
+      db.execute('DROP INDEX tracks_priority');
+      db.execute('ALTER TABLE tracks DROP COLUMN queue_priority');
+      db.execute('ALTER TABLE tracks DROP COLUMN queue_run');
+      for (final column in [
+        'match_status',
+        'manual_url',
+        'manual_mode',
+        'queue_hidden'
+      ]) {
+        db.execute('ALTER TABLE tracks DROP COLUMN $column');
+      }
       db.execute('ALTER TABLE tracks DROP COLUMN explicit');
       db.execute('ALTER TABLE tracks DROP COLUMN resolved_cover_url');
       db.execute('PRAGMA user_version = 2');
@@ -93,6 +106,10 @@ void main() {
     final rows = (await restored.page(id)).items;
     expect(rows[0].artist, 'Laboratório D.d');
     expect(rows[1].artist, 'Laboratório Trama');
-    expect((await source.page(id)).items[0].artist, 'Laboratório Trama');
+    expect(
+        await source.database.run((db) => db.select(
+            'SELECT artist FROM tracks WHERE collection_id=? ORDER BY position LIMIT 1',
+            [id]).first['artist']),
+        'Laboratório Trama');
   });
 }

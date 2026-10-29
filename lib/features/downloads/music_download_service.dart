@@ -80,7 +80,13 @@ class MusicDownloadService {
       // Only the unique, owned staging directory created above may be removed.
       if (p.isWithin(folder.absolute.path, work.absolute.path) &&
           await work.exists()) {
-        await work.delete(recursive: true);
+        try {
+          await work.delete(recursive: true);
+        } on FileSystemException {
+          // Windows may still hold a descendant's file handle after stopping
+          // the worker. Cleanup must not mask cancellation or a published file.
+          // Keep only this owned staging directory for later inspection.
+        }
       }
     }
   }

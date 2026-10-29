@@ -1,136 +1,115 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../core/app_identity.dart';
-import '../application/library_controller.dart';
+import '../../workspace/domain/workspace_models.dart';
+
+const appDestinations = <(AppSection, String, IconData)>[
+  (AppSection.home, 'Início', Icons.home_outlined),
+  (AppSection.music, 'Músicas', Icons.queue_music_outlined),
+  (AppSection.media, 'Vídeos e Fotos', Icons.perm_media_outlined),
+  (AppSection.files, 'Arquivos', Icons.folder_open_outlined),
+  (AppSection.settings, 'Configurações', Icons.settings_outlined),
+];
 
 class LibrarySidebar extends StatelessWidget {
   const LibrarySidebar(
-      {super.key, required this.controller, required this.compact});
-  final LibraryController controller;
-  final bool compact;
+      {super.key, required this.selected, required this.onSelect});
+  final AppSection selected;
+  final ValueChanged<AppSection> onSelect;
   @override
   Widget build(BuildContext context) => Container(
-      width: compact ? 168 : 202,
+      width: 204,
       decoration: const BoxDecoration(
-          color: Color(0xFFF7F9FA),
+          color: AppColors.background,
           border: Border(right: BorderSide(color: AppColors.line))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 16, 34),
-            child: Row(children: [
-              const Icon(Icons.file_download_outlined,
-                  size: 25, color: AppColors.accent),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(AppIdentity.abbreviation,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: -1)))),
-            ])),
-        _navigation(Icons.queue_music_outlined, 'Coleções', 'collections'),
-        _navigation(Icons.downloading_outlined, 'Downloads', 'downloads'),
-        _navigation(Icons.folder_open_outlined, 'Arquivos', 'files'),
-        const SizedBox(height: 36),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text('Suas coleções',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w600))),
-        const SizedBox(height: 10),
-        Expanded(
-            child: controller.collections.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: Text('As listas importadas\naparecem aqui.',
-                        style: TextStyle(
-                            fontSize: 11, height: 1.8, color: AppColors.muted)))
-                : ListView.builder(
-                    itemCount: controller.collections.length,
-                    itemBuilder: (context, index) {
-                      final item = controller.collections[index];
-                      return InkWell(
-                          onTap: controller.busy
-                              ? null
-                              : () =>
-                                  unawaited(controller.openCollection(item)),
-                          child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(24, 10, 16, 10),
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(item.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight:
-                                                controller.current?.id ==
-                                                        item.id
-                                                    ? FontWeight.w600
-                                                    : FontWeight.w400,
-                                            color: AppColors.ink)),
-                                    const SizedBox(height: 4),
-                                    Text('${item.trackCount} faixas',
-                                        style: const TextStyle(
-                                            fontSize: 10,
-                                            color: AppColors.muted)),
-                                  ])));
-                    })),
-        Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 16, 22),
+            padding: EdgeInsets.fromLTRB(22, 24, 18, 28),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Feito para organizar.',
-                  style: TextStyle(fontSize: 11, color: AppColors.muted)),
-              const SizedBox(height: 5),
-              Text('Versão 0.1 · desktop',
+              Text(AppIdentity.abbreviation,
+                  style: TextStyle(
+                      fontSize: 34,
+                      letterSpacing: -2,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                      color: AppColors.accent)),
+              SizedBox(height: 8),
+              Text(AppIdentity.name,
                   style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.muted.withValues(alpha: .8))),
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500)),
             ])),
+        Expanded(
+            child: ListView(padding: EdgeInsets.zero, children: [
+          for (final (section, label, icon) in appDestinations)
+            Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                child: Material(
+                    borderRadius: BorderRadius.circular(10),
+                    color: section == selected
+                        ? AppColors.accentSoft
+                        : Colors.transparent,
+                    child: ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        minLeadingWidth: 18,
+                        horizontalTitleGap: 10,
+                        dense: true,
+                        selected: section == selected,
+                        selectedColor: AppColors.accent,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        leading: Icon(icon,
+                            size: 21,
+                            color: section == selected
+                                ? AppColors.accent
+                                : AppColors.muted),
+                        title: Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: section == selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500)),
+                        onTap: () => onSelect(section)))),
+        ])),
+        const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Versão 0.1.6\nDesktop e mobile',
+                style: TextStyle(
+                    fontSize: 11, height: 1.8, color: AppColors.muted))),
       ]));
+}
 
-  Widget _navigation(IconData icon, String label, String value) {
-    final selected = controller.view == value;
-    return Container(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        decoration: BoxDecoration(
-            color: selected ? const Color(0xFFEAF0F4) : Colors.transparent,
-            border: Border(
-                left: BorderSide(
-                    color: selected ? AppColors.accent : Colors.transparent,
-                    width: 3))),
-        child: InkWell(
-            onTap: () => unawaited(controller.setView(value)),
-            child: Padding(
-                padding: const EdgeInsets.fromLTRB(21, 12, 14, 12),
-                child: Row(children: [
-                  Icon(icon,
-                      size: 18,
-                      color: selected ? AppColors.accent : AppColors.muted),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w400,
-                              color: selected
-                                  ? AppColors.accent
-                                  : AppColors.ink))),
-                ]))));
-  }
+class MobileNavigation extends StatelessWidget {
+  const MobileNavigation(
+      {super.key, required this.selected, required this.onSelect});
+  final AppSection selected;
+  final ValueChanged<AppSection> onSelect;
+  @override
+  Widget build(BuildContext context) => BottomNavigationBar(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          currentIndex: selected.index,
+          selectedItemColor: AppColors.accent,
+          unselectedItemColor: AppColors.muted,
+          selectedFontSize: 10,
+          unselectedFontSize: 10,
+          onTap: (index) => onSelect(AppSection.values[index]),
+          items: [
+            for (final (_, label, icon) in appDestinations)
+              BottomNavigationBarItem(
+                  icon: Icon(icon, size: 20),
+                  label: label == 'Vídeos e Fotos'
+                      ? 'Mídias'
+                      : label == 'Configurações'
+                          ? 'Ajustes'
+                          : label,
+                  tooltip: label)
+          ]);
 }

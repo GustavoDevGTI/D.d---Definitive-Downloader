@@ -43,6 +43,29 @@ class DesktopFiles {
     }
   }
 
+  Future<bool> fileExists(String path) => File(path).exists();
+
+  Future<void> openSavedFile(String path) async {
+    if (!await fileExists(path)) {
+      throw const FileSystemException('Arquivo indisponível.');
+    }
+    if (!await launchUrl(Uri.file(path),
+        mode: LaunchMode.externalApplication)) {
+      throw const FileSystemException('Não foi possível abrir o arquivo.');
+    }
+  }
+
+  Future<void> revealFile(String path) async {
+    final directory = p.dirname(path);
+    if (!await Directory(directory).exists()) {
+      throw const FileSystemException('Pasta indisponível.');
+    }
+    if (!await launchUrl(Uri.directory(directory),
+        mode: LaunchMode.externalApplication)) {
+      throw const FileSystemException('Não foi possível abrir a localização.');
+    }
+  }
+
   Future<void> openUrl(Uri uri) async {
     if (uri.scheme != 'https') {
       throw const FormatException('Endereço externo inválido.');

@@ -1,25 +1,28 @@
 import '../../../core/storage/database.dart';
+import '../../../core/network/bounded_http.dart';
+import 'package:path/path.dart' as p;
 import '../domain/models.dart';
 
 class LibraryRepository {
   const LibraryRepository(this.database);
   final AppDatabase database;
 
-  Future<List<Collection>> collections() => database.run((db) => db
-      .select('''
+  Future<List<Collection>> collections({int offset = 0}) =>
+      database.run((db) => db
+          .select('''
     SELECT c.*, COUNT(t.id) AS total,
       COALESCE(SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END),0) AS completed
     FROM collections c LEFT JOIN tracks t ON t.collection_id=c.id
-    GROUP BY c.id ORDER BY c.id DESC LIMIT 30''')
-      .map((r) => Collection(
-          id: r['id'] as int,
-          name: r['name'] as String,
-          source: r['source'] as String,
-          sourceUrl: r['source_url'] as String,
-          trackCount: r['total'] as int,
-          completedCount: r['completed'] as int,
-          isPartial: r['partial'] == 1))
-      .toList());
+    GROUP BY c.id ORDER BY c.id DESC LIMIT 30 OFFSET ?''', [offset])
+          .map((r) => Collection(
+              id: r['id'] as int,
+              name: r['name'] as String,
+              source: r['source'] as String,
+              sourceUrl: r['source_url'] as String,
+              trackCount: r['total'] as int,
+              completedCount: r['completed'] as int,
+              isPartial: r['partial'] == 1))
+          .toList());
 
   Future<int> importCollection(ImportedCollection collection) async {
     final id = await _createCollection(
@@ -78,7 +81,7 @@ class LibraryRepository {
         db.execute('BEGIN IMMEDIATE');
         final statement = db.prepare(
             '''INSERT INTO tracks(collection_id,position,title,artist,album,
-      duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,explicit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)''');
+      duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,explicit,match_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''');
         try {
           for (var i = 0; i < batch.length; i++) {
             final t = batch[i];
@@ -95,7 +98,8 @@ class LibraryRepository {
               t.mediaUrl,
               t.sourceKind.name,
               t.sourceKind == SourceKind.none ? 'pending' : 'ready',
-              t.explicit == null ? null : (t.explicit! ? 1 : 0)
+              t.explicit == null ? null : (t.explicit! ? 1 : 0),
+              t.sourceKind == SourceKind.none ? 'pending' : 'confirmed'
             ]);
           }
           db.execute('COMMIT');
@@ -108,26 +112,43 @@ class LibraryRepository {
       });
 
   Future<TrackPage> page(int id,
-          {int offset = 0, int limit = 40, String filter = ''}) =>
+          {int offset = 0,
+          int limit = 40,
+          String filter = '',
+          String query = ''}) =>
       database.run((db) {
         if (limit < 1 || limit > 100 || offset < 0) {
           throw ArgumentError('Página inválida.');
         }
-        final clause = switch (filter) {
+        var clause = switch (filter) {
           'downloads' => " AND status IN ('ready','downloading','failed')",
           'files' => " AND status='completed'",
           _ => ''
         };
-        final total = db.select(
-            'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?$clause',
-            [id]).first['n'] as int;
+        final args = <Object?>[id];
+        if (query.trim().isNotEmpty) {
+          clause +=
+              ' AND (instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0)';
+          args.addAll([query.trim(), query.trim()]);
+        }
+        final total = db
+            .select(
+                'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?$clause',
+                args)
+            .first['n'] as int;
         final selected = db.select(
             'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=? AND selected=1',
             [id]).first['n'] as int;
         final rows = db.select(
             'SELECT * FROM tracks WHERE collection_id=?$clause ORDER BY position LIMIT ? OFFSET ?',
-            [id, limit, offset]);
-        return TrackPage(rows.map(_track).toList(), total, selected);
+            [...args, limit, offset]);
+        final filteredSelected = db
+            .select(
+                'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?$clause AND selected=1',
+                args)
+            .first['n'] as int;
+        return TrackPage(
+            rows.map(readTrack).toList(), total, selected, filteredSelected);
       });
 
   Future<void> select(int id, bool value) => database.run((db) {
@@ -151,8 +172,8 @@ class LibraryRepository {
           String coverUrl = ''}) =>
       database.run((db) {
         db.execute(
-            '''UPDATE tracks SET media_url=?,source_kind=?,status='ready',error='',
-        resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,cover_url=CASE WHEN ?='' THEN cover_url ELSE ? END WHERE id=?''',
+            '''UPDATE tracks SET media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='completed' THEN status ELSE 'ready' END,error='',
+        resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=? WHERE id=? AND manual_url='' ''',
             [
               url,
               kind.name,
@@ -161,23 +182,44 @@ class LibraryRepository {
               album,
               durationMs,
               coverUrl,
-              coverUrl,
               track.id
             ]);
       });
   Future<Track?> nextSelected(int id, {int afterPosition = 0}) =>
       database.run((db) {
         final rows = db.select(
-            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND status IN ('ready','failed') ORDER BY position LIMIT 1",
+            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND match_status!='review' AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed') ORDER BY position LIMIT 1",
             [id, afterPosition]);
-        return rows.isEmpty ? null : _track(rows.first);
+        return rows.isEmpty ? null : readTrack(rows.first);
       });
   Future<void> setStatus(int id, TrackStatus status,
           {String error = '', String localPath = ''}) =>
       database.run((db) {
-        db.execute(
-            'UPDATE tracks SET status=?,error=?,local_path=CASE WHEN ?=\'\' THEN local_path ELSE ? END WHERE id=?',
-            [status.name, error, localPath, localPath, id]);
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              'UPDATE tracks SET status=?,error=?,local_path=CASE WHEN ?=\'\' THEN local_path ELSE ? END WHERE id=?',
+              [status.name, error, localPath, localPath, id]);
+          if (status == TrackStatus.completed && localPath.isNotEmpty) {
+            final row =
+                db.select('SELECT * FROM tracks WHERE id=?', [id]).first;
+            db.execute(
+                '''INSERT OR IGNORE INTO download_history
+            (track_id,name,local_path,folder,source,duration_ms) VALUES(?,?,?,?,?,?)''',
+                [
+                  id,
+                  p.basename(localPath),
+                  localPath,
+                  p.dirname(localPath),
+                  row['source_kind'],
+                  row['resolved_duration_ms'] ?? row['duration_ms']
+                ]);
+          }
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
       });
   Future<String?> preference(String key) => database.run((db) {
         final rows =
@@ -194,10 +236,11 @@ class LibraryRepository {
           .select(
               "SELECT * FROM tracks WHERE collection_id=? AND status='completed' AND position>? ORDER BY position LIMIT 100",
               [id, afterPosition])
-          .map(_track)
+          .map(readTrack)
           .toList());
 
-  static Track _track(Map<String, Object?> r) => Track(
+  static Track readTrack(Map<String, Object?> r) => Track(
+      queuePriority: r['queue_priority'] as int? ?? 0,
       id: r['id'] as int,
       collectionId: r['collection_id'] as int,
       position: r['position'] as int,
@@ -219,11 +262,14 @@ class LibraryRepository {
       resolvedAlbum: r['resolved_album'] as String,
       resolvedDurationMs: r['resolved_duration_ms'] as int?,
       explicit: r['explicit'] == null ? null : r['explicit'] == 1,
+      matchStatus: MatchStatus.values.byName(r['match_status'] as String),
+      manualUrl: r['manual_url'] as String,
+      manualMode: ManualSourceMode.values.byName(r['manual_mode'] as String),
       resolvedCoverUrl: (r['resolved_cover_url'] as String?) ?? '');
 
   Future<Track?> trackById(int id) => database.run((db) {
         final rows = db.select('SELECT * FROM tracks WHERE id=?', [id]);
-        return rows.isEmpty ? null : _track(rows.first);
+        return rows.isEmpty ? null : readTrack(rows.first);
       });
 
   Future<void> saveCandidates(int id, List<Candidate> candidates) =>
@@ -286,8 +332,8 @@ class LibraryRepository {
           throw const FormatException('Videoclipe ou fonte não confirmada.');
         }
         db.execute(
-            '''UPDATE tracks SET media_url=?,source_kind=?,status='ready',selected=1,error='',
-      resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=? WHERE id=?''',
+            '''UPDATE tracks SET media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='completed' THEN status ELSE 'ready' END,error='',
+      resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=? WHERE id=? AND manual_url='' ''',
             [
               candidate.pageUrl,
               candidate.kind.name,
@@ -298,6 +344,84 @@ class LibraryRepository {
               candidate.coverUrl,
               track.id
             ]);
+      });
+
+  Future<void> setManualSource(
+      int id, String value, ManualSourceMode mode) async {
+    var uri = Uri.parse(value.trim());
+    validateHttpUrl(uri);
+    if (['www.youtube.com', 'youtube.com', 'music.youtube.com']
+            .contains(uri.host) &&
+        uri.path == '/watch' &&
+        RegExp(r'^[a-zA-Z0-9_-]{11}$')
+            .hasMatch(uri.queryParameters['v'] ?? '')) {
+      uri = Uri.https(uri.host, '/watch', {'v': uri.queryParameters['v']!});
+    } else if (uri.hasQuery || uri.hasFragment) {
+      throw const FormatException(
+          'Use um link público estável, sem tokens, parâmetros ou fragmentos.');
+    }
+    if (uri.toString().length > 4096) {
+      throw const FormatException('Link muito longo.');
+    }
+    await database.run((db) {
+      db.execute(
+          '''UPDATE tracks SET manual_url=?,manual_mode=?,match_status='manual',queue_hidden=0,
+        media_url=?,source_kind=?,resolved_title='',resolved_artist='',resolved_album='',resolved_duration_ms=NULL,
+        resolved_cover_url='',error='',status=CASE WHEN status='completed' THEN status WHEN ?='originalAudio' THEN 'ready' ELSE 'pending' END
+        WHERE id=? AND status!='downloading' ''',
+          [
+            uri.toString(),
+            mode.name,
+            mode == ManualSourceMode.originalAudio ? uri.toString() : '',
+            mode == ManualSourceMode.originalAudio ? 'directMp3' : 'none',
+            mode.name,
+            id
+          ]);
+    });
+  }
+
+  Future<void> removeManualSource(int id) => database.run((db) {
+        db.execute(
+            '''UPDATE tracks SET manual_url='',manual_mode='originalAudio',match_status='pending',
+      media_url='',source_kind='none',resolved_title='',resolved_artist='',resolved_album='',resolved_duration_ms=NULL,
+      resolved_cover_url='',error='',status=CASE WHEN status='completed' THEN status ELSE 'pending' END WHERE id=? AND status!='downloading' ''',
+            [id]);
+      });
+
+  Future<void> markForReview(int id) => database.run((db) {
+        db.execute(
+            "UPDATE tracks SET match_status='review' WHERE id=? AND status!='downloading'",
+            [id]);
+      });
+
+  Future<void> confirmSource(int id) => database.run((db) {
+        db.execute(
+            "UPDATE tracks SET match_status='confirmed' WHERE id=? AND source_kind!='none' AND manual_url='' AND status!='downloading'",
+            [id]);
+      });
+
+  Future<Collection?> collectionById(int id) => database.run((db) {
+        final rows = db.select('''SELECT c.*, COUNT(t.id) AS total,
+      COALESCE(SUM(t.status='completed'),0) AS completed FROM collections c
+      LEFT JOIN tracks t ON t.collection_id=c.id WHERE c.id=? GROUP BY c.id''',
+            [id]);
+        if (rows.isEmpty) return null;
+        final r = rows.first;
+        return Collection(
+            id: id,
+            name: r['name'] as String,
+            source: r['source'] as String,
+            sourceUrl: r['source_url'] as String,
+            trackCount: r['total'] as int,
+            completedCount: r['completed'] as int,
+            isPartial: r['partial'] == 1);
+      });
+
+  Future<void> selectCollection(int id, bool value, {String query = ''}) =>
+      database.run((db) {
+        db.execute('''UPDATE tracks SET selected=? WHERE collection_id=?
+      AND (?='' OR instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0)''',
+            [value ? 1 : 0, id, query, query, query]);
       });
 
   Future<void> recordMusicAttempt(int id, SourceKind provider,

@@ -68,7 +68,7 @@ class DeezerSession:
         self.account.close()
         self.media.close()
 
-    def download(self, candidate, directory):
+    def download(self, candidate, directory, control=None):
         page = urlparse(candidate['pageUrl'])
         if page.scheme != 'https' or page.hostname != 'www.deezer.com':
             raise MusicError('Endereço Deezer inválido.')
@@ -109,6 +109,8 @@ class DeezerSession:
                 def bounded_chunks():
                     nonlocal received
                     for chunk in r.iter_content(65536):
+                        if control is not None:
+                            control.consume(len(chunk))
                         received += len(chunk)
                         if received > 80_000_000:
                             raise MusicError('O áudio ultrapassou o limite de tamanho.')

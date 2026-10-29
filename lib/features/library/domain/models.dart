@@ -1,5 +1,18 @@
 enum TrackStatus { pending, ready, downloading, completed, failed }
 
+enum MatchStatus { pending, review, confirmed, manual }
+
+enum ManualSourceMode { extractAudio, originalAudio }
+
+extension MatchStatusLabel on MatchStatus {
+  String get label => switch (this) {
+        MatchStatus.pending => 'Pendente',
+        MatchStatus.review => 'Conferir',
+        MatchStatus.confirmed => 'Confirmada',
+        MatchStatus.manual => 'Fonte manual definida',
+      };
+}
+
 enum SourceKind {
   none,
   localExample,
@@ -84,7 +97,16 @@ class Track {
       this.resolvedAlbum = '',
       this.resolvedDurationMs,
       this.explicit,
-      this.resolvedCoverUrl = ''});
+      this.matchStatus = MatchStatus.confirmed,
+      this.manualUrl = '',
+      this.manualMode = ManualSourceMode.originalAudio,
+      this.resolvedCoverUrl = '',
+      this.queuePriority = 0});
+  final int queuePriority;
+  final MatchStatus matchStatus;
+  final String manualUrl;
+  final ManualSourceMode manualMode;
+  bool get hasManualSource => manualUrl.isNotEmpty;
   final bool? explicit;
   final String resolvedCoverUrl;
   final int id;
@@ -107,7 +129,11 @@ class Track {
   final String resolvedArtist;
   final String resolvedAlbum;
   final int? resolvedDurationMs;
-  bool get canDownload => sourceKind != SourceKind.none && mediaUrl.isNotEmpty;
+  bool get canDownload =>
+      sourceKind != SourceKind.none &&
+      mediaUrl.isNotEmpty &&
+      matchStatus != MatchStatus.review &&
+      !(hasManualSource && manualMode == ManualSourceMode.extractAudio);
   String get outputTitle => resolvedTitle.isEmpty ? title : resolvedTitle;
   String get outputArtist => resolvedArtist.isEmpty ? artist : resolvedArtist;
   String get outputAlbum => resolvedAlbum.isEmpty ? album : resolvedAlbum;
@@ -125,10 +151,12 @@ class Track {
 }
 
 class TrackPage {
-  const TrackPage(this.items, this.total, this.selectedCount);
+  const TrackPage(this.items, this.total, this.selectedCount,
+      [this.filteredSelectedCount = 0]);
   final List<Track> items;
   final int total;
   final int selectedCount;
+  final int filteredSelectedCount;
 }
 
 class Candidate {

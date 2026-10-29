@@ -57,7 +57,7 @@ class QuietLogger:
     def error(self, *_): pass
 
 
-def download(candidate, directory, ffmpeg):
+def download(candidate, directory, ffmpeg, control=None):
     from urllib.parse import urlparse, parse_qs
     page = urlparse(candidate['pageUrl'])
     if page.scheme != 'https' or page.hostname != 'music.youtube.com' or page.path != '/watch':
@@ -72,7 +72,13 @@ def download(candidate, directory, ffmpeg):
         raise MusicError('Esta faixa não está disponível no YouTube Music.')
     check_duration(int(details.get('lengthSeconds') or 0) * 1000, candidate['durationMs'])
     emit('stage', message='Recebendo faixa do YouTube Music')
+    received = 0
     def progress(info):
+        nonlocal received
+        current = int(info.get('downloaded_bytes') or 0)
+        if control is not None:
+            control.consume(max(0, current - received))
+        received = current
         if info.get('status') == 'finished':
             emit('stage', message='Validando áudio e capa')
     options = {

@@ -38,6 +38,26 @@ void main() {
     expect((await restored.page(id)).selectedCount, 1);
     await expectLater(repository.page(id, limit: 10000), throwsArgumentError);
   });
+  test(
+      'selecionar todas considera a pesquisa completa, inclusive outras páginas',
+      () async {
+    final id = await seed(85);
+    await repository.selectCollection(id, true, query: 'Repetida');
+    var filtered = await repository.page(id, query: 'Repetida');
+    expect(filtered.total, 85);
+    expect(filtered.filteredSelectedCount, 85);
+    expect(
+        (await repository.page(id, offset: 80)).items.every((t) => t.selected),
+        isTrue);
+    await repository.selectCollection(id, false, query: 'Outra');
+    expect((await repository.page(id, query: 'Repetida')).filteredSelectedCount,
+        85);
+    await repository.selectCollection(id, false, query: 'Repetida');
+    filtered = await repository.page(id, query: 'Repetida');
+    expect(filtered.selectedCount, 0);
+    expect(filtered.filteredSelectedCount, 0);
+    expect(filtered.items.first.position, 1);
+  });
 
   test('lotes gravados permanecem parciais até concluir o stream', () async {
     final persisted = Completer<void>();

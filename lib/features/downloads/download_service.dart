@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -12,6 +13,40 @@ class DownloadCancelled implements Exception {
 
 class DownloadCancellation {
   bool cancelled = false;
+  bool _pauseMode = false;
+  bool get pauseMode => _pauseMode;
+  set pauseMode(bool value) {
+    if (_pauseMode == value) return;
+    _pauseMode = value;
+    _pacedBytes = 0;
+    _paceClock.reset();
+    if (value) _paceClock.start();
+  }
+
+  final Stopwatch _paceClock = Stopwatch();
+  int _pacedBytes = 0;
+  // Pause mode keeps the current connection alive at 10 KiB/s. The queue
+  // controller prevents another transfer from starting until it is resumed.
+  Future<void> throttle(int bytes) async {
+    check();
+    if (!pauseMode) return;
+    _pacedBytes += bytes;
+    final target = _pacedBytes * 1000 ~/ 10240;
+    while (pauseMode && _paceClock.elapsedMilliseconds < target) {
+      check();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    check();
+  }
+
+  Future<void> waitForQueue() async {
+    while (pauseMode) {
+      check();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    check();
+  }
+
   void check() {
     if (cancelled) throw const DownloadCancelled();
   }
@@ -25,6 +60,10 @@ class DownloadService {
 
   Future<String> save(Track track, String directory, DownloadCancellation token,
       void Function(double? fraction) progress) async {
+    if (!track.canDownload) {
+      throw const FormatException(
+          'A fonte precisa de revisão ou ainda não tem suporte para download.');
+    }
     if (track.sourceKind == SourceKind.deezerFull ||
         track.sourceKind == SourceKind.youtubeMusic) {
       if (music == null) {
@@ -63,12 +102,15 @@ class DownloadService {
     }
     token.check();
     Uint8List? cover;
-    if (track.coverUrl == 'asset:assets/demo/cover.png') {
+    final coverUrl = track.resolvedCoverUrl.isEmpty
+        ? track.coverUrl
+        : track.resolvedCoverUrl;
+    if (coverUrl == 'asset:assets/demo/cover.png') {
       final bytes = await bundle.load('assets/demo/cover.png');
       cover =
           bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
-    } else if (track.coverUrl.isNotEmpty) {
-      cover = await http.bytes(Uri.parse(track.coverUrl));
+    } else if (coverUrl.isNotEmpty) {
+      cover = await http.bytes(Uri.parse(coverUrl));
     }
     try {
       await const Mp3TagWriter().write(
@@ -118,6 +160,7 @@ class DownloadService {
         await for (final chunk
             in response.timeout(const Duration(seconds: 20))) {
           token.check();
+          await token.throttle(chunk.length);
           received += chunk.length;
           if (received > 500 * 1024 * 1024) {
             throw const FormatException('O arquivo ultrapassa 500 MB.');

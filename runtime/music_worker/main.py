@@ -8,11 +8,12 @@ from common import MusicError, clean_text, emit
 import deezer
 import youtube_music
 from audio_files import finish
+from transfer_control import TransferControl
 
 logging.disable(logging.CRITICAL)
 
 
-def execute(request):
+def execute(request, control=None):
     operation = request.get('operation')
     if operation == 'health':
         return {'ready': True, 'protocol': 1}
@@ -47,11 +48,11 @@ def execute(request):
         if not 1000 <= expected <= 3600000:
             raise MusicError('Duração da faixa não confirmada.')
         if candidate.get('kind') == 'youtubeMusic':
-            source, actual = youtube_music.download(candidate, directory, ffmpeg)
+            source, actual = youtube_music.download(candidate, directory, ffmpeg, control)
         elif candidate.get('kind') == 'deezerFull':
             session = deezer.DeezerSession(request.get('arl', ''))
             try:
-                source, actual = session.download(candidate, directory)
+                source, actual = session.download(candidate, directory, control)
             finally:
                 session.close()
         else:
@@ -62,13 +63,19 @@ def execute(request):
 
 def main():
     try:
-        line = sys.stdin.buffer.readline(32769)
+        # A daemon waiting on BufferedReader holds its lock during interpreter
+        # shutdown. Use the raw pipe for both the request and controls instead.
+        input_stream = sys.stdin.buffer.raw
+        line = input_stream.readline(32769)
         if not line or len(line) > 32768:
             raise MusicError('Requisição excedeu o limite.')
         request = json.loads(line)
         if not isinstance(request, dict):
             raise MusicError('Requisição inválida.')
-        result = execute(request)
+        control = TransferControl()
+        if request.get('operation') == 'download':
+            control.listen(input_stream)
+        result = execute(request, control)
         emit('result', result=result)
     except MusicError as error:
         emit('error', message=str(error))

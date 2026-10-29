@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const background = Color(0xFFF5F7F9);
+  static const background = Color(0xFFF7F8FC);
   static const surface = Colors.white;
-  static const ink = Color(0xFF202A34);
-  static const muted = Color(0xFF65717D);
-  static const line = Color(0xFFE1E6EB);
-  static const accent = Color(0xFF315A76);
+  static const ink = Color(0xFF25283D);
+  static const muted = Color(0xFF677084);
+  static const line = Color(0xFFE5E7EF);
+  static const accent = Color(0xFFB93655);
+  static const accentSoft = Color(0xFFFBEFF2);
+  static const music = Color(0xFF3864A5);
+  static const musicSoft = Color(0xFFEDF3FD);
   static const success = Color(0xFF326B5D);
 }
 
@@ -26,6 +29,7 @@ ThemeData appTheme() {
         bodyMedium: TextStyle(fontSize: 13, color: AppColors.ink),
         bodySmall: TextStyle(fontSize: 11, color: AppColors.muted)),
     dividerColor: AppColors.line,
+    dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1),
     visualDensity: VisualDensity.compact,
     checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
@@ -35,7 +39,7 @@ ThemeData appTheme() {
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             textStyle: const TextStyle(
                 fontFamily: 'Manrope',
                 fontWeight: FontWeight.w600,
@@ -46,7 +50,7 @@ ThemeData appTheme() {
             foregroundColor: AppColors.ink,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5)))),
+                borderRadius: BorderRadius.circular(10)))),
     textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
             textStyle: const TextStyle(

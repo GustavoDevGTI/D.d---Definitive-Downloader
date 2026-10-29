@@ -28,3 +28,9 @@ macos/Flutter/ephemeral/
 .DS_Store
 __pycache__/
 *.pyc
+# Local diagnostics and user-session evidence are not release source files.
+docs/evidencias/
+docs/images/*
+!docs/images/design-016-*.png
+# One-off migration of local pilot files; not a reusable app tool.
+tools/identify_pilot_files.py

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/platform/desktop_files.dart';
-import '../../../core/network/bounded_http.dart';
 import '../../downloads/download_service.dart';
 import '../../downloads/playlist_exporter.dart';
 import '../../importing/csv_importer.dart';
@@ -15,6 +14,7 @@ import '../../matching/music_resolver.dart';
 import '../data/library_repository.dart';
 import '../domain/models.dart';
 import '../domain/matching.dart';
+import '../../workspace/data/workspace_repository.dart';
 
 class LibraryController extends ChangeNotifier {
   LibraryController(
@@ -42,6 +42,9 @@ class LibraryController extends ChangeNotifier {
   String outputDirectory = '';
   String message = '';
   String view = 'collections';
+  String collectionQuery = '';
+  int collectionOffset = 0;
+  int? activeTrackId;
   int offset = 0;
   bool importing = false;
   bool searching = false;
@@ -50,15 +53,36 @@ class LibraryController extends ChangeNotifier {
   double? progress;
   String activeTitle = '';
   DownloadCancellation? _cancellation;
+  bool get pauseMode => downloading && _cancellation?.pauseMode == true;
+
+  void togglePause() {
+    final token = _cancellation;
+    if (!downloading || token == null || token.cancelled) return;
+    token.pauseMode = !token.pauseMode;
+    message = token.pauseMode
+        ? 'Fila pausada. A transferência atual continua a até 10 KiB/s; nenhuma outra será iniciada.'
+        : 'Fila retomada.';
+    notifyListeners();
+  }
+
   int _searchGeneration = 0;
+  int _refreshGeneration = 0;
   bool get busy => importing || downloading || preparing;
   bool get isExample => current?.source == 'Exemplo local';
+  bool get allFilteredSelected =>
+      page.total > 0 && page.filteredSelectedCount == page.total;
+
+  void clearMessage() {
+    if (message.isEmpty || busy) return;
+    message = '';
+    notifyListeners();
+  }
 
   Future<void> initialize({bool example = false}) async {
     await repository.database.initialize();
     outputDirectory = await repository.preference('output_directory') ??
         await files.defaultOutputDirectory();
-    collections = await repository.collections();
+    collections = await repository.collections(offset: collectionOffset);
     if (collections.isNotEmpty) {
       current = collections.first;
       await refresh();
@@ -69,34 +93,44 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    collections = await repository.collections();
-    if (current != null) {
-      current = collections.where((c) => c.id == current!.id).firstOrNull;
-      if (current != null) {
-        page = await repository.page(current!.id,
-            offset: offset, filter: view == 'collections' ? '' : view);
-        if (offset > 0 && page.items.isEmpty) {
-          offset = 0;
-          page = await repository.page(current!.id,
-              filter: view == 'collections' ? '' : view);
-        }
-        focused = page.items.where((t) => t.id == focused?.id).firstOrNull;
-      }
+    final generation = ++_refreshGeneration;
+    final id = current?.id,
+        query = collectionQuery,
+        filter = view == 'collections' ? '' : view;
+    var nextOffset = offset;
+    final nextCollections =
+        await repository.collections(offset: collectionOffset);
+    final owner = id == null ? null : await repository.collectionById(id);
+    var nextPage = owner == null
+        ? const TrackPage([], 0, 0)
+        : await repository.page(owner.id,
+            offset: nextOffset, filter: filter, query: query);
+    if (owner != null && nextOffset > 0 && nextPage.items.isEmpty) {
+      nextOffset = 0;
+      nextPage = await repository.page(owner.id, filter: filter, query: query);
     }
+    if (generation != _refreshGeneration || current?.id != id) return;
+    collections = nextCollections;
+    current = owner;
+    page = nextPage;
+    offset = nextOffset;
+    focused = page.items.where((t) => t.id == focused?.id).firstOrNull;
     notifyListeners();
   }
 
   Future<void> openCollection(Collection collection) async {
-    if (busy) return;
+    _searchGeneration++;
     current = collection;
     offset = 0;
     focused = null;
     candidates = [];
+    collectionQuery = '';
     message = '';
     await refresh();
   }
 
   Future<void> setView(String value) async {
+    _searchGeneration++;
     view = value;
     offset = 0;
     focused = null;
@@ -105,6 +139,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> turnPage(int direction) async {
+    _searchGeneration++;
     offset =
         (offset + direction * 40).clamp(0, page.total > 0 ? page.total - 1 : 0);
     focused = null;
@@ -118,6 +153,68 @@ class LibraryController extends ChangeNotifier {
     _searchGeneration++;
     notifyListeners();
     if (music != null && !isExample) unawaited(_loadMusicCandidates(track));
+  }
+
+  Future<void> searchCollection(String value) async {
+    collectionQuery = value;
+    offset = 0;
+    _searchGeneration++;
+    focused = null;
+    candidates = [];
+    await refresh();
+  }
+
+  Future<void> turnCollections(int direction) async {
+    collectionOffset = (collectionOffset + 30 * direction).clamp(0, 1 << 30);
+    collections = await repository.collections(offset: collectionOffset);
+    if (collections.isEmpty && collectionOffset > 0) {
+      collectionOffset = (collectionOffset - 30).clamp(0, 1 << 30);
+      collections = await repository.collections(offset: collectionOffset);
+    }
+    notifyListeners();
+  }
+
+  Future<void> selectCollection(bool value) async {
+    if (current == null || busy) return;
+    await repository.selectCollection(current!.id, value,
+        query: collectionQuery);
+    await refresh();
+  }
+
+  Future<void> setManualSource(String value, ManualSourceMode mode) async {
+    final track = focused;
+    if (track == null || busy) return;
+    _searchGeneration++;
+    try {
+      await repository.setManualSource(track.id, value, mode);
+      message = mode == ManualSourceMode.extractAudio
+          ? 'Fonte manual salva. A extração de páginas e vídeos ainda não está disponível.'
+          : 'Fonte manual salva. O endereço deve fornecer MP3; o arquivo será validado no download.';
+      await refresh();
+    } catch (error) {
+      message = _message(error);
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeManualSource() async {
+    if (focused == null || busy) return;
+    _searchGeneration++;
+    await repository.removeManualSource(focused!.id);
+    message = 'Vínculo manual removido. A busca automática está disponível.';
+    await refresh();
+  }
+
+  Future<void> reviewSource() async {
+    if (focused == null || busy) return;
+    await repository.markForReview(focused!.id);
+    await refresh();
+  }
+
+  Future<void> confirmSource() async {
+    if (focused == null || busy) return;
+    await repository.confirmSource(focused!.id);
+    await refresh();
   }
 
   Future<void> _loadMusicCandidates(Track track) async {
@@ -147,6 +244,7 @@ class LibraryController extends ChangeNotifier {
         for (final track in batch.items) {
           cancellation.check();
           if (track.status == TrackStatus.completed ||
+              track.hasManualSource ||
               track.sourceKind == SourceKind.localExample) {
             continue;
           }
@@ -164,6 +262,7 @@ class LibraryController extends ChangeNotifier {
               await repository.chooseMusicSource(track, choice);
               prepared++;
             } else {
+              if (found.isNotEmpty) await repository.markForReview(track.id);
               review++;
             }
           } on DownloadCancelled {
@@ -192,7 +291,12 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> useMusicCandidate(Candidate candidate) async {
-    if (focused == null || busy || music?.canUse(candidate) != true) return;
+    if (focused == null ||
+        focused!.hasManualSource ||
+        busy ||
+        music?.canUse(candidate) != true) {
+      return;
+    }
     await repository.chooseMusicSource(focused!, candidate);
     message =
         'Faixa vinculada: ${candidate.kind == SourceKind.deezerFull ? 'Deezer' : 'YouTube Music'}. A versão escolhida será reconferida no download.';
@@ -222,6 +326,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _import(Future<ImportedCollection> Function() source) async {
     if (busy) return;
+    _searchGeneration++;
     importing = true;
     message = 'Lendo a coleção…';
     notifyListeners();
@@ -230,6 +335,8 @@ class LibraryController extends ChangeNotifier {
       final id = await repository.importCollection(imported);
       collections = await repository.collections();
       current = collections.firstWhere((c) => c.id == id);
+      collectionOffset = 0;
+      collectionQuery = '';
       offset = 0;
       focused = null;
       candidates = [];
@@ -280,7 +387,12 @@ class LibraryController extends ChangeNotifier {
       const TrackMatcher().assess(focused!, candidate);
   Future<void> usePreview(Candidate candidate) async {
     final track = focused;
-    if (track == null || candidate.previewUrl.isEmpty || busy) return;
+    if (track == null ||
+        track.hasManualSource ||
+        candidate.previewUrl.isEmpty ||
+        busy) {
+      return;
+    }
     await repository.linkSource(track,
         url: candidate.previewUrl,
         kind: SourceKind.preview,
@@ -294,19 +406,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> linkMp3(String url) async {
-    if (focused == null || busy) return;
-    try {
-      final uri = Uri.parse(url.trim());
-      validateHttpUrl(uri);
-      await repository.linkSource(focused!,
-          url: uri.toString(), kind: SourceKind.directMp3);
-      message =
-          'MP3 vinculado. O conteúdo será validado durante a transferência.';
-      await refresh();
-    } catch (error) {
-      message = _message(error);
-      notifyListeners();
-    }
+    await setManualSource(url, ManualSourceMode.originalAudio);
   }
 
   Future<void> chooseOutput() async {
@@ -334,27 +434,41 @@ class LibraryController extends ChangeNotifier {
         {'q': '${focused!.artist} ${focused!.title}'}));
   }
 
-  Future<void> downloadSelected() async {
+  Future<void> downloadSelected(
+      {List<int>? queueIds, bool failedOnly = false}) async {
     final collection = current;
-    if (collection == null || busy) return;
+    if ((collection == null && queueIds == null) || busy) return;
     downloading = true;
     progress = null;
     final token = DownloadCancellation();
     _cancellation = token;
-    final directory = p.join(
-        outputDirectory, '${safeSegment(collection.name)} [${collection.id}]');
+    final destinations = <int, String>{};
     var saved = 0;
     var failed = 0;
-    var position = 0;
+    final queue = WorkspaceRepository(repository.database);
+    final run = '${DateTime.now().microsecondsSinceEpoch}';
     notifyListeners();
     try {
       while (!token.cancelled) {
-        final track = await repository.nextSelected(collection.id,
-            afterPosition: position);
+        try {
+          await token.waitForQueue();
+        } on DownloadCancelled {
+          break;
+        }
+        final track = await queue.claimNext(
+            run: run,
+            ids: queueIds,
+            collectionId: collection?.id,
+            failedOnly: failedOnly);
         if (track == null) break;
-        position = track.position;
+        final owner = await repository.collectionById(track.collectionId);
+        if (owner == null) continue;
+        final directory =
+            p.join(outputDirectory, '${safeSegment(owner.name)} [${owner.id}]');
+        destinations[owner.id] = directory;
+        activeTrackId = track.id;
         activeTitle = track.title;
-        await repository.setStatus(track.id, TrackStatus.downloading);
+        progress = null;
         await refresh();
         try {
           Future<String> receive(Track item) async {
@@ -370,6 +484,7 @@ class LibraryController extends ChangeNotifier {
             } on DownloadCancelled {
               rethrow;
             } catch (error) {
+              token.check();
               await repository.recordMusicAttempt(item.id, item.sourceKind,
                   succeeded: false, message: _message(error));
               rethrow;
@@ -382,7 +497,10 @@ class LibraryController extends ChangeNotifier {
           } on DownloadCancelled {
             rethrow;
           } catch (error) {
-            if (track.sourceKind != SourceKind.deezerFull || music == null) {
+            token.check();
+            if (track.hasManualSource ||
+                track.sourceKind != SourceKind.deezerFull ||
+                music == null) {
               rethrow;
             }
             final alternatives = await repository.musicCandidates(track.id);
@@ -410,9 +528,13 @@ class LibraryController extends ChangeNotifier {
               error: _message(error));
         }
         await refresh();
+        // Finish the current transfer in pause mode without starting another.
+        if (token.pauseMode) break;
       }
       if (saved > 0) {
-        await PlaylistExporter(repository).export(collection.id, directory);
+        for (final entry in destinations.entries) {
+          await PlaylistExporter(repository).export(entry.key, entry.value);
+        }
       }
       message = token.cancelled
           ? 'Transferência interrompida. Os arquivos concluídos foram preservados.'
@@ -424,6 +546,7 @@ class LibraryController extends ChangeNotifier {
     } finally {
       downloading = false;
       activeTitle = '';
+      activeTrackId = null;
       progress = null;
       _cancellation = null;
       await refresh();

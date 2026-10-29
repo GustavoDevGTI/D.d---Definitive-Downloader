@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 5) {
+      if (version > 7) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -122,6 +122,78 @@ class AppDatabase {
             message TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY(track_id,provider))''');
           db.execute('PRAGMA user_version = 5');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 5) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN match_status TEXT NOT NULL DEFAULT 'pending'");
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN manual_url TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN manual_mode TEXT NOT NULL DEFAULT 'originalAudio'");
+          db.execute(
+              'ALTER TABLE tracks ADD COLUMN queue_hidden INTEGER NOT NULL DEFAULT 0');
+          db.execute(
+              "UPDATE tracks SET match_status=CASE WHEN source_kind='none' THEN 'pending' WHEN source_kind='directMp3' THEN 'manual' ELSE 'confirmed' END");
+          db.execute(
+              "UPDATE tracks SET manual_url=media_url WHERE source_kind='directMp3'");
+          db.execute('''CREATE TABLE download_history (
+            id INTEGER PRIMARY KEY, track_id INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
+            category TEXT NOT NULL DEFAULT 'music', name TEXT NOT NULL,
+            local_path TEXT NOT NULL UNIQUE, folder TEXT NOT NULL,
+            source TEXT NOT NULL, duration_ms INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, hidden INTEGER NOT NULL DEFAULT 0)''');
+          // Keep completed-file references even when a track gets a new source later.
+          var afterId = 0;
+          while (true) {
+            final completed = db.select(
+                "SELECT * FROM tracks WHERE status='completed' AND local_path!='' AND id>? ORDER BY id LIMIT 100",
+                [afterId]);
+            if (completed.isEmpty) break;
+            for (final row in completed) {
+              afterId = row['id'] as int;
+              final local = row['local_path'] as String;
+              final separator = local.lastIndexOf(RegExp(r'[/\\]'));
+              db.execute(
+                  '''INSERT OR IGNORE INTO download_history
+              (track_id,name,local_path,folder,source,duration_ms) VALUES(?,?,?,?,?,?)''',
+                  [
+                    row['id'],
+                    separator < 0 ? local : local.substring(separator + 1),
+                    local,
+                    separator < 0 ? '' : local.substring(0, separator),
+                    row['source_kind'],
+                    row['resolved_duration_ms'] ?? row['duration_ms']
+                  ]);
+            }
+          }
+          db.execute(
+              'CREATE INDEX history_folder_name ON download_history(hidden,folder,name)');
+          db.execute(
+              'CREATE INDEX tracks_transfer_status ON tracks(queue_hidden,status,id)');
+          db.execute('PRAGMA user_version = 6');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 6) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              'ALTER TABLE tracks ADD COLUMN queue_priority INTEGER NOT NULL DEFAULT 0');
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN queue_run TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              'CREATE INDEX tracks_priority ON tracks(queue_hidden,status,queue_priority DESC,collection_id,position)');
+          db.execute('PRAGMA user_version = 7');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');
