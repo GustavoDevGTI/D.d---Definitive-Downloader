@@ -80,7 +80,7 @@ class _CaptureWorkspaceState extends State<CaptureWorkspace> {
                               'capture-analyze-${widget.category.name}'),
                           style: OutlinedButton.styleFrom(
                               shape: const StadiumBorder(),
-                              backgroundColor: const Color(0xFFF3F4F5)),
+                              backgroundColor: AppColors.surface),
                           onPressed: null,
                           icon: const Icon(Icons.search, size: 18),
                           label: const Text('Analisar link'))),

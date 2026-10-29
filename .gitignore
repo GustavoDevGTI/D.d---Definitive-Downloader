@@ -33,5 +33,6 @@ docs/evidencias/
 docs/images/*
 !docs/images/design-016-*.png
 !docs/images/brand-017-*.png
+!docs/images/palette-018-*.png
 # One-off migration of local pilot files; not a reusable app tool.
 tools/identify_pilot_files.py

@@ -92,7 +92,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   LayoutBuilder(builder: (context, constraints) {
                     final mobile = constraints.maxWidth < 780;
                     return Scaffold(
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppColors.background,
                         bottomNavigationBar: mobile
                             ? MobileNavigation(
                                 selected: _section,
@@ -202,7 +202,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-            color: const Color(0xFFF2F4F6),
+            color: AppColors.surface,
             border: Border.all(color: AppColors.line),
             borderRadius: BorderRadius.circular(4)),
         child: Row(children: [

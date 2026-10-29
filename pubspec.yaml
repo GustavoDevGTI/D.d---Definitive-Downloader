@@ -1,7 +1,7 @@
 name: definitive_downloader
 description: Aplicativo desktop e mobile para organizar, transferir e baixar coleções musicais.
 publish_to: none
-version: 0.1.7+8
+version: 0.1.8+9
 environment:
   sdk: '>=3.5.0 <4.0.0'
 dependencies:

@@ -19,13 +19,12 @@ class LibrarySidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
       width: 204,
-      decoration: const BoxDecoration(
-          color: AppColors.background,
-          border: Border(right: BorderSide(color: AppColors.line))),
+      decoration: const BoxDecoration(color: AppColors.navigation),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Padding(
             padding: EdgeInsets.fromLTRB(22, 24, 18, 28),
-            child: BrandLockup(stacked: true, markSize: 44, fontSize: 14)),
+            child: BrandLockup(
+                stacked: true, markSize: 44, fontSize: 14, inverse: true)),
         Expanded(
             child: ListView(padding: EdgeInsets.zero, children: [
           for (final (section, label, icon) in appDestinations)
@@ -35,7 +34,7 @@ class LibrarySidebar extends StatelessWidget {
                 child: Material(
                     borderRadius: BorderRadius.circular(10),
                     color: section == selected
-                        ? AppColors.accentSoft
+                        ? AppColors.accentActive
                         : Colors.transparent,
                     child: ListTile(
                         contentPadding:
@@ -44,14 +43,13 @@ class LibrarySidebar extends StatelessWidget {
                         horizontalTitleGap: 10,
                         dense: true,
                         selected: section == selected,
-                        selectedColor: AppColors.accent,
+                        selectedColor: Colors.white,
+                        textColor: Colors.white,
+                        hoverColor: Colors.white12,
+                        focusColor: Colors.white24,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
-                        leading: Icon(icon,
-                            size: 21,
-                            color: section == selected
-                                ? AppColors.accent
-                                : AppColors.muted),
+                        leading: Icon(icon, size: 21, color: Colors.white),
                         title: Text(label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -64,9 +62,9 @@ class LibrarySidebar extends StatelessWidget {
         ])),
         const Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Versão 0.1.7\nDesktop e mobile',
+            child: Text('Versão 0.1.8\nDesktop e mobile',
                 style: TextStyle(
-                    fontSize: 11, height: 1.8, color: AppColors.muted))),
+                    fontSize: 11, height: 1.8, color: Colors.white70))),
       ]));
 }
 
@@ -81,8 +79,8 @@ class MobileNavigation extends StatelessWidget {
           backgroundColor: Colors.white,
           type: BottomNavigationBarType.fixed,
           currentIndex: selected.index,
-          selectedItemColor: AppColors.accent,
-          unselectedItemColor: AppColors.muted,
+          selectedItemColor: AppColors.accentActive,
+          unselectedItemColor: AppColors.secondary,
           selectedFontSize: 10,
           unselectedFontSize: 10,
           onTap: (index) => onSelect(AppSection.values[index]),

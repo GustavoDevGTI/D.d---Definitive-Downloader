@@ -17,7 +17,7 @@ class TrackTable extends StatelessWidget {
         final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
         return Column(children: [
           Container(
-              color: const Color(0xFFF7F8FA),
+              color: AppColors.surface,
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Row(children: [
                 SizedBox(
@@ -53,7 +53,7 @@ class TrackTable extends StatelessWidget {
                         final t = controller.page.items[index];
                         return Material(
                             color: controller.focused?.id == t.id
-                                ? const Color(0xFFEDF1F4)
+                                ? AppColors.accentSoft
                                 : Colors.white,
                             child: InkWell(
                                 onTap: () => onFocus(t),

@@ -26,7 +26,7 @@ class BrandMarkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final background = switch (tone) {
       BrandTone.primary => AppColors.accent,
-      BrandTone.monochrome => AppColors.ink,
+      BrandTone.monochrome => AppColors.navigation,
       BrandTone.soft => AppColors.accentSoft,
       BrandTone.outline => Colors.white,
     };
@@ -62,9 +62,11 @@ class BrandLockup extends StatelessWidget {
       this.stacked = false,
       this.markSize = 40,
       this.fontSize = 18,
-      this.monochrome = false});
+      this.monochrome = false,
+      this.inverse = false});
   final bool stacked;
   final bool monochrome;
+  final bool inverse;
   final double markSize, fontSize;
 
   @override
@@ -84,11 +86,14 @@ class BrandLockup extends StatelessWidget {
                   TextSpan(
                       text: stacked ? '\nDownloader' : ' Downloader',
                       style: TextStyle(
-                          color:
-                              monochrome ? AppColors.ink : AppColors.accent)),
+                          color: inverse
+                              ? Colors.white
+                              : monochrome
+                                  ? AppColors.navigation
+                                  : AppColors.accent)),
                 ]),
                 style: TextStyle(
-                    color: AppColors.ink,
+                    color: inverse ? Colors.white : AppColors.navigation,
                     fontSize: fontSize,
                     fontWeight: FontWeight.w700,
                     height: 1.12,

@@ -89,7 +89,7 @@ class DownloadWorkspace extends StatelessWidget {
                       shape: const StadiumBorder(),
                       foregroundColor: AppColors.muted,
                       backgroundColor: c.filter == filter
-                          ? const Color(0xFFF1F2F4)
+                          ? AppColors.accentSoft
                           : Colors.transparent),
                   onPressed: () => unawaited(c.setFilter(filter)),
                   child: Text(switch (filter) {
@@ -251,18 +251,34 @@ class DownloadToolbar extends StatelessWidget {
               onPressed: action,
               isSelected: active,
               style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  foregroundColor: primary ? Colors.white : AppColors.ink,
-                  backgroundColor: primary
-                      ? AppColors.accent
-                      : active
-                          ? AppColors.accentSoft
-                          : Colors.transparent,
-                  disabledForegroundColor: const Color(0xFFA5ABBA),
-                  disabledBackgroundColor:
-                      primary ? AppColors.background : Colors.transparent),
+                      minimumSize: const Size(48, 48),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: primary ? Colors.white : AppColors.ink,
+                      backgroundColor: primary
+                          ? AppColors.accent
+                          : active
+                              ? AppColors.accentSoft
+                              : Colors.transparent,
+                      disabledForegroundColor: AppColors.muted,
+                      disabledBackgroundColor:
+                          primary ? AppColors.background : Colors.transparent)
+                  .copyWith(backgroundColor:
+                      WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
+                  return primary ? AppColors.background : Colors.transparent;
+                }
+                if (!primary) {
+                  return active ? AppColors.accentSoft : Colors.transparent;
+                }
+                return states.any((state) => const {
+                          WidgetState.hovered,
+                          WidgetState.focused,
+                          WidgetState.pressed
+                        }.contains(state))
+                    ? AppColors.accentActive
+                    : AppColors.accent;
+              })),
               icon: Icon(icon, size: 22)));
 }
 
@@ -384,7 +400,7 @@ class DownloadTable extends StatelessWidget {
     return Container(
         constraints: BoxConstraints(minHeight: header ? 40 : 48),
         decoration: BoxDecoration(
-            color: selected ? const Color(0xFFF1F3F5) : Colors.white,
+            color: selected ? AppColors.accentSoft : Colors.white,
             border: const Border(bottom: BorderSide(color: AppColors.line))),
         child: Row(children: [
           for (var i = 0; i < cells.length; i++)

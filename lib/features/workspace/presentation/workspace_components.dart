@@ -31,7 +31,7 @@ class CategoryTabs extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                             foregroundColor: i == selected
-                                ? AppColors.accent
+                                ? AppColors.accentActive
                                 : AppColors.muted,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10)),
@@ -55,7 +55,7 @@ class WorkspacePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
       clipBehavior: Clip.antiAlias,
-      color: Colors.white,
+      color: AppColors.surface,
       shape: RoundedRectangleBorder(
           side: const BorderSide(color: AppColors.line),
           borderRadius: BorderRadius.circular(12)),
