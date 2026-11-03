@@ -106,7 +106,7 @@ class _DownloadTableState extends State<DownloadTable> {
                           _row([
                             Checkbox(
                                 shape: const CircleBorder(),
-                                checkColor: AppColors.accentActive,
+                                checkColor: AppColors.navigation,
                                 fillColor: WidgetStateProperty.resolveWith(
                                     (states) =>
                                         states.contains(WidgetState.selected)
@@ -262,7 +262,7 @@ class _DownloadTableState extends State<DownloadTable> {
         constraints: const BoxConstraints(minHeight: 56),
         decoration: BoxDecoration(
             color: header
-                ? AppColors.accentActive
+                ? AppColors.navigation
                 : selected
                     ? AppColors.accentSoft
                     : hovered

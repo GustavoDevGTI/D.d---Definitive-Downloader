@@ -80,6 +80,8 @@
 
 - Pedido posterior na 0.1.19 substitui o rosa claro do cabeçalho por vinho `#A01F45`, igual ao botão Músicas selecionado, com texto e divisórias claros; linhas mantêm branco/rosa suave.
 
+- Pedido posterior na 0.1.20 restaura o cabeçalho azul-marinho `#23273F` com texto e divisórias claros, substituindo o vinho da 0.1.19. Preservar redimensionamento nos dois sentidos, demais cores e funções da tabela.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

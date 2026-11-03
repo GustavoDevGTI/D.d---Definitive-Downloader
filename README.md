@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.19](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.19). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.20](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.20). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
-![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0119-desktop.png)
+![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0120-desktop.png)
+
+A versão **0.1.20** restaura o cabeçalho azul-marinho `#23273F`, com texto e divisórias claros, conforme pedido posterior. Preserva o redimensionamento nos dois sentidos e as demais funções da tabela. [Validação](docs/RELEASE_0_1_20.md).
 
 A versão **0.1.19** corrige o arraste das divisórias de Downloads nos dois sentidos: a coluna vizinha cede ou recebe espaço, mantendo as demais posições enquanto houver espaço; no mínimo da vizinha, a tabela pode crescer. O cabeçalho usa o mesmo vinho `#A01F45` do botão Músicas, com texto branco. O ajuste usa as larguras exibidas, sem compensação automática de Nome durante o gesto, e persiste o conjunto ao terminar. [Validação](docs/RELEASE_0_1_19.md).
 
