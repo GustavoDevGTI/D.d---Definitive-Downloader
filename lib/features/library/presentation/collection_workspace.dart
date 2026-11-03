@@ -125,21 +125,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
       for (final collection in c.collections)
         Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: WorkspacePanel(
-                child: ListTile(
-                    title: Text(collection.name,
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text(
-                        '${collection.trackCount} faixas · ${collection.source}${collection.isPartial ? ' · parcial' : ''}',
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.muted)),
-                    trailing: const Icon(Icons.chevron_right, size: 19),
-                    onTap: () {
-                      _query.clear();
-                      setState(() => _detail = true);
-                      unawaited(c.openCollection(collection));
-                    }))),
+            child: _collectionButton(collection)),
       if (c.collectionOffset > 0 || c.collections.length == 30)
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
           IconButton(
@@ -156,6 +142,62 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               icon: const Icon(Icons.chevron_right)),
         ]),
     ]);
+  }
+
+  Widget _collectionButton(Collection collection) {
+    bool highlighted(Set<WidgetState> states) => states.any((state) => const {
+          WidgetState.hovered,
+          WidgetState.focused,
+          WidgetState.pressed,
+        }.contains(state));
+    return OutlinedButton(
+        key: ValueKey('collection-open-${collection.id}'),
+        style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(68),
+                alignment: Alignment.centerLeft,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)))
+            .copyWith(
+                backgroundColor: WidgetStateProperty.resolveWith((states) => highlighted(states)
+                    ? AppColors.accentActive
+                    : AppColors.accentSoft),
+                foregroundColor: WidgetStateProperty.resolveWith((states) =>
+                    highlighted(states) ? Colors.white : AppColors.ink),
+                iconColor: WidgetStateProperty.resolveWith((states) =>
+                    highlighted(states) ? Colors.white : AppColors.accent),
+                side: WidgetStateProperty.resolveWith(
+                    (states) => BorderSide(color: highlighted(states) ? AppColors.accentActive : AppColors.accent)),
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent)),
+        onPressed: () {
+          _query.clear();
+          setState(() => _detail = true);
+          unawaited(widget.controller.openCollection(collection));
+        },
+        child: Row(children: [
+          const Icon(Icons.library_music_outlined, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(collection.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Opacity(
+                    opacity: .8,
+                    child: Text(
+                        '${collection.trackCount} faixas · ${collection.source}${collection.isPartial ? ' · parcial' : ''}',
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w500))),
+              ])),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, size: 22),
+        ]));
   }
 
   Widget _back() => Align(

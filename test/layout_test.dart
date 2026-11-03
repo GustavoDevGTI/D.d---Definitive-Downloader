@@ -133,6 +133,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Minhas coleções'), findsOneWidget);
       await capture(tester, captureKey, 'collections-${width.toInt()}');
+      if (width == 1360 && Platform.environment['DD_LAYOUT_OUTPUT'] != null) {
+        final pointer =
+            await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+        await pointer.addPointer(location: Offset.zero);
+        await pointer.moveTo(tester.getCenter(find.byKey(
+            ValueKey('collection-open-${controller.collections.first.id}'))));
+        await tester.pumpAndSettle();
+        await capture(tester, captureKey, 'collections-hover-${width.toInt()}');
+        await pointer.removePointer();
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.widgetWithText(OutlinedButton, 'Conexões'));
       await tester.pumpAndSettle();
       expect(find.text('Conectar Spotify'), findsOneWidget);
