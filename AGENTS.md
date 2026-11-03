@@ -62,6 +62,7 @@
 - Tema claro, sóbrio, com superfícies brancas/cinzas frias e acento discreto.
 - Preferir listas e tabelas com hierarquia e espaço útil; evitar mural de cartões, pílulas, bolhas, sombras e gradientes decorativos.
 - Poucas ações principais, linguagem direta em português e estados de erro/ausência com orientação concreta.
+- Evitar orientações estáticas e explicações repetidas: o usuário as considera poluição visual (03/11). Não recriar o painel informativo de Conferência. Preferir rótulos claros, estados curtos e ajuda contextual; preservar erros, indisponibilidade real e informações necessárias à decisão.
 - Tipografia legível, foco de teclado, atalhos, contraste e escala de texto adequados.
 - Layout adaptativo: compartilhar identidade, não reduzir mecanicamente a tela desktop para mobile.
 

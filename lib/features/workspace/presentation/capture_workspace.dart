@@ -25,13 +25,6 @@ class _CaptureWorkspaceState extends State<CaptureWorkspace> {
       Text(audio ? 'Capturador de áudio' : 'Capturador de vídeos e imagens',
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
       const SizedBox(height: 12),
-      Text(
-          audio
-              ? 'Analise links de áudio, faixas e páginas compatíveis.'
-              : 'Analise páginas e repositórios para encontrar vídeos e fotos.',
-          style: const TextStyle(
-              fontSize: 12, color: AppColors.muted, height: 1.6)),
-      const SizedBox(height: 14),
       WorkspacePanel(
           padding: const EdgeInsets.all(16),
           child:
@@ -59,52 +52,24 @@ class _CaptureWorkspaceState extends State<CaptureWorkspace> {
                         borderSide: const BorderSide(
                             color: AppColors.accent, width: 1.4)))),
             const SizedBox(height: 10),
-            Wrap(
-                key: ValueKey('capture-filter-${widget.category.name}'),
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 16,
-                runSpacing: 10,
-                children: [
-                  Text(
-                      audio
-                          ? 'Filtro: arquivos de áudio'
-                          : 'Filtro: vídeos e imagens',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.muted)),
-                  Tooltip(
-                      message:
-                          'A análise de links individuais ainda não está integrada.',
-                      child: OutlinedButton.icon(
-                          key: ValueKey(
-                              'capture-analyze-${widget.category.name}'),
-                          style: OutlinedButton.styleFrom(
-                              shape: const StadiumBorder(),
-                              backgroundColor: AppColors.surface),
-                          onPressed: null,
-                          icon: const Icon(Icons.search, size: 18),
-                          label: const Text('Analisar link'))),
-                ]),
+            Align(
+                alignment: Alignment.centerRight,
+                child: Tooltip(
+                    message:
+                        'A análise de links individuais ainda não está integrada.',
+                    child: OutlinedButton.icon(
+                        key:
+                            ValueKey('capture-analyze-${widget.category.name}'),
+                        style: OutlinedButton.styleFrom(
+                            shape: const StadiumBorder(),
+                            backgroundColor: AppColors.surface),
+                        onPressed: null,
+                        icon: const Icon(Icons.search, size: 18),
+                        label: const Text('Analisar link')))),
           ])),
       const SizedBox(height: 14),
-      const WorkspacePanel(
-          padding: EdgeInsets.all(24),
-          child: Column(children: [
-            Icon(Icons.search, size: 27, color: AppColors.muted),
-            SizedBox(height: 14),
-            Text(
-                'Os arquivos encontrados aparecerão aqui após a análise do link.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.muted, height: 1.6)),
-          ])),
-      const SizedBox(height: 14),
-      Text(
-          audio
-              ? 'A captura de URLs ainda não está disponível. MP3 direto pode ser vinculado na conferência de uma faixa.'
-              : 'A captura de páginas, escolha de resolução e download de vídeos e fotos ainda não estão disponíveis.',
-          style: const TextStyle(
-              fontSize: 11, color: AppColors.muted, height: 1.6)),
+      const Text('Captura de links indisponível nesta versão.',
+          style: TextStyle(fontSize: 11, color: AppColors.muted, height: 1.6)),
     ]);
   }
 }

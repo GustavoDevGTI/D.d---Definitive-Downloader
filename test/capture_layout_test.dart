@@ -37,13 +37,13 @@ void main() {
               .onPressed,
           isNull);
       await tester.scrollUntilVisible(
-          find.textContaining('A captura de páginas, escolha'), 120,
+          find.text('Captura de links indisponível nesta versão.'), 120,
           scrollable: find
               .descendant(
                   of: find.byType(ListView), matching: find.byType(Scrollable))
               .first);
-      expect(
-          find.textContaining('ainda não estão disponíveis'), findsOneWidget);
+      expect(find.text('Captura de links indisponível nesta versão.'),
+          findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

@@ -51,11 +51,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                       icon: const Icon(Icons.close, size: 20)),
               ])),
           if (t == null)
-            const Expanded(
-                child: WorkspaceNotice(
-                    title: 'Escolha uma faixa',
-                    message:
-                        'Clique na linha para comparar versões. O checkbox seleciona a faixa para download.'))
+            const Expanded(child: Center(child: Text('Selecione uma faixa')))
           else ...[
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -179,11 +175,6 @@ class _TrackInspectorState extends State<TrackInspector> {
                                   label: Text(c.searching
                                       ? 'Pesquisando…'
                                       : 'Pesquisar faixas')),
-                              const SizedBox(height: 8),
-                              const Text(
-                                  'A busca automática exclui videoclipes.',
-                                  style: TextStyle(
-                                      fontSize: 11, color: AppColors.muted)),
                               RadioGroup<Candidate>(
                                   groupValue: _candidate,
                                   onChanged: (value) =>

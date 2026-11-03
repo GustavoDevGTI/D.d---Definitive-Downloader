@@ -12,9 +12,6 @@ class SettingsWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       ListView(primary: false, padding: EdgeInsets.zero, children: [
-        const Text('Preferências e comportamento do aplicativo',
-            style: TextStyle(fontSize: 12, color: AppColors.muted)),
-        const SizedBox(height: 16),
         WorkspacePanel(
             padding: const EdgeInsets.all(16),
             child: Column(

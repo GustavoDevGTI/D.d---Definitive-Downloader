@@ -155,19 +155,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                   : null,
               icon: const Icon(Icons.chevron_right)),
         ]),
-      const SizedBox(height: 2),
-      const WorkspacePanel(
-          padding: EdgeInsets.all(16),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Conferência',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            SizedBox(height: 10),
-            Text(
-                'Ao selecionar uma coleção, confira as faixas identificadas e suas correspondências antes de baixar.',
-                style: TextStyle(
-                    fontSize: 11, color: AppColors.muted, height: 1.6)),
-          ])),
     ]);
   }
 

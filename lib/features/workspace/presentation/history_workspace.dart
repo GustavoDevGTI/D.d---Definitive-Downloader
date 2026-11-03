@@ -30,9 +30,6 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
         return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Histórico dos downloads organizado por pastas',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted)),
-              const SizedBox(height: 10),
               FolderBreadcrumb(
                   folder: c.folder, onOpen: (v) => unawaited(c.openFolder(v))),
               const SizedBox(height: 10),
@@ -146,10 +143,6 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                   onPressed: () => unawaited(c.library.openOutput()),
                   icon: const Icon(Icons.folder_open_outlined, size: 18),
                   label: const Text('Pasta principal')),
-              const SizedBox(height: 8),
-              const Text(
-                  'Pastas e caminhos reais dos downloads registrados pelo aplicativo.',
-                  style: TextStyle(fontSize: 10, color: AppColors.muted)),
             ]);
       });
 }

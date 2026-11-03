@@ -110,7 +110,7 @@ class DownloadWorkspace extends StatelessWidget {
                               ? 'Nenhum download neste filtro'
                               : 'Fila de vídeos e fotos',
                           message: enabled
-                              ? 'Vincule uma fonte em Músicas → Coleções. Os arquivos concluídos ficam no histórico de Arquivos.'
+                              ? 'Adicione faixas em Músicas → Coleções.'
                               : 'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
                       : DownloadTable(
                           entries: page.items,
@@ -143,10 +143,6 @@ class DownloadWorkspace extends StatelessWidget {
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text('Capturar novo link')),
               ]),
-          const SizedBox(height: 8),
-          const Text(
-              'Deezer tem preferência; YouTube Music é a alternativa de áudio. Velocidade e tempo restante ainda não são medidos.',
-              style: TextStyle(fontSize: 10, color: AppColors.muted)),
         ]);
         return LayoutBuilder(builder: (context, constraints) {
           final minimumHeight = constraints.maxWidth < 600
@@ -323,9 +319,15 @@ class DownloadTable extends StatelessWidget {
             'Progresso',
             'Salvar em'
           ])
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+            Tooltip(
+                message: switch (label) {
+                  'Velocidade' => 'Medição de velocidade indisponível.',
+                  'Tempo restante' => 'Estimativa de tempo indisponível.',
+                  _ => '',
+                },
+                child: Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w500))),
         ], header: true),
         Expanded(
             child: ListView.builder(

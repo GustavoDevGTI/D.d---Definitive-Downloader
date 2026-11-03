@@ -235,14 +235,14 @@ void main() {
       expect(input.overlaps(analyze), isFalse);
       expect(analyze.top, greaterThan(input.bottom + 6));
       await tester.scrollUntilVisible(
-          find.textContaining('A captura de páginas, escolha'), 100,
+          find.text('Captura de links indisponível nesta versão.'), 100,
           scrollable: find
               .descendant(
                   of: find.byType(CaptureWorkspace),
                   matching: find.byType(Scrollable))
               .first);
-      expect(
-          find.textContaining('A captura de páginas, escolha'), findsOneWidget);
+      expect(find.text('Captura de links indisponível nesta versão.'),
+          findsOneWidget);
       await tester.tap(find.text('Downloads'));
       await tester.pumpAndSettle();
       expect(find.text('Fila de vídeos e fotos'), findsOneWidget);
@@ -261,8 +261,7 @@ void main() {
       });
       await tester.pump();
       await tester.pumpAndSettle();
-      expect(find.text('Histórico dos downloads organizado por pastas'),
-          findsOneWidget);
+      expect(find.text('Pasta principal'), findsOneWidget);
       await capture(tester, captureKey, 'history-${width.toInt()}');
       await tester.tap(find.descendant(
           of: nav,

@@ -24,9 +24,6 @@ class HomeWorkspace extends StatelessWidget {
                       height: 1.12,
                       letterSpacing: -1.2,
                       fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              const Text('Importe uma playlist ou acompanhe seus downloads.',
-                  style: TextStyle(color: AppColors.muted, height: 1.6)),
             ]);
             final import = FilledButton.icon(
                 onPressed: () => onNavigate(AppSection.music, 0),
