@@ -103,6 +103,12 @@ class WorkspaceController extends ChangeNotifier {
     await refresh();
   }
 
+  void acknowledgeMessage(String value) {
+    if (message != value) return;
+    message = '';
+    notifyListeners();
+  }
+
   void resizeColumn(int index, double width) {
     columnWidths = [...columnWidths]..[index] =
         boundedColumnWidth(index, width);

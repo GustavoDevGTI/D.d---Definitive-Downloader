@@ -90,6 +90,8 @@
 
 - Downloads 0.1.24: larguras padrão compactas somam 1008 px até Baixado em; em 1360 px desktop todas essas colunas devem aparecer inicialmente, deixando apenas Salvar em além da borda. Manter ajuste manual e tooltips, fonte de 12 px e rolagem mobile. Recebido substitui o rótulo Baixado para o volume em bytes, ainda sem medição. Nesta entrega, o pedido explícito autoriza aplicar uma única vez as larguras compactas às preferências locais atuais, com backup; não criar redefinição automática em inicializações.
 
+- Coleções 0.1.25: avisos/resultados concluídos usam popup central; progresso continua contextual e erros de formulários já modais permanecem dentro deles, sem popup duplicado. Seleção única no cabeçalho abrange todas as faixas do filtro, inclusive outras páginas, com estado parcial. Cadeado é botão de explicação, nunca desbloqueio da coleção. Fonte manual tem destaque vinho quando disponível; concluídas oferecem consulta da fonte sem edição. Remover Ouvir prévia enquanto não houver reprodução integrada. Detalhes em `docs/RELEASE_0_1_25.md`.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

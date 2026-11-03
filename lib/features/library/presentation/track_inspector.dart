@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../app/app_notice.dart';
+import '../../workspace/presentation/download_action_button.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
@@ -132,7 +134,18 @@ class _TrackInspectorState extends State<TrackInspector> {
                             if (t.hasManualSource)
                               _line('Link manual', t.manualUrl),
                           ] else ...[
-                            if (t.hasManualSource) ...[
+                            if (t.status == TrackStatus.completed) ...[
+                              OutlinedButton.icon(
+                                  style: downloadActionStyle(
+                                      AppColors.accentActive),
+                                  onPressed: () => unawaited(showAppNotice(
+                                      context,
+                                      title: 'Fonte da faixa concluída',
+                                      message:
+                                          '${t.sourceKind.musicProviderName ?? t.sourceLabel}${t.hasManualSource ? '\n${t.manualUrl}' : ''}\nEste arquivo já foi concluído. Para baixar outra versão, adicione um novo link à coleção.')),
+                                  icon: const Icon(Icons.link, size: 16),
+                                  label: const Text('Ver fonte vinculada')),
+                            ] else if (t.hasManualSource) ...[
                               const Text('Fonte manual prioritária',
                                   style:
                                       TextStyle(fontWeight: FontWeight.w600)),
@@ -140,15 +153,16 @@ class _TrackInspectorState extends State<TrackInspector> {
                               SelectableText(t.manualUrl,
                                   style: const TextStyle(fontSize: 12)),
                               const SizedBox(height: 8),
-                              TextButton.icon(
-                                  onPressed: c.busy ||
-                                          t.status == TrackStatus.completed
-                                      ? null
-                                      : _manual,
+                              OutlinedButton.icon(
+                                  style: downloadActionStyle(
+                                      AppColors.accentActive),
+                                  onPressed: c.busy ? null : _manual,
                                   icon:
                                       const Icon(Icons.edit_outlined, size: 16),
                                   label: const Text('Editar link manual')),
-                              TextButton(
+                              OutlinedButton(
+                                  style:
+                                      downloadActionStyle(AppColors.secondary),
                                   onPressed: c.busy ||
                                           t.status == TrackStatus.completed
                                       ? null
@@ -198,29 +212,22 @@ class _TrackInspectorState extends State<TrackInspector> {
                                       _candidate?.isVideoRecording == true
                                           ? 'Aprovar videoclipe'
                                           : 'Confirmar correspondência')),
-                              TextButton(
+                              OutlinedButton(
+                                  style:
+                                      downloadActionStyle(AppColors.secondary),
                                   onPressed:
                                       c.busy || t.sourceKind == SourceKind.none
                                           ? null
                                           : () => unawaited(c.reviewSource()),
                                   child: const Text('Marcar para revisão')),
-                              TextButton.icon(
-                                  onPressed: c.busy ||
-                                          t.status == TrackStatus.completed
-                                      ? null
-                                      : _manual,
+                              OutlinedButton.icon(
+                                  style: downloadActionStyle(
+                                      AppColors.accentActive),
+                                  onPressed: c.busy ? null : _manual,
                                   icon: const Icon(Icons.link, size: 16),
                                   label:
                                       const Text('Informar link manualmente')),
                             ],
-                            const SizedBox(height: 8),
-                            Tooltip(
-                                message:
-                                    'A reprodução de prévias ainda não está integrada.',
-                                child: TextButton.icon(
-                                    onPressed: null,
-                                    icon: Icon(Icons.play_arrow, size: 17),
-                                    label: Text('Ouvir prévia'))),
                             if (c.isExample)
                               const Text('Exemplo local com áudio sintético.',
                                   style: TextStyle(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
 import '../../../app/brand.dart';
+import '../../../app/app_notice.dart';
 import '../../connections/application/spotify_connection_controller.dart';
 import '../../connections/presentation/connections_dialog.dart';
 import '../application/library_controller.dart';
@@ -81,7 +82,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
+  Widget build(BuildContext context) => AppNoticeHost(
+      listenable: Listenable.merge([widget.controller, _workspace]),
+      readMessage: () {
+        final c = widget.controller;
+        if (!c.busy && !c.searching && c.message.isNotEmpty) return c.message;
+        return _workspace.message;
+      },
+      acknowledge: (message) {
+        widget.controller.acknowledgeMessage(message);
+        _workspace.acknowledgeMessage(message);
+      },
+      child: CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.keyO, control: true): () =>
                 unawaited(widget.controller.importCsv()),
@@ -124,7 +136,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                             _status(),
                                           ]))),
                             ])));
-                  })));
+                  }))));
 
   Widget _heading(bool mobile) {
     if (_section == AppSection.home) {
@@ -195,7 +207,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _status() {
     final c = widget.controller;
-    if (c.message.isEmpty && !c.downloading && !c.preparing) {
+    if (!c.downloading && !c.preparing && !c.importing) {
       return const SizedBox(height: 8);
     }
     return Container(

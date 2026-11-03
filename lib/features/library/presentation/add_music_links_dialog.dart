@@ -84,6 +84,7 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
       _saving = false;
       _error = widget.controller.message;
     });
+    widget.controller.acknowledgeMessage(_error);
   }
 
   @override

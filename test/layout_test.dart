@@ -28,6 +28,14 @@ import 'package:definitive_downloader/features/workspace/presentation/download_w
 import 'package:definitive_downloader/features/workspace/presentation/capture_workspace.dart';
 import 'package:definitive_downloader/features/workspace/presentation/home_workspace.dart';
 
+Future<void> fixtureEditingLock(AppDatabase database, int id, bool locked) =>
+    database.run((db) => db.execute(
+        'UPDATE collections SET editing_locked=? WHERE id=?',
+        [locked ? 1 : 0, id]));
+Future<void> fixtureTrackStatus(AppDatabase database, int id, String status) =>
+    database.run((db) =>
+        db.execute('UPDATE tracks SET status=? WHERE id=?', [status, id]));
+
 void main() {
   Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
     final output = Platform.environment['DD_LAYOUT_OUTPUT'];
@@ -135,6 +143,27 @@ void main() {
           .tap(find.descendant(of: nav, matching: find.text('Músicas')));
       await tester.pumpAndSettle();
       expect(find.text('Minhas coleções'), findsOneWidget);
+      if (width == 1360 || width == 390) {
+        for (var attempt = 0; attempt < 2; attempt++) {
+          await tester.enterText(find.byKey(const ValueKey('playlist-url')),
+              'https://example.org/invalido');
+          await tester
+              .runAsync(() => tester.tap(find.text('Importar por link')));
+          await tester.runAsync(controller.refresh);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('app-notice')), findsOneWidget);
+          expect(find.text('Cole um link de playlist de open.spotify.com.'),
+              findsOneWidget);
+          if (attempt == 0) {
+            await capture(
+                tester, captureKey, 'notice-invalid-link-${width.toInt()}');
+          }
+          await tester.tap(find.text('OK'));
+          await tester.pumpAndSettle();
+          expect(controller.message, isEmpty);
+        }
+      }
+
       await capture(tester, captureKey, 'collections-${width.toInt()}');
       if (width == 1360 && Platform.environment['DD_LAYOUT_OUTPUT'] != null) {
         final pointer =
@@ -160,6 +189,49 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Baixar selecionadas'), findsOneWidget);
       expect(find.text('Faixa / artista'), findsOneWidget);
+      expect(find.text('Selecionar todas'), findsNothing);
+      final selectAll = find.byKey(const ValueKey('select-all-collection'));
+      await tester
+          .runAsync(() => controller.select(controller.page.items.first, true));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Checkbox>(selectAll).value, isNull);
+      Future<void> waitSelection(int expected) async {
+        await tester.runAsync(() async {
+          for (var i = 0; i < 30; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+            await controller.refresh();
+            if (controller.page.filteredSelectedCount == expected) break;
+          }
+        });
+        await tester.pumpAndSettle();
+        expect(controller.page.filteredSelectedCount, expected);
+      }
+
+      await tester.runAsync(() => tester.tap(selectAll));
+      await waitSelection(controller.page.total);
+      await tester.runAsync(() => tester.tap(selectAll));
+      await waitSelection(0);
+      if (width == 1360 || width == 390) {
+        await tester.runAsync(() async {
+          await fixtureEditingLock(
+              controller.repository.database, controller.current!.id, true);
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Por que a edição está bloqueada?'));
+        await tester.pumpAndSettle();
+        expect(find.text('Edição bloqueada'), findsOneWidget);
+        await capture(tester, captureKey, 'notice-locked-${width.toInt()}');
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          await fixtureEditingLock(
+              controller.repository.database, controller.current!.id, false);
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+      }
+
       if (width >= 1360) {
         expect(find.text('Deezer'), findsOneWidget);
         expect(find.text('YouTube Music'), findsOneWidget);
@@ -231,6 +303,35 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.focused!.hasManualSource, isTrue,
           reason: controller.message);
+      expect(find.byKey(const ValueKey('app-notice')), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ouvir prévia'), findsNothing);
+      if (width == 1360 || width == 390) {
+        // Presentation fixture only: no file or completed download is claimed.
+        await tester.runAsync(() async {
+          await fixtureTrackStatus(controller.repository.database,
+              controller.focused!.id, 'completed');
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Ver fonte vinculada'));
+        await tester.tap(find.text('Ver fonte vinculada'));
+        await tester.pumpAndSettle();
+        expect(find.text('Fonte da faixa concluída'), findsOneWidget);
+        expect(find.text('Informar link manualmente'), findsNothing);
+        await capture(
+            tester, captureKey, 'notice-completed-source-${width.toInt()}');
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          await fixtureTrackStatus(
+              controller.repository.database, controller.focused!.id, 'ready');
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+      }
+
       expect(controller.page.selectedCount, 0);
       if (width < 1360) {
         await tester.tap(find.byTooltip('Fechar conferência'));
@@ -457,6 +558,18 @@ void main() {
       await tester.tap(find.byTooltip('Adicionar links'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('extra-music-links')), findsOneWidget);
+      if (width == 1360 || width == 390) {
+        await tester.enterText(
+            find.byKey(const ValueKey('extra-music-links')), 'inválido');
+        await tester.runAsync(() => tester.tap(find.text('Adicionar')));
+        await tester.runAsync(controller.refresh);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.byKey(const ValueKey('app-notice')), findsNothing);
+        expect(controller.message, isEmpty);
+        await capture(tester, captureKey, 'notice-links-form-${width.toInt()}');
+      }
+
       expect(tester.takeException(), isNull);
       await capture(tester, captureKey, 'add-music-links-${width.toInt()}');
       await tester.ensureVisible(find.text('Cancelar'));

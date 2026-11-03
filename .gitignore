@@ -64,3 +64,5 @@ tools/identify_pilot_files.py
 !docs/images/table-0123-*.png
 
 !docs/images/table-0124-*.png
+
+!docs/images/notice-0125-*.png

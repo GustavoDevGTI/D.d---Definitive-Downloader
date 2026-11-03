@@ -72,6 +72,7 @@ class _EditTrackDialogState extends State<EditTrackDialog> {
       _saving = false;
       _error = widget.controller.message;
     });
+    widget.controller.acknowledgeMessage(_error);
   }
 
   @override

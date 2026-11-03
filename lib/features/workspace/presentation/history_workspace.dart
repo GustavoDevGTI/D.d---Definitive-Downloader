@@ -43,11 +43,6 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                         () => unawaited(c.searchHistory(value)));
                   }),
               const SizedBox(height: 14),
-              if (c.message.isNotEmpty)
-                Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child:
-                        Text(c.message, style: const TextStyle(fontSize: 12))),
               Expanded(
                   child: c.history.total == 0
                       ? const WorkspacePanel(

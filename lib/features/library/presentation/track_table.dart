@@ -24,14 +24,18 @@ class TrackTable extends StatelessWidget {
                 SizedBox(
                     width: 36,
                     child: Checkbox(
-                        semanticLabel: 'Selecionar faixas da página',
-                        value: controller.page.items.isNotEmpty &&
-                            controller.page.items.every((t) => t.selected),
-                        onChanged: controller.busy ||
-                                controller.page.items.isEmpty
+                        key: const ValueKey('select-all-collection'),
+                        semanticLabel: 'Selecionar todas as faixas do filtro',
+                        tristate: true,
+                        value: controller.allFilteredSelected
+                            ? true
+                            : controller.page.filteredSelectedCount > 0
+                                ? null
+                                : false,
+                        onChanged: controller.busy || controller.page.total == 0
                             ? null
-                            : (v) =>
-                                unawaited(controller.selectPage(v ?? false)))),
+                            : (_) => unawaited(controller.selectCollection(
+                                !controller.allFilteredSelected)))),
                 const Expanded(child: Text('Faixa / artista', style: _header)),
                 if (!compact) ...[
                   const SizedBox(

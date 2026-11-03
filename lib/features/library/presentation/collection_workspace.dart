@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../app/app_notice.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
@@ -174,12 +175,14 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600))),
               if (c.current!.editingLocked)
-                const Tooltip(
-                    message: 'Nomes e ordem bloqueados após o início',
-                    child: Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(Icons.lock_outline,
-                            size: 18, color: AppColors.muted))),
+                IconButton(
+                    tooltip: 'Por que a edição está bloqueada?',
+                    onPressed: () => unawaited(showAppNotice(context,
+                        title: 'Edição bloqueada',
+                        message:
+                            'Nomes, ordem e IDs ficam bloqueados após o início dos downloads. Você ainda pode adicionar novos links à coleção.')),
+                    icon: const Icon(Icons.lock_outline,
+                        size: 18, color: AppColors.accentActive)),
               DownloadActionButton(
                   label: 'Adicionar links',
                   color: DownloadActionColors.add,
@@ -207,24 +210,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                   _timer = Timer(const Duration(milliseconds: 300),
                       () => unawaited(c.searchCollection(value)));
                 })),
-        Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Text('Seleção múltipla',
-                      style: TextStyle(fontSize: 11, color: AppColors.muted)),
-                  TextButton(
-                      onPressed: c.busy || c.page.items.isEmpty
-                          ? null
-                          : () => unawaited(
-                              c.selectCollection(!c.allFilteredSelected)),
-                      child: Text(c.allFilteredSelected
-                          ? 'Desmarcar todas'
-                          : 'Selecionar todas')),
-                ])),
         if (c.importing || c.preparing)
           const LinearProgressIndicator(minHeight: 2),
         Expanded(

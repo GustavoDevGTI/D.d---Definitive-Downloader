@@ -165,6 +165,12 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void acknowledgeMessage(String value) {
+    if (message != value) return;
+    message = '';
+    notifyListeners();
+  }
+
   Future<void> initialize({bool example = false}) async {
     await repository.database.initialize();
     outputDirectory = await repository.preference('output_directory') ??

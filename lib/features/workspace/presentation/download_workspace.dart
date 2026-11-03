@@ -197,10 +197,6 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       Expanded(child: filters)
                     ])
                   else ...[toolbar, const SizedBox(height: 8), filters],
-                  if (c.message.isNotEmpty)
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(c.message)),
                   const SizedBox(height: 8),
                   Expanded(
                       child: WorkspacePanel(
