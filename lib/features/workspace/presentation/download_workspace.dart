@@ -227,7 +227,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                               : DownloadTable(
                                   entries: page.items,
                                   widths: c.columnWidths,
-                                  onResize: c.resizeColumn,
+                                  onResize: c.resizeColumns,
                                   onResizeEnd: () =>
                                       unawaited(c.saveColumnWidths()),
                                   selection: c.selection,

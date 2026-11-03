@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../../../app/theme.dart';
@@ -23,7 +24,7 @@ class DownloadTable extends StatefulWidget {
       required this.output});
   final List<DownloadEntry> entries;
   final List<double> widths;
-  final void Function(int, double) onResize;
+  final ValueChanged<List<double>> onResize;
   final VoidCallback onResizeEnd;
   final Set<int> selection;
   final void Function(int, bool) onSelect;
@@ -105,12 +106,18 @@ class _DownloadTableState extends State<DownloadTable> {
                           _row([
                             Checkbox(
                                 shape: const CircleBorder(),
+                                checkColor: AppColors.accentActive,
+                                fillColor: WidgetStateProperty.resolveWith(
+                                    (states) =>
+                                        states.contains(WidgetState.selected)
+                                            ? Colors.white
+                                            : Colors.transparent),
                                 semanticLabel: 'Selecionar downloads da página',
                                 value: entries.isNotEmpty &&
                                     entries.every(
                                         (e) => selection.contains(e.track.id)),
                                 side: const BorderSide(
-                                    color: AppColors.secondary, width: 1.2),
+                                    color: Colors.white70, width: 1.2),
                                 onChanged: entries.isEmpty
                                     ? null
                                     : (v) => onSelectPage(v ?? false)),
@@ -139,7 +146,7 @@ class _DownloadTableState extends State<DownloadTable> {
                                       style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.ink))),
+                                          color: Colors.white))),
                           ], widths: widths, header: true),
                           Expanded(
                               child: ListView.builder(
@@ -255,7 +262,7 @@ class _DownloadTableState extends State<DownloadTable> {
         constraints: const BoxConstraints(minHeight: 56),
         decoration: BoxDecoration(
             color: header
-                ? AppColors.accentSoft
+                ? AppColors.accentActive
                 : selected
                     ? AppColors.accentSoft
                     : hovered
@@ -275,21 +282,38 @@ class _DownloadTableState extends State<DownloadTable> {
                       padding: EdgeInsets.fromLTRB(
                           8, 2, header && i > 0 ? 22 : 8, 2),
                       child: cells[i]),
-                  if (header && i > 0)
+                  if (header && i > 0 && i < cells.length - 1)
                     Positioned(
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        child: ColumnResizeHandle(
-                            key: ValueKey(
-                                'resize-download-${downloadColumns[i].key}'),
-                            label: downloadColumns[i].label,
-                            width: widths[i],
-                            defaultWidth: downloadColumns[i].width,
-                            minimumWidth: downloadColumns[i].minimum,
-                            onResize: (value) => widget.onResize(i, value),
-                            onEnd: widget.onResizeEnd)),
+                        child: _resizeHandle(i, widths)),
                 ]))
         ]));
+  }
+
+  Widget _resizeHandle(int index, List<double> widths) {
+    final total = widths[index] + widths[index + 1];
+    final minimum = math.max(downloadColumns[index].minimum, total - 1200);
+    const maximum = 1200.0;
+    return ColumnResizeHandle(
+        key: ValueKey('resize-download-${downloadColumns[index].key}'),
+        label:
+            '${downloadColumns[index].label} e ${downloadColumns[index + 1].label}',
+        width: widths[index],
+        defaultWidth: downloadColumns[index].width,
+        minimumWidth: minimum,
+        maximumWidth: maximum,
+        color: Colors.white70,
+        onResize: (value) {
+          // Materialize the displayed widths together so automatic Name growth
+          // cannot counteract the pointer movement on compact layouts.
+          final left = value.clamp(minimum, maximum);
+          widget.onResize([...widths]
+            ..[index] = left
+            ..[index + 1] =
+                math.max(downloadColumns[index + 1].minimum, total - left));
+        },
+        onEnd: widget.onResizeEnd);
   }
 }

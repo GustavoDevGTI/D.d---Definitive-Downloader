@@ -90,6 +90,17 @@ class WorkspaceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void resizeColumns(List<double> widths) {
+    if (widths.length != downloadColumns.length) {
+      throw ArgumentError('Quantidade de colunas inválida.');
+    }
+    columnWidths = [
+      downloadColumns.first.width,
+      for (var i = 1; i < widths.length; i++) boundedColumnWidth(i, widths[i])
+    ];
+    notifyListeners();
+  }
+
   Future<void> saveColumnWidths() async {
     try {
       await repository.saveColumnWidths([...columnWidths]);

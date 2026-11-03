@@ -9,10 +9,13 @@ class ColumnResizeHandle extends StatefulWidget {
       required this.width,
       required this.defaultWidth,
       required this.minimumWidth,
+      this.maximumWidth = 1200,
+      this.color = AppColors.line,
       required this.onResize,
       required this.onEnd});
   final String label;
-  final double width, defaultWidth, minimumWidth;
+  final Color color;
+  final double width, defaultWidth, minimumWidth, maximumWidth;
   final ValueChanged<double> onResize;
   final VoidCallback onEnd;
   @override
@@ -30,7 +33,8 @@ class _ColumnResizeHandleState extends State<ColumnResizeHandle> {
   bool _focused = false;
   double? _dragWidth;
   void _step(double delta) {
-    widget.onResize(widget.width + delta);
+    widget.onResize(
+        (widget.width + delta).clamp(widget.minimumWidth, widget.maximumWidth));
     widget.onEnd();
   }
 
@@ -39,9 +43,9 @@ class _ColumnResizeHandleState extends State<ColumnResizeHandle> {
       label: 'Largura de ${widget.label}',
       value: '${widget.width.round()} pixels',
       increasedValue:
-          '${(widget.width + 20).clamp(widget.minimumWidth, 1200).round()} pixels',
+          '${(widget.width + 20).clamp(widget.minimumWidth, widget.maximumWidth).round()} pixels',
       decreasedValue:
-          '${(widget.width - 20).clamp(widget.minimumWidth, 1200).round()} pixels',
+          '${(widget.width - 20).clamp(widget.minimumWidth, widget.maximumWidth).round()} pixels',
       onIncrease: () => _step(20),
       onDecrease: () => _step(-20),
       child: Tooltip(
@@ -61,17 +65,21 @@ class _ColumnResizeHandleState extends State<ColumnResizeHandle> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: _focus.requestFocus,
-                    onHorizontalDragStart: (_) => _dragWidth = widget.width,
+                    onHorizontalDragStart: (_) {
+                      _focus.requestFocus();
+                      _dragWidth = widget.width;
+                    },
                     onHorizontalDragUpdate: (event) {
                       _dragWidth =
                           ((_dragWidth ?? widget.width) + event.delta.dx)
-                              .clamp(widget.minimumWidth, 1200);
+                              .clamp(widget.minimumWidth, widget.maximumWidth);
                       widget.onResize(_dragWidth!);
                     },
                     onHorizontalDragEnd: (_) => widget.onEnd(),
                     onHorizontalDragCancel: widget.onEnd,
                     onDoubleTap: () {
-                      widget.onResize(widget.defaultWidth);
+                      widget.onResize(widget.defaultWidth
+                          .clamp(widget.minimumWidth, widget.maximumWidth));
                       widget.onEnd();
                     },
                     child: Container(
@@ -84,8 +92,7 @@ class _ColumnResizeHandleState extends State<ColumnResizeHandle> {
                         child: Container(
                             width: 2,
                             height: 18,
-                            color:
-                                _focused ? AppColors.accent : AppColors.line)),
+                            color: _focused ? AppColors.accent : widget.color)),
                   )),
             )),
       ));

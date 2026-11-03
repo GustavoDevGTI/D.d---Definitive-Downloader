@@ -76,6 +76,10 @@
 
 - Cabeçalho de Downloads 0.1.18: rosa suave oficial `#FDE7ED`, texto grafite `#1E293B` e seleção azul acinzentado `#5B6B85`, conforme pedido posterior de clarear o cabeçalho. Substitui o fundo azul-marinho da 0.1.17; preservar dimensões e rolagem.
 
+- Divisórias de Downloads 0.1.19 ajustam as duas colunas vizinhas em conjunto nos dois sentidos, mantendo a largura total e as demais divisórias enquanto houver espaço na vizinha; no mínimo dela, permitir ampliar a tabela. Partir das larguras exibidas para que a expansão automática de Nome não contrarie o gesto. Persistir o conjunto ao terminar; mínimos de ambas as colunas e máximo de 1200 px continuam aplicados. Última coluna ajustável pela divisória anterior; restaurar colunas mantém o reset global.
+
+- Pedido posterior na 0.1.19 substitui o rosa claro do cabeçalho por vinho `#A01F45`, igual ao botão Músicas selecionado, com texto e divisórias claros; linhas mantêm branco/rosa suave.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.
