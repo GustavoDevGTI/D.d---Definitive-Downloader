@@ -82,6 +82,8 @@ void main() {
       // Simulate the actual v2 schema, not a current schema with a false version.
       db.execute('DROP TABLE music_candidates');
       db.execute('DROP TABLE music_source_attempts');
+      db.execute('DROP TABLE download_run_additions');
+      db.execute('ALTER TABLE tracks DROP COLUMN queue_added');
       db.execute('DROP TABLE download_history');
       db.execute('DROP INDEX tracks_transfer_status');
       db.execute('DROP INDEX tracks_priority');

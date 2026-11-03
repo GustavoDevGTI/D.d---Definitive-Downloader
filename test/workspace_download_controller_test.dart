@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:definitive_downloader/features/importing/music_link.dart';
+import 'package:definitive_downloader/features/importing/music_link_catalog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/network/bounded_http.dart';
@@ -46,6 +48,28 @@ class GatedDownload extends DownloadService {
       await release.future;
     }
     return super.save(track, directory, token, progress);
+  }
+}
+
+// Fixture catalog returns the app's synthetic asset; no provider is contacted.
+class HeldLinkCatalog extends MusicLinkCatalog {
+  HeldLinkCatalog();
+  final started = Completer<void>();
+  final release = Completer<void>();
+  @override
+  Future<ResolvedMusicLink> resolve(MusicLink link) async {
+    if (!started.isCompleted) started.complete();
+    await release.future;
+    return ResolvedMusicLink(
+        link: link,
+        pinned: true,
+        ready: true,
+        draft: const TrackDraft(
+            title: 'Extra sintético',
+            artist: 'Laboratório D.d',
+            durationMs: 4000,
+            sourceKind: SourceKind.localExample,
+            mediaUrl: 'asset:assets/demo/tone.mp3'));
   }
 }
 
@@ -249,5 +273,83 @@ void main() {
         .where((s) => s.isNotEmpty && !s.startsWith('#'))
         .toList();
     expect(entries.map((s) => s.substring(0, 3)), ['001', '002', '003']);
+  });
+  test(
+      'inclusão iniciada em execução aguarda catálogo e baixa extras ao final na mesma rodada',
+      () async {
+    controller.dispose();
+    final downloader = GatedDownload();
+    final catalog = HeldLinkCatalog();
+    controller = LibraryController(
+        repository: repository,
+        files: DesktopFiles(),
+        spotify: const SpotifyImporter(BoundedHttp()),
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: downloader,
+        linkCatalog: catalog);
+    controller.outputDirectory = directory.path;
+    await controller.loadExample();
+    final owner = controller.current!;
+    final first = controller.page.items.first;
+    final running = controller.downloadSelected(queueIds: [first.id]);
+    await downloader.started.future;
+    final adding =
+        controller.addLinks(owner.id, 'https://example.org/extra.mp3');
+    await catalog.started.future;
+    downloader.release.complete();
+    while ((await repository.trackById(first.id))!.status !=
+        TrackStatus.completed) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(controller.downloading, isTrue);
+    catalog.release.complete();
+    expect(await adding, isTrue);
+    await running;
+    final rows = (await repository.page(owner.id)).items;
+    expect(rows.length, 7);
+    expect(downloader.ids, [first.id, rows.last.id]);
+    expect(rows.last.position, 7);
+    expect(rows.last.status, TrackStatus.completed);
+    final lists = await directory
+        .list(recursive: true)
+        .where((f) => f.path.endsWith('.m3u8'))
+        .toList();
+    final contents = await File(lists.single.path).readAsString();
+    expect(contents.indexOf('001 -'), lessThan(contents.indexOf('007 -')));
+  });
+  test(
+      'parar durante inclusão preserva extra pronto sem iniciar transferência adicional',
+      () async {
+    controller.dispose();
+    final downloader = GatedDownload();
+    final catalog = HeldLinkCatalog();
+    controller = LibraryController(
+        repository: repository,
+        files: DesktopFiles(),
+        spotify: const SpotifyImporter(BoundedHttp()),
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: downloader,
+        linkCatalog: catalog);
+    controller.outputDirectory = directory.path;
+    await controller.loadExample();
+    final owner = controller.current!;
+    final first = controller.page.items.first;
+    final running = controller.downloadSelected(queueIds: [first.id]);
+    await downloader.started.future;
+    final adding =
+        controller.addLinks(owner.id, 'https://example.org/extra.mp3');
+    await catalog.started.future;
+    controller.cancel();
+    downloader.release.complete();
+    await running;
+    catalog.release.complete();
+    expect(await adding, isTrue);
+    expect(downloader.ids, [first.id]);
+    final last = (await repository.page(owner.id)).items.last;
+    expect(last.position, 7);
+    expect(last.status, TrackStatus.ready);
+    expect(last.selected, isTrue);
   });
 }

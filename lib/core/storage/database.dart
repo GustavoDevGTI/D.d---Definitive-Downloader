@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 7) {
+      if (version > 8) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -200,6 +200,24 @@ class AppDatabase {
           rethrow;
         }
       }
+      if (version <= 7) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              'ALTER TABLE tracks ADD COLUMN queue_added INTEGER NOT NULL DEFAULT 0');
+          db.execute('''CREATE TABLE download_run_additions (
+            ordinal INTEGER PRIMARY KEY AUTOINCREMENT, run TEXT NOT NULL,
+            track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+            UNIQUE(run,track_id))''');
+          db.execute('PRAGMA user_version = 8');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      // Stale run membership is not work: the occurrences themselves stay queued.
+      db.execute('DELETE FROM download_run_additions');
       db.execute(
           "UPDATE tracks SET status='ready', error='Transferência interrompida; pronta para reiniciar.' WHERE status='downloading'");
     });

@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import '../../../app/theme.dart';
 import '../../library/domain/models.dart';
 import '../application/workspace_controller.dart';
 import '../domain/workspace_models.dart';
 import 'workspace_components.dart';
-import 'horizontal_table_viewport.dart';
+import 'download_table.dart';
+import '../../library/presentation/add_music_links_dialog.dart';
 
-class DownloadWorkspace extends StatelessWidget {
+class DownloadWorkspace extends StatefulWidget {
   const DownloadWorkspace(
       {super.key,
       required this.controller,
@@ -17,6 +17,24 @@ class DownloadWorkspace extends StatelessWidget {
   final WorkspaceController controller;
   final ContentCategory category;
   final VoidCallback? onCapture;
+  @override
+  State<DownloadWorkspace> createState() => _DownloadWorkspaceState();
+}
+
+class _DownloadWorkspaceState extends State<DownloadWorkspace> {
+  late final _query =
+      TextEditingController(text: widget.controller.downloadQuery);
+  Timer? _searchTimer;
+  WorkspaceController get controller => widget.controller;
+  ContentCategory get category => widget.category;
+  VoidCallback? get onCapture => widget.onCapture;
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    _query.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: Listenable.merge([controller, controller.library]),
@@ -48,17 +66,61 @@ class DownloadWorkspace extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: AppColors.muted))
           ]),
           const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+                child: TextField(
+              key: ValueKey('download-search-${category.name}'),
+              controller: _query,
+              enabled: enabled,
+              maxLength: 200,
+              decoration: InputDecoration(
+                  counterText: '',
+                  hintText: 'Buscar nos downloads…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _query.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Limpar busca de downloads',
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () {
+                            _searchTimer?.cancel();
+                            _query.clear();
+                            setState(() {});
+                            unawaited(c.searchDownloads(''));
+                          })),
+              onChanged: (value) {
+                setState(() {});
+                _searchTimer?.cancel();
+                _searchTimer = Timer(const Duration(milliseconds: 300),
+                    () => unawaited(c.searchDownloads(value)));
+              },
+            )),
+            const SizedBox(width: 8),
+            IconButton(
+                tooltip: 'Restaurar colunas',
+                onPressed: () => unawaited(c.resetColumnWidths()),
+                icon: const Icon(Icons.view_column_outlined,
+                    color: AppColors.accent)),
+          ]),
+          const SizedBox(height: 12),
           DownloadToolbar(
+              onAdd: enabled &&
+                      !library.addingLinks &&
+                      !library.importing &&
+                      !library.preparing &&
+                      library.current != null
+                  ? () => unawaited(showAddMusicLinks(context, library))
+                  : null,
               paused: library.pauseMode,
               onStart: canStart || (enabled && library.pauseMode)
                   ? () => unawaited(c.start())
                   : null,
               onPause: canCancel ? library.togglePause : null,
               onCancel: canCancel ? library.cancel : null,
-              onUp: canPrioritize &&
-                      selected.any((e) => e.track.queuePriority < 4)
-                  ? () => unawaited(c.changePriority(1))
-                  : null,
+              onUp:
+                  canPrioritize && selected.any((e) => e.track.queuePriority < 4)
+                      ? () => unawaited(c.changePriority(1))
+                      : null,
               onDown: canPrioritize &&
                       selected.any((e) => e.track.queuePriority > -4)
                   ? () => unawaited(c.changePriority(-1))
@@ -114,6 +176,9 @@ class DownloadWorkspace extends StatelessWidget {
                               : 'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
                       : DownloadTable(
                           entries: page.items,
+                          widths: c.columnWidths,
+                          onResize: c.resizeColumn,
+                          onResizeEnd: () => unawaited(c.saveColumnWidths()),
                           selection: c.selection,
                           onSelect: c.select,
                           onSelectPage: c.selectPage,
@@ -139,9 +204,17 @@ class DownloadWorkspace extends StatelessWidget {
                 OutlinedButton.icon(
                     style:
                         OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                    onPressed: onCapture,
+                    onPressed: enabled && library.current != null
+                        ? (library.addingLinks ||
+                                library.importing ||
+                                library.preparing
+                            ? null
+                            : () =>
+                                unawaited(showAddMusicLinks(context, library)))
+                        : onCapture,
                     icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Capturar novo link')),
+                    label: Text(
+                        enabled ? 'Adicionar links' : 'Capturar novo link')),
               ]),
         ]);
         return LayoutBuilder(builder: (context, constraints) {
@@ -178,6 +251,7 @@ class DownloadWorkspace extends StatelessWidget {
 class DownloadToolbar extends StatelessWidget {
   const DownloadToolbar(
       {super.key,
+      this.onAdd,
       this.onStart,
       this.onPause,
       this.onCancel,
@@ -187,7 +261,8 @@ class DownloadToolbar extends StatelessWidget {
       this.onRetry,
       this.onRemove,
       this.paused = false});
-  final VoidCallback? onStart,
+  final VoidCallback? onAdd,
+      onStart,
       onPause,
       onCancel,
       onUp,
@@ -197,42 +272,63 @@ class DownloadToolbar extends StatelessWidget {
       onRemove;
   final bool paused;
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-      key: const ValueKey('download-toolbar-scroll'),
-      scrollDirection: Axis.horizontal,
-      primary: false,
-      child: Row(children: [
-        _button(
-            Icons.play_arrow_rounded,
-            paused ? 'Continuar fila' : 'Iniciar selecionados',
-            'Arquivos incompletos reiniciam do começo.',
-            onStart,
-            primary: true),
-        const SizedBox(width: 4),
-        _button(
-            paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-            paused ? 'Retomar' : 'Pausar fila',
-            'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
-            onPause,
-            active: paused),
-        _button(
-            Icons.stop_rounded,
-            'Parar fila',
-            'Interromper a operação ativa e preservar os arquivos concluídos.',
-            onCancel),
-        _separator(),
-        _button(Icons.arrow_upward_rounded, 'Aumentar prioridade',
-            'Aumentar a prioridade sem alterar a ordem da playlist.', onUp),
-        _button(Icons.arrow_downward_rounded, 'Diminuir prioridade',
-            'Diminuir a prioridade dos selecionados.', onDown),
-        _separator(),
-        _button(Icons.folder_open_rounded, 'Abrir pasta',
-            'Abrir a pasta do arquivo selecionado.', onOpen),
-        _button(Icons.refresh_rounded, 'Tentar novamente',
-            'Reiniciar somente os selecionados que falharam.', onRetry),
-        _button(Icons.delete_outline_rounded, 'Remover da fila',
-            'Preservar a coleção, os arquivos e o histórico.', onRemove),
-      ]));
+  Widget build(BuildContext context) => Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.line),
+              borderRadius: BorderRadius.circular(14)),
+          child: SingleChildScrollView(
+              key: const ValueKey('download-toolbar-scroll'),
+              scrollDirection: Axis.horizontal,
+              primary: false,
+              child: Row(children: [
+                _button(
+                    Icons.play_arrow_rounded,
+                    paused ? 'Continuar fila' : 'Iniciar selecionados',
+                    'Arquivos incompletos reiniciam do começo.',
+                    onStart,
+                    primary: true),
+                const SizedBox(width: 6),
+                _button(
+                    paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                    paused ? 'Retomar' : 'Pausar fila',
+                    'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
+                    onPause,
+                    active: paused),
+                const SizedBox(width: 6),
+                _button(
+                    Icons.stop_rounded,
+                    'Parar fila',
+                    'Interromper a operação ativa e preservar os arquivos concluídos.',
+                    onCancel),
+                _separator(),
+                _button(
+                    Icons.arrow_upward_rounded,
+                    'Aumentar prioridade',
+                    'Aumentar a prioridade sem alterar a ordem da playlist.',
+                    onUp),
+                const SizedBox(width: 6),
+                _button(Icons.arrow_downward_rounded, 'Diminuir prioridade',
+                    'Diminuir a prioridade dos selecionados.', onDown),
+                _separator(),
+                _button(Icons.folder_open_rounded, 'Abrir pasta',
+                    'Abrir a pasta do arquivo selecionado.', onOpen),
+                const SizedBox(width: 6),
+                _button(Icons.refresh_rounded, 'Tentar novamente',
+                    'Reiniciar somente os selecionados que falharam.', onRetry),
+                const SizedBox(width: 6),
+                _button(
+                    Icons.delete_outline_rounded,
+                    'Remover da fila',
+                    'Preservar a coleção, os arquivos e o histórico.',
+                    onRemove),
+                _separator(),
+                _button(Icons.add_link_rounded, 'Adicionar links',
+                    'Acrescentar faixas ao final da coleção.', onAdd),
+              ]))));
 
   Widget _separator() => const SizedBox(
       height: 22, width: 20, child: VerticalDivider(width: 20, thickness: 1));
@@ -248,9 +344,15 @@ class DownloadToolbar extends StatelessWidget {
               isSelected: active,
               style: IconButton.styleFrom(
                       minimumSize: const Size(48, 48),
+                      visualDensity: VisualDensity.standard,
+                      side: BorderSide(
+                          color: AppColors.accent
+                              .withAlpha(action == null ? 65 : 125)),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
-                      foregroundColor: primary ? Colors.white : AppColors.ink,
+                      foregroundColor: primary || active
+                          ? Colors.white
+                          : AppColors.accentActive,
                       backgroundColor: primary
                           ? AppColors.accent
                           : active
@@ -262,10 +364,10 @@ class DownloadToolbar extends StatelessWidget {
                   .copyWith(backgroundColor:
                       WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.disabled)) {
-                  return primary ? AppColors.background : Colors.transparent;
+                  return AppColors.accentSoft.withAlpha(115);
                 }
                 if (!primary) {
-                  return active ? AppColors.accentSoft : Colors.transparent;
+                  return active ? AppColors.accentActive : AppColors.accentSoft;
                 }
                 return states.any((state) => const {
                           WidgetState.hovered,
@@ -276,142 +378,4 @@ class DownloadToolbar extends StatelessWidget {
                     : AppColors.accent;
               })),
               icon: Icon(icon, size: 22)));
-}
-
-class DownloadTable extends StatelessWidget {
-  const DownloadTable(
-      {super.key,
-      required this.entries,
-      required this.selection,
-      required this.onSelect,
-      required this.onSelectPage,
-      this.activeId,
-      this.progress,
-      this.paused = false,
-      required this.output});
-  final List<DownloadEntry> entries;
-  final Set<int> selection;
-  final void Function(int, bool) onSelect;
-  final ValueChanged<bool> onSelectPage;
-  final int? activeId;
-  final double? progress;
-  final bool paused;
-  final String output;
-  @override
-  Widget build(BuildContext context) => HorizontalTableViewport(
-      width: 1160,
-      child: Column(children: [
-        _row([
-          Checkbox(
-              shape: const CircleBorder(),
-              semanticLabel: 'Selecionar downloads da página',
-              value: entries.isNotEmpty &&
-                  entries.every((e) => selection.contains(e.track.id)),
-              onChanged: (v) => onSelectPage(v ?? false)),
-          for (final label in [
-            'Nome',
-            'Tamanho',
-            'Servidor',
-            'Status',
-            'Velocidade',
-            'Tempo restante',
-            'Baixado',
-            'Progresso',
-            'Salvar em'
-          ])
-            Tooltip(
-                message: switch (label) {
-                  'Velocidade' => 'Medição de velocidade indisponível.',
-                  'Tempo restante' => 'Estimativa de tempo indisponível.',
-                  _ => '',
-                },
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w500))),
-        ], header: true),
-        Expanded(
-            child: ListView.builder(
-                primary: false,
-                itemCount: entries.length,
-                itemBuilder: (context, index) {
-                  final e = entries[index], t = e.track;
-                  return _row([
-                    Checkbox(
-                        shape: const CircleBorder(),
-                        semanticLabel: 'Selecionar download ${t.title}',
-                        value: selection.contains(t.id),
-                        onChanged: (v) => onSelect(t.id, v ?? false)),
-                    Tooltip(
-                        message:
-                            '${t.title} · ${e.collectionName} · Prioridade ${t.queuePriority}',
-                        child: Text(
-                            t.localPath.isEmpty
-                                ? t.title
-                                : p.basename(t.localPath),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11))),
-                    const Text('—'),
-                    Text(t.sourceKind.musicProviderName ?? t.sourceLabel,
-                        style: const TextStyle(fontSize: 11)),
-                    Tooltip(
-                        message: t.error,
-                        child: Text(
-                            t.id == activeId && paused
-                                ? 'Pausado · 10 KiB/s'
-                                : e.statusLabel,
-                            style: const TextStyle(fontSize: 11))),
-                    const Text('—'),
-                    const Text('—'),
-                    const Text('—'),
-                    t.status == TrackStatus.completed
-                        ? const Text('Concluído',
-                            style: TextStyle(fontSize: 11))
-                        : t.id == activeId
-                            ? LinearProgressIndicator(
-                                value: progress, minHeight: 6)
-                            : const Text('—'),
-                    Tooltip(
-                        message: t.localPath.isEmpty
-                            ? output
-                            : p.dirname(t.localPath),
-                        child: Text(
-                            t.localPath.isEmpty
-                                ? output
-                                : p.dirname(t.localPath),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11))),
-                  ], selected: selection.contains(t.id));
-                })),
-      ]));
-  Widget _row(List<Widget> cells,
-      {bool header = false, bool selected = false}) {
-    const widths = [
-      38.0,
-      170.0,
-      80.0,
-      120.0,
-      130.0,
-      90.0,
-      110.0,
-      90.0,
-      120.0,
-      212.0
-    ];
-    return Container(
-        constraints: BoxConstraints(minHeight: header ? 40 : 48),
-        decoration: BoxDecoration(
-            color: selected ? AppColors.accentSoft : Colors.white,
-            border: const Border(bottom: BorderSide(color: AppColors.line))),
-        child: Row(children: [
-          for (var i = 0; i < cells.length; i++)
-            SizedBox(
-                width: widths[i],
-                child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: cells[i]))
-        ]));
-  }
 }

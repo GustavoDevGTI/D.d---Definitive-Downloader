@@ -40,3 +40,5 @@ docs/images/*
 !docs/images/forms-0112-*.png
 # One-off migration of local pilot files; not a reusable app tool.
 tools/identify_pilot_files.py
+
+!docs/images/downloads-0113-*.png

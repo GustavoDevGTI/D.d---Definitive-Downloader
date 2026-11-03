@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../library/application/library_controller.dart';
 import '../data/workspace_repository.dart';
 import '../domain/workspace_models.dart';
+import '../domain/download_columns.dart';
 
 class WorkspaceController extends ChangeNotifier {
   WorkspaceController(this.library)
@@ -18,6 +19,9 @@ class WorkspaceController extends ChangeNotifier {
   DownloadFilter filter = DownloadFilter.all;
   int downloadOffset = 0;
   int historyOffset = 0;
+  String downloadQuery = '';
+  List<double> columnWidths = downloadColumns.map((c) => c.width).toList();
+  bool _layoutLoaded = false;
   String folder = '';
   String historyQuery = '';
   String message = '';
@@ -40,11 +44,19 @@ class WorkspaceController extends ChangeNotifier {
     final results = await Future.wait<Object>([
       repository.summary(),
       repository.downloads(category,
-          filter: filter, offset: downloadOffset, pauseMode: library.pauseMode),
+          filter: filter,
+          query: downloadQuery,
+          offset: downloadOffset,
+          pauseMode: library.pauseMode),
       repository.history(
           folder: folder, query: historyQuery, offset: historyOffset),
+      if (!_layoutLoaded) repository.columnWidths(),
     ]);
     if (_disposed || generation != _generation) return;
+    if (!_layoutLoaded && results.length > 3) {
+      columnWidths = results[3] as List<double>;
+      _layoutLoaded = true;
+    }
     summary = results[0] as ActivitySummary;
     loaded = true;
     var downloadPage = results[1] as DownloadPage;
@@ -52,7 +64,10 @@ class WorkspaceController extends ChangeNotifier {
       downloadOffset =
           downloadPage.total == 0 ? 0 : ((downloadPage.total - 1) ~/ 40) * 40;
       downloadPage = await repository.downloads(category,
-          filter: filter, offset: downloadOffset, pauseMode: library.pauseMode);
+          filter: filter,
+          query: downloadQuery,
+          offset: downloadOffset,
+          pauseMode: library.pauseMode);
       if (_disposed || generation != _generation) return;
     }
     downloads = downloadPage;
@@ -67,6 +82,35 @@ class WorkspaceController extends ChangeNotifier {
     availability.clear();
     availability.addEntries(states);
     notifyListeners();
+  }
+
+  void resizeColumn(int index, double width) {
+    columnWidths = [...columnWidths]..[index] =
+        boundedColumnWidth(index, width);
+    notifyListeners();
+  }
+
+  Future<void> saveColumnWidths() async {
+    try {
+      await repository.saveColumnWidths([...columnWidths]);
+    } catch (_) {
+      message = 'Não foi possível salvar a largura das colunas.';
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> resetColumnWidths() async {
+    columnWidths = downloadColumns.map((c) => c.width).toList();
+    notifyListeners();
+    await saveColumnWidths();
+  }
+
+  Future<void> searchDownloads(String value) async {
+    if (value.length > 200) return;
+    downloadQuery = value.trim();
+    downloadOffset = 0;
+    selection.clear();
+    await refresh();
   }
 
   Future<void> setCategory(ContentCategory value) async {

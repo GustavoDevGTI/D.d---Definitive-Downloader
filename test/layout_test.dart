@@ -213,12 +213,29 @@ void main() {
       expect(find.textContaining('MP3 vinculado'), findsOneWidget,
           reason:
               '${downloadsWidget.controller.category}: ${downloadsWidget.controller.downloads.items.map((e) => e.track.sourceLabel).join(', ')}');
+      final downloadSearch =
+          find.byKey(const ValueKey('download-search-music'));
+      await tester.enterText(downloadSearch, 'Nada com este nome');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.runAsync(downloadsWidget.controller.refresh);
+      await tester.pumpAndSettle();
+      expect(downloadsWidget.controller.downloads.total, 0);
+      await tester.tap(find.byTooltip('Limpar busca de downloads'));
+      await tester.runAsync(downloadsWidget.controller.refresh);
+      await tester.pumpAndSettle();
+      expect(downloadsWidget.controller.downloadQuery, isEmpty);
+      expect(downloadsWidget.controller.downloads.total, greaterThan(0));
+      downloadsWidget.controller.selectPage(true);
+      await tester.pumpAndSettle();
+      await capture(tester, captureKey, 'music-tools-active-${width.toInt()}');
+      downloadsWidget.controller.selectPage(false);
+      await tester.pumpAndSettle();
       expect(find.byTooltip('Pausar fila'), findsOneWidget);
       final tools = find.descendant(
           of: find.byType(DownloadToolbar), matching: find.byType(IconButton));
-      expect(tools, findsNWidgets(8));
+      expect(tools, findsNWidgets(9));
       final toolY = tester.getRect(tools.first).center.dy;
-      for (var index = 1; index < 8; index++) {
+      for (var index = 1; index < 9; index++) {
         expect(tester.getRect(tools.at(index)).center.dy, toolY);
       }
       await tester.ensureVisible(find.byTooltip('Remover da fila'));
@@ -228,8 +245,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
-      await tester.ensureVisible(find.text('Capturar novo link'));
-      await tester.tap(find.text('Capturar novo link'));
+      await tester.ensureVisible(find.text('Adicionar links'));
+      await tester.tap(find.text('Adicionar links'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('extra-music-links')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await capture(tester, captureKey, 'add-music-links-${width.toInt()}');
+      await tester.ensureVisible(find.text('Cancelar'));
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Capturar áudio'));
       await tester.pumpAndSettle();
       expect(find.text('Capturador de áudio'), findsOneWidget);
       await capture(tester, captureKey, 'audio-capture-${width.toInt()}');

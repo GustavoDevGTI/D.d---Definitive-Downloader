@@ -6,6 +6,9 @@ import '../../../core/platform/desktop_files.dart';
 import '../../downloads/download_service.dart';
 import '../../downloads/playlist_exporter.dart';
 import '../../importing/csv_importer.dart';
+import '../../importing/music_link_catalog.dart';
+import '../../importing/music_link_service.dart';
+import '../../importing/music_link_repository.dart';
 import '../../importing/demo_collection.dart';
 import '../../importing/spotify_importer.dart';
 import '../../importing/spotify_account_importer.dart';
@@ -25,8 +28,50 @@ class LibraryController extends ChangeNotifier {
       required this.catalog,
       required this.downloader,
       this.accountSpotify,
+      this.linkCatalog,
       this.music});
   final MusicResolver? music;
+  final MusicLinkCatalog? linkCatalog;
+  bool addingLinks = false;
+  String linkProgress = '';
+  String? _activeRun;
+  Completer<void>? _additionDone;
+
+  Future<List<Collection>> collectionChoices(int offset) =>
+      repository.collections(offset: offset);
+
+  Future<bool> addLinks(int collectionId, String input) async {
+    if (addingLinks || importing || preparing) return false;
+    addingLinks = true;
+    _additionDone = Completer<void>();
+    notifyListeners();
+    try {
+      final entries = await MusicLinkService(
+              linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify), music)
+          .resolve(input, onProgress: (done, total) {
+        linkProgress = 'Conferindo links: $done/$total';
+        notifyListeners();
+      });
+      final ids = await MusicLinkRepository(repository.database).append(
+          collectionId, entries,
+          run: _cancellation?.cancelled == true ? null : _activeRun);
+      final ready = entries.where((e) => e.ready).length;
+      message =
+          '${ids.length} faixa(s) adicionada(s). $ready pronta(s) para baixar.';
+      await refresh();
+      return true;
+    } catch (error) {
+      message = _message(error);
+      return false;
+    } finally {
+      addingLinks = false;
+      linkProgress = '';
+      _additionDone?.complete();
+      _additionDone = null;
+      notifyListeners();
+    }
+  }
+
   final LibraryRepository repository;
   final DesktopFiles files;
   final SpotifyImporter spotify;
@@ -67,7 +112,7 @@ class LibraryController extends ChangeNotifier {
 
   int _searchGeneration = 0;
   int _refreshGeneration = 0;
-  bool get busy => importing || downloading || preparing;
+  bool get busy => importing || downloading || preparing || addingLinks;
   bool get isExample => current?.source == 'Exemplo local';
   bool get allFilteredSelected =>
       page.total > 0 && page.filteredSelectedCount == page.total;
@@ -243,6 +288,15 @@ class LibraryController extends ChangeNotifier {
         if (batch.items.isEmpty) break;
         for (final track in batch.items) {
           cancellation.check();
+          if (track.hasManualSource &&
+              track.status == TrackStatus.pending &&
+              resolver.available &&
+              (track.sourceKind == SourceKind.youtubeMusic ||
+                  (track.sourceKind == SourceKind.deezerFull &&
+                      resolver.connection.connected))) {
+            await repository.setStatus(track.id, TrackStatus.ready);
+            prepared++;
+          }
           if (track.status == TrackStatus.completed ||
               track.hasManualSource ||
               track.sourceKind == SourceKind.localExample) {
@@ -447,6 +501,7 @@ class LibraryController extends ChangeNotifier {
     var failed = 0;
     final queue = WorkspaceRepository(repository.database);
     final run = '${DateTime.now().microsecondsSinceEpoch}';
+    _activeRun = run;
     notifyListeners();
     try {
       while (!token.cancelled) {
@@ -460,7 +515,19 @@ class LibraryController extends ChangeNotifier {
             ids: queueIds,
             collectionId: collection?.id,
             failedOnly: failedOnly);
-        if (track == null) break;
+        if (track == null) {
+          final addition = _additionDone;
+          if (addition != null) {
+            while (!token.cancelled && identical(_additionDone, addition)) {
+              await Future.any<void>([
+                addition.future,
+                Future<void>.delayed(const Duration(milliseconds: 100))
+              ]);
+            }
+            continue;
+          }
+          break;
+        }
         final owner = await repository.collectionById(track.collectionId);
         if (owner == null) continue;
         final directory =
@@ -531,6 +598,7 @@ class LibraryController extends ChangeNotifier {
         // Finish the current transfer in pause mode without starting another.
         if (token.pauseMode) break;
       }
+      _activeRun = null;
       if (saved > 0) {
         for (final entry in destinations.entries) {
           await PlaylistExporter(repository).export(entry.key, entry.value);
@@ -544,6 +612,13 @@ class LibraryController extends ChangeNotifier {
     } catch (error) {
       message = _message(error);
     } finally {
+      _activeRun = null;
+      try {
+        await queue.finishRun(run);
+      } catch (_) {
+        // Membership is also cleared on startup. Do not mask cancellation or
+        // leave the UI locked if this auxiliary cleanup fails.
+      }
       downloading = false;
       activeTitle = '';
       activeTrackId = null;

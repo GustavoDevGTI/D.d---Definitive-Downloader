@@ -7,6 +7,7 @@ import '../../workspace/presentation/workspace_components.dart';
 import '../../workspace/presentation/link_entry_panel.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
+import 'add_music_links_dialog.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -171,6 +172,13 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600))),
+              IconButton(
+                  tooltip: 'Adicionar links',
+                  onPressed: c.addingLinks || c.importing || c.preparing
+                      ? null
+                      : () => unawaited(showAddMusicLinks(context, c)),
+                  icon: const Icon(Icons.add_link_rounded,
+                      color: AppColors.accent, size: 22)),
               IconButton(
                   tooltip: 'Buscar músicas',
                   onPressed: c.busy || c.isExample || c.music?.available != true
