@@ -64,27 +64,17 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                           itemBuilder: (context, index) {
                             if (index < c.history.folders.length) {
                               final folder = c.history.folders[index];
-                              return WorkspacePanel(
-                                  child: Tooltip(
-                                      message: folder.path,
-                                      child: ListTile(
-                                          dense: true,
-                                          leading: const Icon(
-                                              Icons.folder_outlined,
-                                              size: 20),
-                                          title: Text(p.basename(folder.path),
-                                              style: const TextStyle(
-                                                  fontSize: 12)),
-                                          subtitle: Text(
-                                              '${folder.count} arquivo(s)',
-                                              style: const TextStyle(
-                                                  fontSize: 10,
-                                                  color: AppColors.muted)),
-                                          trailing: const Icon(
-                                              Icons.chevron_right,
-                                              size: 18),
-                                          onTap: () => unawaited(
-                                              c.openFolder(folder.path)))));
+                              return Tooltip(
+                                  message: folder.path,
+                                  child: WorkspaceNavigationButton(
+                                      key: ValueKey(
+                                          'history-folder-${folder.path}'),
+                                      icon: Icons.folder_outlined,
+                                      title: p.basename(folder.path),
+                                      subtitle:
+                                          '${folder.count} ${folder.count == 1 ? 'arquivo' : 'arquivos'}',
+                                      onPressed: () => unawaited(
+                                          c.openFolder(folder.path))));
                             }
                             final file = c.history
                                     .files[index - c.history.folders.length],

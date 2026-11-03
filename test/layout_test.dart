@@ -274,6 +274,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Pasta principal'), findsOneWidget);
       await capture(tester, captureKey, 'history-${width.toInt()}');
+      if (width == 1360 && Platform.environment['DD_LAYOUT_OUTPUT'] != null) {
+        final pointer =
+            await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+        await pointer.addPointer(location: Offset.zero);
+        await pointer.moveTo(tester.getCenter(find.text('Playlist Teste')));
+        await tester.pumpAndSettle();
+        await capture(tester, captureKey, 'history-hover-${width.toInt()}');
+        await pointer.removePointer();
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.descendant(
           of: nav,
           matching: find.text(width < 780 ? 'Ajustes' : 'Configurações')));

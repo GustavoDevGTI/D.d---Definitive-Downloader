@@ -47,6 +47,69 @@ class CategoryTabs extends StatelessWidget {
       ]);
 }
 
+class WorkspaceNavigationButton extends StatelessWidget {
+  const WorkspaceNavigationButton(
+      {super.key,
+      required this.title,
+      required this.subtitle,
+      required this.icon,
+      required this.onPressed});
+  final String title, subtitle;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    bool highlighted(Set<WidgetState> states) => states.any((state) => const {
+          WidgetState.hovered,
+          WidgetState.focused,
+          WidgetState.pressed,
+        }.contains(state));
+    return OutlinedButton(
+        style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(68),
+                alignment: Alignment.centerLeft,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)))
+            .copyWith(
+                backgroundColor: WidgetStateProperty.resolveWith((states) => highlighted(states)
+                    ? AppColors.accentActive
+                    : AppColors.accentSoft),
+                foregroundColor: WidgetStateProperty.resolveWith((states) =>
+                    highlighted(states) ? Colors.white : AppColors.ink),
+                iconColor: WidgetStateProperty.resolveWith((states) =>
+                    highlighted(states) ? Colors.white : AppColors.accent),
+                side: WidgetStateProperty.resolveWith(
+                    (states) => BorderSide(color: highlighted(states) ? AppColors.accentActive : AppColors.accent)),
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent)),
+        onPressed: onPressed,
+        child: Row(children: [
+          Icon(icon, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Opacity(
+                    opacity: .8,
+                    child: Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w500))),
+              ])),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, size: 22),
+        ]));
+  }
+}
+
 class WorkspacePanel extends StatelessWidget {
   const WorkspacePanel(
       {super.key, required this.child, this.padding = EdgeInsets.zero});

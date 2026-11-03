@@ -36,5 +36,6 @@ docs/images/*
 !docs/images/palette-018-*.png
 !docs/images/clarity-019-*.png
 !docs/images/collections-0110-*.png
+!docs/images/folders-0111-*.png
 # One-off migration of local pilot files; not a reusable app tool.
 tools/identify_pilot_files.py
