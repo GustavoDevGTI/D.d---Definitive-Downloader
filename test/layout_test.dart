@@ -282,11 +282,17 @@ void main() {
           .descendant(of: startButton, matching: find.byType(Material))
           .first;
       final restingColor = tester.widget<Material>(startMaterial).color;
+      final restingBounds = tester.getRect(startButton);
       final hoverPointer =
           await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
       await hoverPointer.addPointer(location: Offset.zero);
       await hoverPointer.moveTo(tester.getCenter(startButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final midWidth = tester.getRect(startButton).width;
+      expect(midWidth, greaterThan(restingBounds.width));
       await tester.pumpAndSettle();
+      expect(tester.getRect(startButton).width, greaterThan(midWidth));
       expect(tester.widget<Material>(startMaterial).color, isNot(restingColor));
       await capture(tester, captureKey, 'music-play-hover-${width.toInt()}');
       final addButton = find.descendant(
@@ -296,6 +302,8 @@ void main() {
       await tester.pumpAndSettle();
       await hoverPointer.moveTo(tester.getCenter(addButton));
       await tester.pumpAndSettle();
+      expect(
+          tester.getRect(startButton).width, closeTo(restingBounds.width, .01));
       await capture(tester, captureKey, 'music-add-hover-${width.toInt()}');
       await hoverPointer.removePointer();
       await tester.pumpAndSettle();

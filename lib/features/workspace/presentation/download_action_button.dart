@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../app/button_hover_motion.dart';
 
 abstract final class DownloadActionColors {
   static const start = AppColors.success;
@@ -60,17 +61,20 @@ class DownloadActionButton extends StatelessWidget {
   final Color color;
   final bool primary, active;
   @override
-  Widget build(BuildContext context) => Semantics(
-      hint: description,
-      child: IconButton(
-          tooltip: label,
-          onPressed: onPressed,
-          isSelected: active,
-          style: downloadActionStyle(color, primary: primary, active: active)
-              .copyWith(
-                  minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
-                  visualDensity: VisualDensity.standard,
-                  shape: WidgetStatePropertyAll(RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)))),
-          icon: Icon(icon, size: 22)));
+  Widget build(BuildContext context) => ButtonHoverMotion(
+      builder: (states) => Semantics(
+          hint: description,
+          child: IconButton(
+              statesController: states,
+              tooltip: label,
+              onPressed: onPressed,
+              isSelected: active,
+              style: downloadActionStyle(color,
+                      primary: primary, active: active)
+                  .copyWith(
+                      minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+                      visualDensity: VisualDensity.standard,
+                      shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)))),
+              icon: Icon(icon, size: 22))));
 }

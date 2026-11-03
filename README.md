@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.15](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.15). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.16](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.16). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
-![Controles de Downloads do D.d — captura de layout com dados isolados](docs/images/controls-0115-desktop.png)
+![Hover dos controles do D.d — captura de layout com dados isolados](docs/images/motion-0116-hover-desktop.png)
+
+A versão **0.1.16** acrescenta animação de escala aos controles de Downloads e Adicionar links: crescimento no hover/foco, compressão ao pressionar e retorno suave, sem deslocar os outros controles. Respeita movimento reduzido e botões desabilitados. [Validação](docs/RELEASE_0_1_16.md).
 
 A versão **0.1.15** diferencia as cores de iniciar, pausar, parar e adicionar links, torna o hover/foco dos botões mais perceptível e permite comprimir as colunas de Downloads até 40–64 px. Reticências preservam as linhas e tooltips mostram o conteúdo completo. [Validação e capturas](docs/RELEASE_0_1_15.md).
 
@@ -50,7 +52,7 @@ A conexão Spotify por PKCE permite importar a playlist de teste com 10 faixas. 
 
 ## Executar
 
-A versão 0.1.15 mantém o instalador por usuário para Windows, com atalho no menu Iniciar e desinstalador. Biblioteca e sessões ficam fora da pasta instalada e são preservadas na desinstalação. O instalador não está assinado digitalmente. Notas e limites em [RELEASE_0_1_15.md](docs/RELEASE_0_1_15.md). As versões seguintes devem avançar de forma incremental, conforme AGENTS.md.
+A versão 0.1.16 mantém o instalador por usuário para Windows, com atalho no menu Iniciar e desinstalador. Biblioteca e sessões ficam fora da pasta instalada e são preservadas na desinstalação. O instalador não está assinado digitalmente. Notas e limites em [RELEASE_0_1_16.md](docs/RELEASE_0_1_16.md). As versões seguintes devem avançar de forma incremental, conforme AGENTS.md.
 
 No Windows, abra `INICIAR.cmd`. Ele atualiza o pacote em `%LOCALAPPDATA%\DefinitiveDownloader\app` e abre essa cópia local, evitando uma falha de carregamento de DLL do motor quando iniciado pelo Flutter em pasta de rede. Não abra o executável diretamente pela UNC. O executável precisa permanecer junto das DLLs e das pastas `data` e `music_engine` do pacote; contas e biblioteca usam seu armazenamento próprio.
 

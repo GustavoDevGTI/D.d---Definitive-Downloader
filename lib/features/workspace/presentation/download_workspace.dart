@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../app/button_hover_motion.dart';
 import '../../library/domain/models.dart';
 import '../application/workspace_controller.dart';
 import '../domain/workspace_models.dart';
@@ -203,23 +204,26 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                 Text('${c.selection.length} selecionados',
                     style:
                         const TextStyle(fontSize: 11, color: AppColors.muted)),
-                OutlinedButton.icon(
-                    style: downloadActionStyle(DownloadActionColors.add)
-                        .copyWith(
-                            shape:
-                                const WidgetStatePropertyAll(StadiumBorder())),
-                    onPressed: enabled && library.current != null
-                        ? (library.addingLinks ||
-                                library.importing ||
-                                library.preparing ||
-                                library.editing
-                            ? null
-                            : () =>
-                                unawaited(showAddMusicLinks(context, library)))
-                        : onCapture,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: Text(
-                        enabled ? 'Adicionar links' : 'Capturar novo link')),
+                ButtonHoverMotion(
+                    builder: (states) => OutlinedButton.icon(
+                        statesController: states,
+                        style: downloadActionStyle(DownloadActionColors.add)
+                            .copyWith(
+                                shape: const WidgetStatePropertyAll(
+                                    StadiumBorder())),
+                        onPressed: enabled && library.current != null
+                            ? (library.addingLinks ||
+                                    library.importing ||
+                                    library.preparing ||
+                                    library.editing
+                                ? null
+                                : () => unawaited(
+                                    showAddMusicLinks(context, library)))
+                            : onCapture,
+                        icon: const Icon(Icons.add, size: 16),
+                        label: Text(enabled
+                            ? 'Adicionar links'
+                            : 'Capturar novo link'))),
               ]),
         ]);
         return LayoutBuilder(builder: (context, constraints) {
@@ -289,53 +293,62 @@ class DownloadToolbar extends StatelessWidget {
               key: const ValueKey('download-toolbar-scroll'),
               scrollDirection: Axis.horizontal,
               primary: false,
-              child: Row(children: [
-                _button(
-                    Icons.play_arrow_rounded,
-                    paused ? 'Continuar fila' : 'Iniciar selecionados',
-                    'Arquivos incompletos reiniciam do começo.',
-                    onStart,
-                    color: DownloadActionColors.start,
-                    primary: true),
-                const SizedBox(width: 6),
-                _button(
-                    paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                    paused ? 'Retomar' : 'Pausar fila',
-                    'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
-                    onPause,
-                    color: DownloadActionColors.pause,
-                    active: paused),
-                const SizedBox(width: 6),
-                _button(
-                    Icons.stop_rounded,
-                    'Parar fila',
-                    'Interromper a operação ativa e preservar os arquivos concluídos.',
-                    onCancel,
-                    color: DownloadActionColors.stop),
-                _separator(),
-                _button(
-                    Icons.arrow_upward_rounded,
-                    'Aumentar prioridade',
-                    'Aumentar a prioridade sem alterar a ordem da playlist.',
-                    onUp),
-                const SizedBox(width: 6),
-                _button(Icons.arrow_downward_rounded, 'Diminuir prioridade',
-                    'Diminuir a prioridade dos selecionados.', onDown),
-                _separator(),
-                _button(Icons.folder_open_rounded, 'Abrir pasta',
-                    'Abrir a pasta do arquivo selecionado.', onOpen),
-                const SizedBox(width: 6),
-                _button(Icons.refresh_rounded, 'Tentar novamente',
-                    'Reiniciar somente os selecionados que falharam.', onRetry),
-                const SizedBox(width: 6),
-                _button(Icons.delete_outline_rounded, 'Remover da fila',
-                    'Preservar a coleção, os arquivos e o histórico.', onRemove,
-                    color: DownloadActionColors.stop),
-                _separator(),
-                _button(Icons.add_link_rounded, 'Adicionar links',
-                    'Acrescentar faixas ao final da coleção.', onAdd,
-                    color: DownloadActionColors.add),
-              ]))));
+              child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                  child: Row(children: [
+                    _button(
+                        Icons.play_arrow_rounded,
+                        paused ? 'Continuar fila' : 'Iniciar selecionados',
+                        'Arquivos incompletos reiniciam do começo.',
+                        onStart,
+                        color: DownloadActionColors.start,
+                        primary: true),
+                    const SizedBox(width: 6),
+                    _button(
+                        paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                        paused ? 'Retomar' : 'Pausar fila',
+                        'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
+                        onPause,
+                        color: DownloadActionColors.pause,
+                        active: paused),
+                    const SizedBox(width: 6),
+                    _button(
+                        Icons.stop_rounded,
+                        'Parar fila',
+                        'Interromper a operação ativa e preservar os arquivos concluídos.',
+                        onCancel,
+                        color: DownloadActionColors.stop),
+                    _separator(),
+                    _button(
+                        Icons.arrow_upward_rounded,
+                        'Aumentar prioridade',
+                        'Aumentar a prioridade sem alterar a ordem da playlist.',
+                        onUp),
+                    const SizedBox(width: 6),
+                    _button(Icons.arrow_downward_rounded, 'Diminuir prioridade',
+                        'Diminuir a prioridade dos selecionados.', onDown),
+                    _separator(),
+                    _button(Icons.folder_open_rounded, 'Abrir pasta',
+                        'Abrir a pasta do arquivo selecionado.', onOpen),
+                    const SizedBox(width: 6),
+                    _button(
+                        Icons.refresh_rounded,
+                        'Tentar novamente',
+                        'Reiniciar somente os selecionados que falharam.',
+                        onRetry),
+                    const SizedBox(width: 6),
+                    _button(
+                        Icons.delete_outline_rounded,
+                        'Remover da fila',
+                        'Preservar a coleção, os arquivos e o histórico.',
+                        onRemove,
+                        color: DownloadActionColors.stop),
+                    _separator(),
+                    _button(Icons.add_link_rounded, 'Adicionar links',
+                        'Acrescentar faixas ao final da coleção.', onAdd,
+                        color: DownloadActionColors.add),
+                  ])))));
 
   Widget _separator() => const SizedBox(
       height: 22, width: 20, child: VerticalDivider(width: 20, thickness: 1));
