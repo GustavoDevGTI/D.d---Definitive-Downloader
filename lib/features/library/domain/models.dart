@@ -2,6 +2,8 @@ enum TrackStatus { pending, ready, downloading, completed, failed }
 
 enum MatchStatus { pending, review, confirmed, manual }
 
+enum SourceAuthorization { catalog, manualLink, approvedVideo }
+
 enum ManualSourceMode { extractAudio, originalAudio }
 
 extension MatchStatusLabel on MatchStatus {
@@ -19,13 +21,15 @@ enum SourceKind {
   directMp3,
   preview,
   deezerFull,
-  youtubeMusic
+  youtubeMusic,
+  youtube
 }
 
 extension MusicSourceName on SourceKind {
   String? get musicProviderName => switch (this) {
         SourceKind.deezerFull => 'Deezer',
         SourceKind.youtubeMusic => 'YouTube Music',
+        SourceKind.youtube => 'YouTube',
         _ => null,
       };
   String get musicProviderSuffix =>
@@ -40,7 +44,8 @@ class Collection {
       required this.sourceUrl,
       required this.trackCount,
       required this.completedCount,
-      required this.isPartial});
+      required this.isPartial,
+      this.editingLocked = false});
   final int id;
   final String name;
   final String source;
@@ -48,6 +53,7 @@ class Collection {
   final int trackCount;
   final int completedCount;
   final bool isPartial;
+  final bool editingLocked;
 }
 
 class TrackDraft {
@@ -101,7 +107,13 @@ class Track {
       this.manualUrl = '',
       this.manualMode = ManualSourceMode.originalAudio,
       this.resolvedCoverUrl = '',
-      this.queuePriority = 0});
+      this.queuePriority = 0,
+      this.customTitle = '',
+      this.recordingType = '',
+      this.sourceAuthorization = SourceAuthorization.catalog});
+  final String customTitle, recordingType;
+  final SourceAuthorization sourceAuthorization;
+  String get displayTitle => customTitle.isEmpty ? title : customTitle;
   final int queuePriority;
   final MatchStatus matchStatus;
   final String manualUrl;
@@ -132,9 +144,15 @@ class Track {
   bool get canDownload =>
       sourceKind != SourceKind.none &&
       mediaUrl.isNotEmpty &&
+      (sourceKind != SourceKind.youtube ||
+          sourceAuthorization != SourceAuthorization.catalog) &&
       matchStatus != MatchStatus.review &&
       !(hasManualSource && manualMode == ManualSourceMode.extractAudio);
-  String get outputTitle => resolvedTitle.isEmpty ? title : resolvedTitle;
+  String get outputTitle => customTitle.isNotEmpty
+      ? customTitle
+      : resolvedTitle.isEmpty
+          ? title
+          : resolvedTitle;
   String get outputArtist => resolvedArtist.isEmpty ? artist : resolvedArtist;
   String get outputAlbum => resolvedAlbum.isEmpty ? album : resolvedAlbum;
   int? get outputDurationMs => sourceKind == SourceKind.preview
@@ -147,6 +165,7 @@ class Track {
         SourceKind.preview => 'Prévia Deezer',
         SourceKind.deezerFull => 'Deezer · faixa',
         SourceKind.youtubeMusic => 'YouTube Music · faixa',
+        SourceKind.youtube => 'YouTube · áudio escolhido',
       };
 }
 
@@ -172,6 +191,8 @@ class Candidate {
       this.kind = SourceKind.preview,
       this.recordingType = '',
       this.explicit});
+  bool get isVideoRecording =>
+      kind == SourceKind.youtube && recordingType == 'MUSIC_VIDEO_TYPE_OMV';
   final SourceKind kind;
   final String recordingType;
   final bool? explicit;

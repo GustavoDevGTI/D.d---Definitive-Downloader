@@ -78,10 +78,10 @@ class DownloadTable extends StatelessWidget {
                         onChanged: (v) => onSelect(t.id, v ?? false)),
                     Tooltip(
                         message:
-                            '${t.title} · ${e.collectionName} · Prioridade ${t.queuePriority}',
+                            '${t.displayTitle} · ${e.collectionName} · Prioridade ${t.queuePriority}',
                         child: Text(
                             t.localPath.isEmpty
-                                ? t.title
+                                ? t.displayTitle
                                 : p.basename(t.localPath),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

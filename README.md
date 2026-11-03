@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.13](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.13). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.14](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.14). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
-![Downloads do D.d — captura de layout com dados isolados](docs/images/downloads-0113-desktop.png)
+![Edição de faixas no D.d — captura de layout com dados isolados](docs/images/playlists-0114-edit-desktop.png)
+
+A versão **0.1.14** permite editar nome, posição/número e link/ID de cada ocorrência antes dos downloads; ao iniciar, a coleção mantém nomes e ordem bloqueados, inclusive após reiniciar. Links extras continuam disponíveis antes e durante a execução. Spotify busca equivalentes nas outras fontes; links musicais YouTube manuais representam escolha da versão, enquanto videoclipes encontrados automaticamente só aparecem como última alternativa e exigem aprovação. [Validações e limites](docs/RELEASE_0_1_14.md).
 
 A versão **0.1.13** reúne os comandos de Downloads em uma barra contornada com ícones coloridos, acrescenta pesquisa paginada e colunas redimensionáveis com persistência. O botão de adicionar links aparece na coleção e na fila: aceita faixas Spotify, Deezer, YouTube Music ATV e MP3 direto, preservando ocorrências e acrescentando fontes prontas ao final da execução ativa. Esta é uma entrega do piloto Windows; veja validações e limites em [RELEASE_0_1_13.md](docs/RELEASE_0_1_13.md).
 
@@ -30,7 +32,7 @@ A versão local **0.1.3** aproxima a organização do HTML de referência: cole�
 
 A reestruturação [Wireframe v0.5.1](docs/REESTRUTURACAO_WIREFRAME_0_5_1.md), no aplicativo 0.1.2, organiza Início, Músicas, Vídeos e Fotos, Arquivos e Configurações. Músicas reúne Coleções, Capturar Áudio e Downloads; Vídeos e Fotos reúne Capturar Mídias e Downloads. O histórico de arquivos é organizado pelas pastas em que os downloads foram salvos. A navegação inferior e a lista compacta foram preparadas para mobile; as integrações nativas mobile continuam pendentes.
 
-Fontes manuais são persistidas por ocorrência e protegidas da busca automática. MP3 direto mantém o download existente; a opção de extração de página/vídeo registra apenas um vínculo pendente. Captura geral, downloads de vídeos/fotos e métricas de rede continuam indisponíveis. Pausa e prioridade foram acrescentadas ao piloto Windows em 0.1.5; o motor musical mobile segue pendente.
+Fontes manuais são persistidas por ocorrência e protegidas da busca automática. MP3 direto mantém o download existente; links musicais do YouTube passam pelo catálogo e pelo motor de áudio; páginas genéricas permanecem sem extração disponível. Captura geral, downloads de vídeos/fotos e métricas de rede continuam indisponíveis. Pausa e prioridade foram acrescentadas ao piloto Windows em 0.1.5; o motor musical mobile segue pendente.
 
 Resultados e limites desta entrega: [primeira versão desktop](docs/PRIMEIRA_VERSAO_DESKTOP.md) e [testes sem conta](docs/TESTES_SEM_CONTA.md).
 
@@ -46,7 +48,7 @@ A conexão Spotify por PKCE permite importar a playlist de teste com 10 faixas. 
 
 ## Executar
 
-A versão 0.1.13 mantém o instalador por usuário para Windows, com atalho no menu Iniciar e desinstalador. Biblioteca e sessões ficam fora da pasta instalada e são preservadas na desinstalação. O instalador não está assinado digitalmente. Notas e limites em [RELEASE_0_1_13.md](docs/RELEASE_0_1_13.md). As versões seguintes devem avançar de forma incremental, conforme AGENTS.md.
+A versão 0.1.14 mantém o instalador por usuário para Windows, com atalho no menu Iniciar e desinstalador. Biblioteca e sessões ficam fora da pasta instalada e são preservadas na desinstalação. O instalador não está assinado digitalmente. Notas e limites em [RELEASE_0_1_14.md](docs/RELEASE_0_1_14.md). As versões seguintes devem avançar de forma incremental, conforme AGENTS.md.
 
 No Windows, abra `INICIAR.cmd`. Ele atualiza o pacote em `%LOCALAPPDATA%\DefinitiveDownloader\app` e abre essa cópia local, evitando uma falha de carregamento de DLL do motor quando iniciado pelo Flutter em pasta de rede. Não abra o executável diretamente pela UNC. O executável precisa permanecer junto das DLLs e das pastas `data` e `music_engine` do pacote; contas e biblioteca usam seu armazenamento próprio.
 
@@ -67,7 +69,7 @@ O motor musical tem build próprio: `tools/build_music_engine.ps1 -Python <pytho
 - Tentativa de leitura pública de playlists Spotify, sempre identificada como parcial. Essa leitura depende do conteúdo disponibilizado pelo site e não substitui autenticação oficial.
 - Conexão Spotify em módulo próprio, com sessão no cofre do sistema e importação autenticada paginada. Login real, importação de uma playlist de 10 faixas e restauração da conexão após reinício foram confirmados no Windows; veja `docs/evidencias/spotify-conta-real.md`.
 - Busca integrada em Deezer e YouTube Music, comparando artista, título, duração, versão e álbum. Candidatos ambíguos exigem revisão.
-- YouTube Music aceita apenas faixas de catálogo do tipo `MUSIC_VIDEO_TYPE_ATV`, reconferidas antes do download. Videoclipes e busca genérica de vídeos são excluídos.
+- Busca automática prioriza faixas Deezer e YouTube Music ATV. Videoclipes OMV só são oferecidos em último caso, com aprovação da versão específica. Links YouTube inseridos manualmente dispensam matching/aprovação; ID, disponibilidade, duração e áudio continuam sendo validados. Não há corte de duração para ajustar outra versão.
 - Conexão Deezer por sessão própria informada somente no app, guardada no cofre do sistema. Autenticação, restauração após reinício e sete arquivos completos foram confirmados neste piloto; isso não comprova todo o catálogo ou outras contas/regiões.
 - MP3 com capa embutida, metadados da fonte, conferência de duração, decodificação integral e exportação M3U8 em ordem.
 - Fluxos anteriores de prévia Deezer e vínculo manual de MP3 continuam distintos do novo fluxo musical.

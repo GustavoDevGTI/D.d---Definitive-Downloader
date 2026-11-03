@@ -105,6 +105,14 @@ void main() {
     await library.setStatus(rows[0].id, TrackStatus.completed,
         localPath: '${directory.path}/original.mp3');
     await library.database.run((db) {
+      db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
+      for (final column in [
+        'custom_title',
+        'recording_type',
+        'source_authorization'
+      ]) {
+        db.execute('ALTER TABLE tracks DROP COLUMN $column');
+      }
       db.execute('DROP TABLE download_run_additions');
       db.execute('ALTER TABLE tracks DROP COLUMN queue_added');
       db.execute('DROP INDEX tracks_priority');
@@ -121,7 +129,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        8);
+        9);
   });
 
   test('fonte manual persiste por ocorrência e protege contra busca automática',
@@ -263,6 +271,14 @@ void main() {
     await library.database.run((db) {
       db.execute('DROP TABLE download_history');
       db.execute('DROP INDEX tracks_transfer_status');
+      db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
+      for (final column in [
+        'custom_title',
+        'recording_type',
+        'source_authorization'
+      ]) {
+        db.execute('ALTER TABLE tracks DROP COLUMN $column');
+      }
       db.execute('DROP TABLE download_run_additions');
       db.execute('ALTER TABLE tracks DROP COLUMN queue_added');
       db.execute('DROP INDEX tracks_priority');

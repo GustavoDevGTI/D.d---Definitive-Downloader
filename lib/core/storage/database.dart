@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 8) {
+      if (version > 9) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -210,6 +210,30 @@ class AppDatabase {
             track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
             UNIQUE(run,track_id))''');
           db.execute('PRAGMA user_version = 8');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 8) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              'ALTER TABLE collections ADD COLUMN editing_locked INTEGER NOT NULL DEFAULT 0');
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN custom_title TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN recording_type TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN source_authorization TEXT NOT NULL DEFAULT 'catalog'");
+          db.execute(
+              "UPDATE tracks SET recording_type=CASE source_kind WHEN 'deezerFull' THEN 'DEEZER_TRACK' WHEN 'youtubeMusic' THEN 'MUSIC_VIDEO_TYPE_ATV' ELSE '' END");
+          db.execute("""UPDATE collections SET editing_locked=1 WHERE EXISTS(
+            SELECT 1 FROM tracks t WHERE t.collection_id=collections.id
+            AND (t.queue_run!='' OR t.status IN ('downloading','completed') OR t.local_path!=''
+              OR EXISTS(SELECT 1 FROM download_history h WHERE h.track_id=t.id)))""");
+          db.execute('PRAGMA user_version = 9');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

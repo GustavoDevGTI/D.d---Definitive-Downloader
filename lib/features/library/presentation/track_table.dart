@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'edit_track_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../application/library_controller.dart';
@@ -69,7 +70,7 @@ class TrackTable extends StatelessWidget {
                                           width: 36,
                                           child: Checkbox(
                                               semanticLabel:
-                                                  'Selecionar ${t.title}',
+                                                  'Selecionar ${t.displayTitle}',
                                               value: t.selected,
                                               onChanged: controller.busy
                                                   ? null
@@ -100,7 +101,8 @@ class TrackTable extends StatelessWidget {
                                                                     color: AppColors
                                                                         .accent))),
                                                       Expanded(
-                                                          child: Text(t.title,
+                                                          child: Text(
+                                                              '${t.position}. ${t.displayTitle}',
                                                               maxLines: 1,
                                                               overflow:
                                                                   TextOverflow
@@ -141,6 +143,51 @@ class TrackTable extends StatelessWidget {
                                                               color: AppColors
                                                                   .accent)),
                                                   ]))),
+                                      PopupMenuButton<String>(
+                                          tooltip: controller
+                                                      .current?.editingLocked ==
+                                                  true
+                                              ? 'Nomes e ordem bloqueados após o início'
+                                              : 'Editar faixa',
+                                          enabled: !controller.busy &&
+                                              controller
+                                                      .current?.editingLocked !=
+                                                  true,
+                                          icon: const Icon(Icons.more_vert,
+                                              size: 19,
+                                              color: AppColors.accent),
+                                          onSelected: (action) {
+                                            if (action == 'edit') {
+                                              unawaited(showEditTrack(
+                                                  context, controller, t));
+                                            } else {
+                                              unawaited(controller.editTrack(t,
+                                                  name: t.displayTitle,
+                                                  position: t.position +
+                                                      (action == 'up'
+                                                          ? -1
+                                                          : 1)));
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                                const PopupMenuItem(
+                                                    value: 'edit',
+                                                    child: Text(
+                                                        'Editar nome, link / ID e posição')),
+                                                PopupMenuItem(
+                                                    value: 'up',
+                                                    enabled: t.position > 1,
+                                                    child: const Text(
+                                                        'Mover para cima')),
+                                                PopupMenuItem(
+                                                    value: 'down',
+                                                    enabled: t.position <
+                                                        (controller.current
+                                                                ?.trackCount ??
+                                                            0),
+                                                    child: const Text(
+                                                        'Mover para baixo')),
+                                              ]),
                                       if (!compact) ...[
                                         SizedBox(
                                             width: 58,

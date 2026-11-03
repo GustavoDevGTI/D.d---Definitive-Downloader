@@ -3,7 +3,7 @@ import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/matching/music_engine.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
-import 'music_resolver_test.dart' show EmptySession;
+import 'music_resolver_test.dart' show EmptySession, EmptyEngine;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/importing/music_link.dart';
@@ -72,7 +72,7 @@ void main() {
       'https://example.org/a.mp3?token=private',
       'https://music.youtube.com.evil.org/watch?v=abcdefghijk',
       'https://open.spotify.com/playlist/0123456789012345678901',
-      'https://www.youtube.com/watch?v=abcdefghijk'
+      'https://www.youtube.com/watch?v=bad'
     ]) {
       expect(() => MusicLink.parse(value), throwsFormatException);
     }
@@ -102,7 +102,7 @@ void main() {
     expect(result.pinned, isTrue);
     expect(result.draft.artist, 'Pessoa');
     row['videoDetails']['musicVideoType'] = 'MUSIC_VIDEO_TYPE_OMV';
-    await expectLater(catalog.resolve(link), throwsFormatException);
+    expect((await catalog.resolve(link)).source!.kind, SourceKind.youtube);
     row['videoDetails']['musicVideoType'] = 'MUSIC_VIDEO_TYPE_ATV';
     row['videoDetails']['isLive'] = true;
     await expectLater(catalog.resolve(link), throwsFormatException);
@@ -185,6 +185,47 @@ void main() {
     }
   });
 
+  test(
+      'YouTube normal, link curto e tipo ausente usam escolha manual sem matching ou aprovação',
+      () async {
+    final engine = EmptyEngine();
+    final connection = DeezerConnectionController(EmptySession(), engine);
+    final transport = FixtureCatalogTransport({
+      'videoDetails': {
+        'videoId': 'abcdefghijk',
+        'title': 'Meu áudio',
+        'author': 'Pessoa',
+        'lengthSeconds': '180'
+      },
+      'playabilityStatus': {'status': 'OK'}
+    });
+    try {
+      final service = MusicLinkService(MusicLinkCatalog(transport: transport),
+          MusicResolver(engine, connection));
+      for (final url in [
+        'https://youtu.be/abcdefghijk?si=tracking',
+        'https://www.youtube.com/watch?v=abcdefghijk',
+        'https://music.youtube.com/watch?v=abcdefghijk'
+      ]) {
+        final entry = (await service.resolve(url)).single;
+        expect(entry.source!.kind, SourceKind.youtube);
+        expect(entry.source!.pageUrl,
+            'https://www.youtube.com/watch?v=abcdefghijk');
+        expect(entry.pinned, isTrue);
+        expect(entry.ready, isTrue);
+      }
+      expect(MusicLink.fromIdentifier(MusicLinkKind.youtube, 'abcdefghijk').url,
+          'https://www.youtube.com/watch?v=abcdefghijk');
+      expect(
+          MusicLink.fromIdentifier(
+                  MusicLinkKind.spotify, '0123456789012345678901')
+              .kind,
+          MusicLinkKind.spotify);
+    } finally {
+      connection.dispose();
+    }
+  });
+
   group('persistência de extras, pesquisa e colunas', () {
     late Directory temp;
     late LibraryRepository library;
@@ -212,6 +253,14 @@ void main() {
         'migração v7 preserva ocorrências e acrescenta apenas controle de extras',
         () async {
       await library.database.run((db) {
+        db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
+        for (final column in [
+          'custom_title',
+          'recording_type',
+          'source_authorization'
+        ]) {
+          db.execute('ALTER TABLE tracks DROP COLUMN $column');
+        }
         db.execute('DROP TABLE download_run_additions');
         db.execute('ALTER TABLE tracks DROP COLUMN queue_added');
         db.execute('PRAGMA user_version=7');
@@ -221,7 +270,7 @@ void main() {
       expect(
           await library.database
               .run((db) => db.select('PRAGMA user_version').first.values.first),
-          8);
+          9);
       expect(
           await library.database
               .run((db) => db.select('PRAGMA quick_check').first.values.first),

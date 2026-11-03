@@ -65,7 +65,8 @@ class DownloadService {
           'A fonte precisa de revisão ou ainda não tem suporte para download.');
     }
     if (track.sourceKind == SourceKind.deezerFull ||
-        track.sourceKind == SourceKind.youtubeMusic) {
+        track.sourceKind == SourceKind.youtubeMusic ||
+        track.sourceKind == SourceKind.youtube) {
       if (music == null) {
         throw const FormatException('O motor musical não está disponível.');
       }

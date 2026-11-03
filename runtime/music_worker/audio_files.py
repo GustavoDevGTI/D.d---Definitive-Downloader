@@ -14,7 +14,7 @@ def run_ffmpeg(ffmpeg, arguments):
         raise MusicError('Não foi possível validar o áudio recebido.')
 
 
-def finish(source, actual, directory, ffmpeg, expected_ms):
+def finish(source, actual, directory, ffmpeg, expected_ms, output_title=''):
     emit('stage', message='Conferindo áudio completo e metadados')
     source = Path(source)
     if not source.is_file() or source.stat().st_size < 1024:
@@ -31,7 +31,7 @@ def finish(source, actual, directory, ffmpeg, expected_ms):
         raise MusicError('Não foi recebida uma capa válida para a faixa.')
     if media.tags is None:
         media.add_tags()
-    media.tags.add(TIT2(encoding=3, text=actual['title']))
+    media.tags.add(TIT2(encoding=3, text=output_title or actual['title']))
     media.tags.add(TPE1(encoding=3, text=actual['artist']))
     media.tags.add(TALB(encoding=3, text=actual['album']))
     if actual.get('isrc'):
@@ -44,4 +44,4 @@ def finish(source, actual, directory, ffmpeg, expected_ms):
     if len(MP3(target).tags.getall('APIC')) != 1:
         raise MusicError('A capa não foi vinculada ao MP3.')
     return {'path': str(target.resolve()), 'actual': actual, 'durationMs': duration,
-            'bytes': target.stat().st_size, 'coverEmbedded': True, 'decoded': True}
+            'bytes': target.stat().st_size, 'coverEmbedded': True, 'decoded': True, 'displayTitle': output_title or actual['title']}

@@ -172,11 +172,19 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600))),
+              if (c.current!.editingLocked)
+                const Tooltip(
+                    message: 'Nomes e ordem bloqueados após o início',
+                    child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.lock_outline,
+                            size: 18, color: AppColors.muted))),
               IconButton(
                   tooltip: 'Adicionar links',
-                  onPressed: c.addingLinks || c.importing || c.preparing
-                      ? null
-                      : () => unawaited(showAddMusicLinks(context, c)),
+                  onPressed:
+                      c.addingLinks || c.importing || c.preparing || c.editing
+                          ? null
+                          : () => unawaited(showAddMusicLinks(context, c)),
                   icon: const Icon(Icons.add_link_rounded,
                       color: AppColors.accent, size: 22)),
               IconButton(

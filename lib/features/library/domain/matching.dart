@@ -10,6 +10,10 @@ class MatchAssessment {
 class TrackMatcher {
   const TrackMatcher();
   MatchAssessment assess(Track track, Candidate candidate) {
+    if (candidate.kind == SourceKind.youtube) {
+      return const MatchAssessment(
+          0, true, 'Videoclipe: aprovação desta versão necessária');
+    }
     final full = candidate.kind == SourceKind.youtubeMusic ||
         candidate.kind == SourceKind.deezerFull;
     if (full && !candidate.isFullRecording) {

@@ -1,4 +1,5 @@
 import '../../core/storage/database.dart';
+import 'package:sqlite3/sqlite3.dart';
 import '../library/domain/models.dart';
 import 'music_link.dart';
 
@@ -29,10 +30,12 @@ class MusicLinkRepository {
           final ids = <int>[];
           for (final entry in links) {
             final draft = entry.draft, source = entry.source;
-            if (entry.alternatives.length > 16 ||
+            if (entry.alternatives.length > 24 ||
                 draft.title.trim().isEmpty ||
                 draft.title.length > 400 ||
-                (source != null && !source.isFullRecording)) {
+                (source != null &&
+                    !source.isFullRecording &&
+                    !(entry.pinned && source.kind == SourceKind.youtube))) {
               throw const FormatException('Metadados ou fonte inválidos.');
             }
             final kind = source?.kind ?? draft.sourceKind;
@@ -79,6 +82,15 @@ class MusicLinkRepository {
                 ]);
             final id = db.lastInsertRowId;
             ids.add(id);
+            db.execute(
+                'UPDATE tracks SET recording_type=?,source_authorization=? WHERE id=?',
+                [
+                  source?.recordingType ?? '',
+                  entry.pinned && source?.kind == SourceKind.youtube
+                      ? 'manualLink'
+                      : 'catalog',
+                  id
+                ]);
             for (var i = 0; i < entry.alternatives.length; i++) {
               final c = entry.alternatives[i];
               db.execute(
@@ -106,6 +118,101 @@ class MusicLinkRepository {
           }
           db.execute('COMMIT');
           return ids;
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
+  // Called inside a short transaction. Manual source edits preserve requested metadata.
+  static void replaceSource(Database db, int id, ResolvedMusicLink entry,
+      {bool replaceRequested = false}) {
+    final c = entry.source, d = entry.draft;
+    if (entry.alternatives.length > 24 ||
+        (c != null &&
+            !c.isFullRecording &&
+            !(entry.pinned && c.kind == SourceKind.youtube))) {
+      throw const FormatException('Fonte não confirmada.');
+    }
+    if (replaceRequested) {
+      db.execute(
+          'UPDATE tracks SET title=?,artist=?,album=?,duration_ms=?,isrc=?,cover_url=?,source_url=?,explicit=? WHERE id=?',
+          [
+            d.title,
+            d.artist,
+            d.album,
+            d.durationMs,
+            d.isrc,
+            d.coverUrl,
+            entry.link.url,
+            d.explicit == null
+                ? null
+                : d.explicit!
+                    ? 1
+                    : 0,
+            id
+          ]);
+    }
+    db.execute(
+        "UPDATE tracks SET media_url=?,source_kind=?,status=?,match_status=?,manual_url=?,manual_mode='originalAudio',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=?,queue_hidden=0,error='' WHERE id=?",
+        [
+          c?.pageUrl ?? d.mediaUrl,
+          (c?.kind ?? d.sourceKind).name,
+          entry.ready ? 'ready' : 'pending',
+          entry.pinned
+              ? 'manual'
+              : c != null
+                  ? 'confirmed'
+                  : entry.alternatives.isNotEmpty
+                      ? 'review'
+                      : 'pending',
+          entry.pinned ? entry.link.url : '',
+          c?.title ?? '',
+          c?.artist ?? '',
+          c?.album ?? '',
+          c?.durationMs,
+          c?.coverUrl ?? '',
+          c?.recordingType ?? '',
+          entry.pinned && c?.kind == SourceKind.youtube
+              ? 'manualLink'
+              : 'catalog',
+          id
+        ]);
+    db.execute('DELETE FROM music_candidates WHERE track_id=?', [id]);
+    for (var i = 0; i < entry.alternatives.length; i++) {
+      final a = entry.alternatives[i];
+      db.execute(
+          'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', [
+        id,
+        i,
+        a.kind.name,
+        a.title,
+        a.artist,
+        a.album,
+        a.durationMs,
+        a.pageUrl,
+        a.coverUrl,
+        a.isrc,
+        a.recordingType,
+        a.explicit == null
+            ? null
+            : a.explicit!
+                ? 1
+                : 0
+      ]);
+    }
+  }
+
+  Future<void> setSource(int id, ResolvedMusicLink entry) => database.run((db) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          final rows = db.select('SELECT status FROM tracks WHERE id=?', [id]);
+          if (rows.isEmpty ||
+              ['downloading', 'completed'].contains(rows.first['status'])) {
+            throw const FormatException(
+                'Não é possível trocar a fonte de uma faixa em transferência ou concluída.');
+          }
+          replaceSource(db, id, entry);
+          db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');
           rethrow;

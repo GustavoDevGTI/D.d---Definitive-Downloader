@@ -29,14 +29,18 @@ Candidate parseMusicCandidate(Map<String, dynamic> row) {
   final kind = switch (row['kind']) {
     'deezerFull' => SourceKind.deezerFull,
     'youtubeMusic' => SourceKind.youtubeMusic,
+    'youtube' => SourceKind.youtube,
     _ => throw const FormatException('Fonte de gravação inválida.'),
   };
   final page = Uri.parse(text('pageUrl'));
   if (page.scheme != 'https' ||
       page.userInfo.isNotEmpty ||
       page.port != 443 ||
-      (kind == SourceKind.youtubeMusic
-          ? page.host != 'music.youtube.com'
+      ((kind == SourceKind.youtubeMusic || kind == SourceKind.youtube)
+          ? page.host !=
+              (kind == SourceKind.youtube
+                  ? 'www.youtube.com'
+                  : 'music.youtube.com')
           : page.host != 'www.deezer.com')) {
     throw const FormatException('Endereço de faixa não permitido.');
   }

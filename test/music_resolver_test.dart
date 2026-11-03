@@ -5,6 +5,7 @@ import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/matching/music_engine.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'support.dart';
+import 'package:definitive_downloader/features/matching/music_candidates.dart';
 
 class EmptyEngine implements MusicEngine {
   @override
@@ -37,6 +38,37 @@ Candidate recording(String id, String album,
         coverUrl: '',
         kind: SourceKind.youtubeMusic,
         recordingType: type);
+
+class SearchPolicyEngine extends EmptyEngine {
+  SearchPolicyEngine(this.audio);
+  final bool audio;
+  final providers = <String>[];
+  @override
+  Future<Map<String, dynamic>> call(Map<String, dynamic> request,
+      {DownloadCancellation? cancellation,
+      void Function(String)? onStage}) async {
+    final provider = request['provider'] as String;
+    providers.add(provider);
+    return {
+      'candidates': provider == 'youtubeMusic' && audio
+          ? [candidateJson(recording('abcdefghijk', 'Ensaios'))]
+          : provider == 'youtube'
+              ? [
+                  candidateJson(const Candidate(
+                      title: 'Entre linhas (Official Video)',
+                      artist: 'Laboratório D.d',
+                      album: '',
+                      durationMs: 190000,
+                      pageUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+                      previewUrl: '',
+                      coverUrl: '',
+                      kind: SourceKind.youtube,
+                      recordingType: 'MUSIC_VIDEO_TYPE_OMV'))
+                ]
+              : []
+    };
+  }
+}
 
 void main() {
   late MusicResolver resolver;
@@ -71,5 +103,27 @@ void main() {
           recording('abcdefghijk', 'Ensaios', type: 'MUSIC_VIDEO_TYPE_OMV')
         ]),
         isNull);
+  });
+  test(
+      'videoclipes só são buscados quando não há correspondência de áudio e nunca são escolhidos automaticamente',
+      () async {
+    for (final audio in [true, false]) {
+      final engine = SearchPolicyEngine(audio);
+      final ownConnection = DeezerConnectionController(EmptySession(), engine);
+      try {
+        final own = MusicResolver(engine, ownConnection);
+        final result = await own.search(testTrack(), 'Entre linhas');
+        expect(
+            engine.providers,
+            audio
+                ? ['deezerFull', 'youtubeMusic']
+                : ['deezerFull', 'youtubeMusic', 'youtube']);
+        expect(own.automaticChoice(testTrack(), result)?.kind,
+            audio ? SourceKind.youtubeMusic : null);
+        if (!audio) expect(result.single.isVideoRecording, isTrue);
+      } finally {
+        ownConnection.dispose();
+      }
+    }
   });
 }

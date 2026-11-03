@@ -35,9 +35,9 @@ class WorkspaceRepository {
         final where =
             "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)$status"
             " AND (?='' OR instr(lower(t.title),lower(?))>0 OR instr(lower(t.artist),lower(?))>0"
-            " OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
+            " OR instr(lower(t.custom_title),lower(?))>0 OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
             " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)";
-        final args = List<Object?>.filled(7, search);
+        final args = List<Object?>.filled(8, search);
         const from = 'FROM tracks t JOIN collections c ON c.id=t.collection_id';
         final count = db
             .select('SELECT COUNT(*) AS n $from WHERE $where', args)
@@ -151,6 +151,7 @@ class WorkspaceRepository {
         WHERE t.queue_run!=? AND t.queue_hidden=0
         AND (($selection) OR a.track_id IS NOT NULL)
         AND t.source_kind!='none' AND t.match_status!='review'
+        AND (t.source_kind!='youtube' OR t.source_authorization IN ('manualLink','approvedVideo'))
         AND NOT(t.manual_url!='' AND t.manual_mode='extractAudio')
         AND t.status IN ('ready','failed')
         ${failedOnly ? "AND (t.status='failed' OR a.track_id IS NOT NULL)" : ''}
@@ -161,6 +162,8 @@ class WorkspaceRepository {
           Track? track;
           if (rows.isNotEmpty) {
             track = LibraryRepository.readTrack(rows.first);
+            db.execute('UPDATE collections SET editing_locked=1 WHERE id=?',
+                [track.collectionId]);
             db.execute(
                 "UPDATE tracks SET queue_run=?,status='downloading',error='' WHERE id=?",
                 [run, track.id]);
@@ -283,6 +286,7 @@ class WorkspaceRepository {
         final rows = db.select(
             '''SELECT * FROM tracks WHERE id>? AND queue_hidden=0 AND $selection
       AND source_kind!='none' AND match_status!='review'
+      AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo'))
       AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed')
       ORDER BY id LIMIT 1''', [afterId, ...?ids]);
         return rows.isEmpty ? null : LibraryRepository.readTrack(rows.first);

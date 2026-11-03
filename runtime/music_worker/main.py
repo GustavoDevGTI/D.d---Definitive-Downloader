@@ -32,6 +32,8 @@ def execute(request, control=None):
             return {'candidates': deezer.search(query, clean_text(request.get('isrc')))}
         if request.get('provider') == 'youtubeMusic':
             return {'candidates': youtube_music.search(query)}
+        if request.get('provider') == 'youtube':
+            return {'candidates': youtube_music.search_videos(query)}
         raise MusicError('Fonte musical inválida.')
     if operation == 'download':
         candidate = request.get('candidate', {})
@@ -44,11 +46,14 @@ def execute(request, control=None):
             ffmpeg = Path(imageio_ffmpeg.get_ffmpeg_exe())
         if not ffmpeg.is_file():
             raise MusicError('O validador de áudio não foi instalado.')
+        output_title = request.get('outputTitle', '')
+        if not isinstance(output_title, str) or len(output_title) > 400 or any(ord(c)<32 for c in output_title):
+            raise MusicError('Nome de saída inválido.')
         expected = int(candidate.get('durationMs') or 0)
         if not 1000 <= expected <= 3600000:
             raise MusicError('Duração da faixa não confirmada.')
-        if candidate.get('kind') == 'youtubeMusic':
-            source, actual = youtube_music.download(candidate, directory, ffmpeg, control)
+        if candidate.get('kind') in ('youtubeMusic', 'youtube'):
+            source, actual = youtube_music.download(candidate, directory, ffmpeg, control, request.get('authorization', 'catalog'))
         elif candidate.get('kind') == 'deezerFull':
             session = deezer.DeezerSession(request.get('arl', ''))
             try:
@@ -57,7 +62,7 @@ def execute(request, control=None):
                 session.close()
         else:
             raise MusicError('Não é uma fonte de faixa completa.')
-        return finish(source, actual, directory, ffmpeg, expected)
+        return finish(source, actual, directory, ffmpeg, expected, output_title)
     raise MusicError('Operação musical inválida.')
 
 

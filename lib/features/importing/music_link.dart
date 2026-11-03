@@ -1,6 +1,6 @@
 import '../library/domain/models.dart';
 
-enum MusicLinkKind { spotify, deezer, youtubeMusic, mp3 }
+enum MusicLinkKind { spotify, deezer, youtubeMusic, youtube, mp3 }
 
 class MusicLink {
   const MusicLink(this.kind, this.url, this.id);
@@ -46,15 +46,28 @@ class MusicLink {
       return MusicLink(MusicLinkKind.deezer,
           'https://www.deezer.com/track/${match[1]}', match[1]!);
     }
-    if (uri.host == 'music.youtube.com' &&
-        uri.scheme == 'https' &&
-        uri.path == '/watch') {
-      final id = uri.queryParameters['v'] ?? '';
+    if ([
+          'music.youtube.com',
+          'www.youtube.com',
+          'youtube.com',
+          'm.youtube.com',
+          'youtu.be'
+        ].contains(uri.host) &&
+        uri.scheme == 'https') {
+      final id = uri.host == 'youtu.be' && uri.pathSegments.length == 1
+          ? uri.pathSegments.single
+          : uri.path == '/watch'
+              ? uri.queryParameters['v'] ?? ''
+              : '';
       if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(id)) {
-        throw const FormatException('Faixa YouTube Music inválida.');
+        throw const FormatException(
+            'Use o link de uma faixa ou vídeo do YouTube.');
       }
-      return MusicLink(MusicLinkKind.youtubeMusic,
-          'https://music.youtube.com/watch?v=$id', id);
+      final music = uri.host == 'music.youtube.com';
+      return MusicLink(
+          music ? MusicLinkKind.youtubeMusic : MusicLinkKind.youtube,
+          'https://${music ? 'music' : 'www'}.youtube.com/watch?v=$id',
+          id);
     }
     if (uri.path.toLowerCase().endsWith('.mp3') &&
         !uri.hasQuery &&
@@ -63,7 +76,21 @@ class MusicLink {
       return MusicLink(MusicLinkKind.mp3, uri.toString(), '');
     }
     throw const FormatException(
-        'Use uma faixa do Spotify, Deezer, YouTube Music ou MP3 direto sem parâmetros.');
+        'Use uma faixa do Spotify, Deezer, YouTube ou MP3 direto sem parâmetros.');
+  }
+
+  static MusicLink fromIdentifier(MusicLinkKind kind, String input) {
+    final value = input.trim();
+    if (value.contains('://') || value.startsWith('spotify:')) {
+      return parse(value);
+    }
+    return parse(switch (kind) {
+      MusicLinkKind.spotify => 'https://open.spotify.com/track/$value',
+      MusicLinkKind.deezer => 'https://www.deezer.com/track/$value',
+      MusicLinkKind.youtubeMusic => 'https://music.youtube.com/watch?v=$value',
+      MusicLinkKind.youtube => 'https://www.youtube.com/watch?v=$value',
+      MusicLinkKind.mp3 => value,
+    });
   }
 
   static List<MusicLink> batch(String input) {

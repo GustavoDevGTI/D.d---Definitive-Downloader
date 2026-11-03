@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/network/bounded_http.dart';
+import '../../importing/music_link.dart';
 import '../domain/models.dart';
 
 class ManualSourceChoice {
@@ -17,7 +17,6 @@ class ManualSourceInput extends StatefulWidget {
 
 class _ManualSourceInputState extends State<ManualSourceInput> {
   late final _url = TextEditingController(text: widget.track.manualUrl);
-  late ManualSourceMode _mode = widget.track.manualMode;
   final _form = GlobalKey<FormState>();
   @override
   void dispose() {
@@ -35,9 +34,9 @@ class _ManualSourceInputState extends State<ManualSourceInput> {
                       key: _form,
                       child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(widget.track.title,
+                            Text(widget.track.displayTitle,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600)),
                             const SizedBox(height: 16),
@@ -45,46 +44,18 @@ class _ManualSourceInputState extends State<ManualSourceInput> {
                                 controller: _url,
                                 autofocus: true,
                                 keyboardType: TextInputType.url,
+                                maxLength: 4096,
                                 decoration: const InputDecoration(
-                                    labelText: 'URL da fonte'),
+                                    labelText: 'Link de faixa, YouTube ou MP3',
+                                    counterText: ''),
                                 validator: (value) {
                                   try {
-                                    validateHttpUrl(
-                                        Uri.parse(value?.trim() ?? ''));
+                                    MusicLink.parse(value ?? '');
                                     return null;
-                                  } catch (_) {
-                                    return 'Use uma URL HTTP ou HTTPS sem credenciais.';
+                                  } on FormatException catch (error) {
+                                    return error.message;
                                   }
                                 }),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<ManualSourceMode>(
-                                initialValue: _mode,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                    labelText: 'Tratamento da fonte'),
-                                items: const [
-                                  DropdownMenuItem(
-                                      value: ManualSourceMode.extractAudio,
-                                      child: Text('Extrair somente áudio',
-                                          style: TextStyle(fontSize: 12))),
-                                  DropdownMenuItem(
-                                      value: ManualSourceMode.originalAudio,
-                                      child: Text(
-                                          'Utilizar áudio original, se disponível',
-                                          style: TextStyle(fontSize: 12))),
-                                ],
-                                onChanged: (v) => setState(() => _mode = v!)),
-                            const SizedBox(height: 12),
-                            Text(
-                                _mode == ManualSourceMode.extractAudio
-                                    ? 'O vínculo será salvo para revisão. A extração de páginas e videoclipes ainda não está disponível.'
-                                    : 'Nesta versão, o endereço deve fornecer um arquivo MP3 diretamente. O conteúdo será verificado durante o download.',
-                                style:
-                                    const TextStyle(fontSize: 12, height: 1.6)),
-                            const SizedBox(height: 8),
-                            const Text(
-                                'Use um link público estável. Não informe credenciais ou URLs temporárias assinadas.',
-                                style: TextStyle(fontSize: 11)),
                           ])))),
           actions: [
             TextButton(
@@ -94,9 +65,11 @@ class _ManualSourceInputState extends State<ManualSourceInput> {
                 onPressed: () {
                   if (_form.currentState!.validate()) {
                     Navigator.pop(
-                        context, ManualSourceChoice(_url.text.trim(), _mode));
+                        context,
+                        ManualSourceChoice(
+                            _url.text.trim(), ManualSourceMode.originalAudio));
                   }
                 },
-                child: const Text('Aplicar link'))
+                child: const Text('Aplicar link')),
           ]);
 }

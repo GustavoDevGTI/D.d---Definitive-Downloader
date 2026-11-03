@@ -1,4 +1,5 @@
 import '../matching/music_resolver.dart';
+import '../library/domain/models.dart';
 import 'music_link.dart';
 import 'music_link_catalog.dart';
 
@@ -19,7 +20,9 @@ class MusicLinkService {
         item = item.prepared(
             source: item.source,
             alternatives: item.alternatives,
-            ready: music?.available == true && music!.canUse(item.source!));
+            ready: music?.available == true &&
+                (item.source!.kind == SourceKind.youtube ||
+                    music!.canUse(item.source!)));
       } else if (!item.pinned && music?.available == true) {
         // Spotify supplies requested metadata, never a downloadable audio URL.
         final track = item.matchingTrack;

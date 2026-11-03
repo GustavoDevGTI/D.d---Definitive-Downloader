@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:definitive_downloader/features/library/data/playlist_editor.dart';
 import 'package:definitive_downloader/features/importing/music_link.dart';
 import 'package:definitive_downloader/features/importing/music_link_catalog.dart';
 import 'package:flutter/services.dart';
@@ -351,5 +352,38 @@ void main() {
     expect(last.position, 7);
     expect(last.status, TrackStatus.ready);
     expect(last.selected, isTrue);
+  });
+  test(
+      'nome e posição editados definem arquivo e M3U8; iniciar bloqueia novas edições',
+      () async {
+    controller.dispose();
+    final downloader = GatedDownload();
+    controller = create(downloader);
+    controller.outputDirectory = directory.path;
+    await controller.loadExample();
+    final rows = controller.page.items;
+    expect(
+        await controller.editTrack(rows.first, name: 'Meu áudio', position: 3),
+        isTrue);
+    final running = controller.downloadSelected(queueIds: [rows.first.id]);
+    await downloader.started.future;
+    await expectLater(
+        PlaylistEditor(repository.database)
+            .edit(rows[1].id, name: 'Não permitido', position: 1),
+        throwsFormatException);
+    downloader.release.complete();
+    await running;
+    final saved = (await repository.trackById(rows.first.id))!;
+    expect(saved.position, 3);
+    expect(saved.localPath, contains('003 -'));
+    expect(saved.localPath, contains('Meu áudio'));
+    final lists = await directory
+        .list(recursive: true)
+        .where((e) => e.path.endsWith('.m3u8'))
+        .toList();
+    expect(await File(lists.single.path).readAsString(), contains('Meu áudio'));
+    expect(controller.current!.editingLocked, isTrue);
+    expect(await controller.editTrack(rows[1], name: 'Novo nome', position: 1),
+        isFalse);
   });
 }

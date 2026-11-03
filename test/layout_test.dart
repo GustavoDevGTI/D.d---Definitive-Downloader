@@ -163,12 +163,54 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await capture(tester, captureKey, 'music-library-${width.toInt()}');
-      await tester.ensureVisible(find.text('Abertura'));
-      await tester.tap(find.text('Abertura'));
+      await tester.tap(find.byTooltip('Editar faixa').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar nome, link / ID e posição'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('edit-track-position')), findsOneWidget);
+      await capture(tester, captureKey, 'edit-track-${width.toInt()}');
+      await tester.ensureVisible(find.text('Cancelar'));
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('1. Abertura'));
+      await tester.tap(find.text('1. Abertura'));
       await tester.pumpAndSettle();
       expect(find.text('Conferência'), findsOneWidget);
       expect(controller.page.selectedCount, 0);
       await capture(tester, captureKey, 'verification-${width.toInt()}');
+      await tester.runAsync(() async {
+        final track = controller.focused!;
+        await controller.repository.saveCandidates(track.id, [
+          const Candidate(
+              title: 'Versão de vídeo para revisão',
+              artist: 'Pessoa',
+              album: '',
+              durationMs: 7000,
+              pageUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+              previewUrl: '',
+              coverUrl: '',
+              kind: SourceKind.youtube,
+              recordingType: 'MUSIC_VIDEO_TYPE_OMV')
+        ]);
+        controller.focus(track);
+        controller.candidates =
+            await controller.repository.musicCandidates(track.id);
+        await controller.refresh();
+      });
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Versão de vídeo para revisão'));
+      await tester.tap(find.text('Versão de vídeo para revisão'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Aprovar videoclipe'));
+      await tester.tap(find.text('Aprovar videoclipe'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aprovar esta versão'), findsOneWidget);
+      expect(find.textContaining('Duração desta versão:'), findsOneWidget);
+      await capture(tester, captureKey, 'approve-video-${width.toInt()}');
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(
+          controller.focused!.sourceAuthorization, SourceAuthorization.catalog);
       await tester.ensureVisible(find.text('Informar link manualmente'));
       await tester
           .runAsync(() => tester.tap(find.text('Informar link manualmente')));

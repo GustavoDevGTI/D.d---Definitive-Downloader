@@ -5,7 +5,7 @@ from Crypto.Cipher import Blowfish
 from common import MusicError, allowed_url, check_duration
 from deezer import DeezerSession, track_state
 from deezer_audio import recording_key, decoded_blocks
-from youtube_music import accept_song, verify_recording
+from youtube_music import accept_song, verify_recording, source_video
 
 
 class MusicPolicyTests(unittest.TestCase):
@@ -35,6 +35,21 @@ class MusicPolicyTests(unittest.TestCase):
             self.assertFalse(accept_song({**song,'videoType':media}))
             with self.assertRaises(MusicError):verify_recording({'musicVideoType':media})
         with self.assertRaises(MusicError):verify_recording({'musicVideoType':'MUSIC_VIDEO_TYPE_ATV','isLiveContent':True})
+
+    def test_manual_youtube_is_distinct_from_automatic_video_approval(self):
+        video = {'kind':'youtube','pageUrl':'https://www.youtube.com/watch?v=abcdefghijk', 'recordingType':'MUSIC_VIDEO_TYPE_OMV'}
+        with self.assertRaises(MusicError): source_video(video, 'catalog')
+        self.assertEqual(source_video(video, 'manualLink'),'abcdefghijk')
+        self.assertEqual(source_video(video, 'approvedVideo'),'abcdefghijk')
+        for recording in ['MUSIC_VIDEO_TYPE_OMV', 'MUSIC_VIDEO_TYPE_UGC', None]:
+            verify_recording({'musicVideoType':recording},'manualLink','youtube')
+        verify_recording({'musicVideoType':'MUSIC_VIDEO_TYPE_OMV'},'approvedVideo','youtube','MUSIC_VIDEO_TYPE_OMV')
+        for recording in ['MUSIC_VIDEO_TYPE_ATV','MUSIC_VIDEO_TYPE_UGC',None]:
+            with self.assertRaises(MusicError): verify_recording({'musicVideoType':recording},'approvedVideo','youtube','MUSIC_VIDEO_TYPE_OMV')
+        with self.assertRaises(MusicError): verify_recording({'isLive':True},'manualLink','youtube')
+        for url in ['https://www.youtube.com.evil.org/watch?v=abcdefghijk','https://user:secret@www.youtube.com/watch?v=abcdefghijk',
+                    'https://www.youtube.com/watch?v=abcdefghijk&token=private', 'https://www.youtube.com/playlist?list=abcdefghijk']:
+            with self.assertRaises(MusicError): source_video({**video,'pageUrl':url},'manualLink')
 
     def test_cookie_never_reaches_media_or_unrelated_host(self):
         session=DeezerSession('a'*192)

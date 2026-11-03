@@ -65,7 +65,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t.title,
+                          Text(t.displayTitle,
                               style: const TextStyle(
                                   fontSize: 17, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 5),
@@ -100,6 +100,8 @@ class _TrackInspectorState extends State<TrackInspector> {
                           if (_tab == 1) ...[
                             _line('Álbum original',
                                 t.album.isEmpty ? 'Não informado' : t.album),
+                            if (t.customTitle.isNotEmpty)
+                              _line('Título de origem', t.title),
                             _line('ISRC',
                                 t.isrc.isEmpty ? 'Não informado' : t.isrc),
                             _line('Coleção', c.current?.name ?? '—'),
@@ -138,19 +140,17 @@ class _TrackInspectorState extends State<TrackInspector> {
                               SelectableText(t.manualUrl,
                                   style: const TextStyle(fontSize: 12)),
                               const SizedBox(height: 8),
-                              Text(
-                                  t.manualMode == ManualSourceMode.extractAudio
-                                      ? 'Vínculo salvo. A extração desta página ainda não está disponível.'
-                                      : 'MP3 direto. O conteúdo será validado durante a transferência.',
-                                  style: const TextStyle(
-                                      fontSize: 12, height: 1.6)),
                               TextButton.icon(
-                                  onPressed: c.busy ? null : _manual,
+                                  onPressed: c.busy ||
+                                          t.status == TrackStatus.completed
+                                      ? null
+                                      : _manual,
                                   icon:
                                       const Icon(Icons.edit_outlined, size: 16),
                                   label: const Text('Editar link manual')),
                               TextButton(
-                                  onPressed: c.busy
+                                  onPressed: c.busy ||
+                                          t.status == TrackStatus.completed
                                       ? null
                                       : () => unawaited(c.removeManualSource()),
                                   child: const Text('Remover vínculo manual')),
@@ -194,8 +194,10 @@ class _TrackInspectorState extends State<TrackInspector> {
                                               !c.music!.canUse(_candidate!))
                                       ? null
                                       : () => unawaited(_confirm()),
-                                  child:
-                                      const Text('Confirmar correspondência')),
+                                  child: Text(
+                                      _candidate?.isVideoRecording == true
+                                          ? 'Aprovar videoclipe'
+                                          : 'Confirmar correspondência')),
                               TextButton(
                                   onPressed:
                                       c.busy || t.sourceKind == SourceKind.none
@@ -203,7 +205,10 @@ class _TrackInspectorState extends State<TrackInspector> {
                                           : () => unawaited(c.reviewSource()),
                                   child: const Text('Marcar para revisão')),
                               TextButton.icon(
-                                  onPressed: c.busy ? null : _manual,
+                                  onPressed: c.busy ||
+                                          t.status == TrackStatus.completed
+                                      ? null
+                                      : _manual,
                                   icon: const Icon(Icons.link, size: 16),
                                   label:
                                       const Text('Informar link manualmente')),
@@ -246,7 +251,7 @@ class _TrackInspectorState extends State<TrackInspector> {
         value: candidate,
         title: Text(candidate.title, style: const TextStyle(fontSize: 12)),
         subtitle: Text(
-            '${candidate.artist}\n${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
+            '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
             style: const TextStyle(fontSize: 11)));
   }
 
@@ -255,7 +260,45 @@ class _TrackInspectorState extends State<TrackInspector> {
       if (widget.controller.music == null) {
         await widget.controller.usePreview(candidate);
       } else {
-        await widget.controller.useMusicCandidate(candidate);
+        var approved = false;
+        if (candidate.isVideoRecording) {
+          final id = widget.controller.focused?.id;
+          approved = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                          title: const Text('Usar áudio deste videoclipe?'),
+                          content: SingleChildScrollView(
+                              child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(candidate.title),
+                                const SizedBox(height: 8),
+                                Text(candidate.artist),
+                                const SizedBox(height: 8),
+                                Text(
+                                    'Duração desta versão: ${formatDuration(candidate.durationMs)}'),
+                                Text(
+                                    'Duração solicitada: ${formatDuration(widget.controller.focused?.durationMs)}'),
+                                const SizedBox(height: 12),
+                                SelectableText(candidate.pageUrl,
+                                    style: const TextStyle(fontSize: 12)),
+                              ])),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancelar')),
+                            FilledButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Aprovar esta versão'))
+                          ])) ==
+              true;
+          if (!approved || !mounted || widget.controller.focused?.id != id) {
+            return;
+          }
+        }
+        await widget.controller
+            .useMusicCandidate(candidate, approveVideo: approved);
       }
     } else {
       await widget.controller.confirmSource();

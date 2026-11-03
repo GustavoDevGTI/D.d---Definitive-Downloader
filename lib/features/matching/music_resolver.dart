@@ -11,8 +11,11 @@ class MusicResolver {
   final DeezerConnectionController connection;
   bool get available => engine.available;
   bool canUse(Candidate candidate) =>
-      candidate.isFullRecording &&
-      (candidate.kind == SourceKind.youtubeMusic || connection.connected);
+      available &&
+      (candidate.isVideoRecording ||
+          (candidate.isFullRecording &&
+              (candidate.kind == SourceKind.youtubeMusic ||
+                  connection.connected)));
 
   Future<List<Candidate>> search(Track track, String query,
       {DownloadCancellation? cancellation}) async {
@@ -41,8 +44,39 @@ class MusicResolver {
         lastError = error;
       }
     }
+    const matcher = TrackMatcher();
+    if (!candidates
+        .any((c) => canUse(c) && !matcher.assess(track, c).needsReview)) {
+      try {
+        candidates.addAll(
+            await searchVideos(track, query, cancellation: cancellation));
+      } on DownloadCancelled {
+        rethrow;
+      } catch (error) {
+        lastError ??= error;
+      }
+    }
     if (candidates.isEmpty && lastError != null) throw lastError;
     return candidates;
+  }
+
+  Future<List<Candidate>> searchVideos(Track track, String query,
+      {DownloadCancellation? cancellation}) async {
+    cancellation?.check();
+    final response = await engine.call({
+      'operation': 'search',
+      'provider': 'youtube',
+      'query': query,
+      'isrc': track.isrc
+    }, cancellation: cancellation);
+    final rows = response['candidates'];
+    if (rows is! List || rows.length > 8) {
+      throw const FormatException('Resposta de videoclipes inválida.');
+    }
+    return rows
+        .map((r) => parseMusicCandidate(Map<String, dynamic>.from(r as Map)))
+        .where((c) => c.isVideoRecording && c.durationMs >= 1000)
+        .toList();
   }
 
   Candidate? automaticChoice(Track track, List<Candidate> candidates,

@@ -82,6 +82,14 @@ void main() {
       // Simulate the actual v2 schema, not a current schema with a false version.
       db.execute('DROP TABLE music_candidates');
       db.execute('DROP TABLE music_source_attempts');
+      db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
+      for (final column in [
+        'custom_title',
+        'recording_type',
+        'source_authorization'
+      ]) {
+        db.execute('ALTER TABLE tracks DROP COLUMN $column');
+      }
       db.execute('DROP TABLE download_run_additions');
       db.execute('ALTER TABLE tracks DROP COLUMN queue_added');
       db.execute('DROP TABLE download_history');

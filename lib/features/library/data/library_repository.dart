@@ -21,7 +21,8 @@ class LibraryRepository {
               sourceUrl: r['source_url'] as String,
               trackCount: r['total'] as int,
               completedCount: r['completed'] as int,
-              isPartial: r['partial'] == 1))
+              isPartial: r['partial'] == 1,
+              editingLocked: r['editing_locked'] == 1))
           .toList());
 
   Future<int> importCollection(ImportedCollection collection) async {
@@ -128,8 +129,8 @@ class LibraryRepository {
         final args = <Object?>[id];
         if (query.trim().isNotEmpty) {
           clause +=
-              ' AND (instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0)';
-          args.addAll([query.trim(), query.trim()]);
+              ' AND (instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0 OR instr(lower(custom_title),lower(?))>0)';
+          args.addAll([query.trim(), query.trim(), query.trim()]);
         }
         final total = db
             .select(
@@ -188,7 +189,7 @@ class LibraryRepository {
   Future<Track?> nextSelected(int id, {int afterPosition = 0}) =>
       database.run((db) {
         final rows = db.select(
-            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND match_status!='review' AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed') ORDER BY position LIMIT 1",
+            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND match_status!='review' AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo')) AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed') ORDER BY position LIMIT 1",
             [id, afterPosition]);
         return rows.isEmpty ? null : readTrack(rows.first);
       });
@@ -240,6 +241,10 @@ class LibraryRepository {
           .toList());
 
   static Track readTrack(Map<String, Object?> r) => Track(
+      customTitle: r['custom_title'] as String? ?? '',
+      recordingType: r['recording_type'] as String? ?? '',
+      sourceAuthorization: SourceAuthorization.values
+          .byName(r['source_authorization'] as String? ?? 'catalog'),
       queuePriority: r['queue_priority'] as int? ?? 0,
       id: r['id'] as int,
       collectionId: r['collection_id'] as int,
@@ -274,8 +279,8 @@ class LibraryRepository {
 
   Future<void> saveCandidates(int id, List<Candidate> candidates) =>
       database.run((db) {
-        if (candidates.length > 16) {
-          throw ArgumentError('Limite de 16 candidatos por faixa.');
+        if (candidates.length > 24) {
+          throw ArgumentError('Limite de 24 candidatos por faixa.');
         }
         db.execute('BEGIN IMMEDIATE');
         try {
@@ -308,7 +313,7 @@ class LibraryRepository {
 
   Future<List<Candidate>> musicCandidates(int id) => database.run((db) => db
       .select(
-          'SELECT * FROM music_candidates WHERE track_id=? ORDER BY ordinal LIMIT 16',
+          'SELECT * FROM music_candidates WHERE track_id=? ORDER BY ordinal LIMIT 24',
           [
             id
           ])
@@ -326,24 +331,65 @@ class LibraryRepository {
           explicit: r['explicit'] == null ? null : r['explicit'] == 1))
       .toList());
 
-  Future<void> chooseMusicSource(Track track, Candidate candidate) =>
+  Future<void> chooseMusicSource(Track track, Candidate candidate,
+          {bool approveVideo = false, bool forFallback = false}) =>
       database.run((db) {
-        if (!candidate.isFullRecording) {
-          throw const FormatException('Videoclipe ou fonte não confirmada.');
+        if (!candidate.isFullRecording &&
+            !(approveVideo && candidate.isVideoRecording)) {
+          throw const FormatException('Esta versão exige aprovação explícita.');
         }
-        db.execute(
-            '''UPDATE tracks SET media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='completed' THEN status ELSE 'ready' END,error='',
-      resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=? WHERE id=? AND manual_url='' ''',
-            [
-              candidate.pageUrl,
-              candidate.kind.name,
-              candidate.title,
-              candidate.artist,
-              candidate.album,
-              candidate.durationMs,
-              candidate.coverUrl,
-              track.id
-            ]);
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          final rows = db.select(
+              'SELECT status,manual_url,source_kind FROM tracks WHERE id=?',
+              [track.id]);
+          if (rows.isNotEmpty && rows.first['manual_url'] != '') {
+            db.execute('COMMIT');
+            return;
+          }
+          if (rows.isEmpty ||
+              (rows.first['status'] == 'completed' ||
+                  (rows.first['status'] == 'downloading' &&
+                      !(forFallback &&
+                          candidate.kind == SourceKind.youtubeMusic &&
+                          rows.first['source_kind'] == 'deezerFull')))) {
+            throw const FormatException(
+                'Esta ocorrência não permite alterar a fonte agora.');
+          }
+          if (candidate.isVideoRecording &&
+              db.select(
+                  'SELECT 1 FROM music_candidates WHERE track_id=? AND kind=? AND page_url=? AND recording_type=? AND duration_ms=? AND title=? AND artist=?',
+                  [
+                    track.id,
+                    candidate.kind.name,
+                    candidate.pageUrl,
+                    candidate.recordingType,
+                    candidate.durationMs,
+                    candidate.title,
+                    candidate.artist
+                  ]).isEmpty) {
+            throw const FormatException(
+                'Pesquise novamente para aprovar esta versão.');
+          }
+          db.execute(
+              "UPDATE tracks SET media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='downloading' THEN status ELSE 'ready' END,error='',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=? WHERE id=?",
+              [
+                candidate.pageUrl,
+                candidate.kind.name,
+                candidate.title,
+                candidate.artist,
+                candidate.album,
+                candidate.durationMs,
+                candidate.coverUrl,
+                candidate.recordingType,
+                candidate.isVideoRecording ? 'approvedVideo' : 'catalog',
+                track.id
+              ]);
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
       });
 
   Future<void> setManualSource(
@@ -414,21 +460,23 @@ class LibraryRepository {
             sourceUrl: r['source_url'] as String,
             trackCount: r['total'] as int,
             completedCount: r['completed'] as int,
-            isPartial: r['partial'] == 1);
+            isPartial: r['partial'] == 1,
+            editingLocked: r['editing_locked'] == 1);
       });
 
   Future<void> selectCollection(int id, bool value, {String query = ''}) =>
       database.run((db) {
         db.execute('''UPDATE tracks SET selected=? WHERE collection_id=?
-      AND (?='' OR instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0)''',
-            [value ? 1 : 0, id, query, query, query]);
+      AND (?='' OR instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0 OR instr(lower(custom_title),lower(?))>0)''',
+            [value ? 1 : 0, id, query, query, query, query]);
       });
 
   Future<void> recordMusicAttempt(int id, SourceKind provider,
           {required bool succeeded, String message = ''}) =>
       database.run((db) {
         if (provider != SourceKind.deezerFull &&
-            provider != SourceKind.youtubeMusic) {
+            provider != SourceKind.youtubeMusic &&
+            provider != SourceKind.youtube) {
           return;
         }
         if (message.length > 1000) message = message.substring(0, 1000);

@@ -142,8 +142,9 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                       keyboardType: TextInputType.multiline,
                       decoration: const InputDecoration(
                           labelText: 'Links das faixas',
+                          alignLabelWithHint: true,
                           hintText:
-                              'Spotify, Deezer, YouTube Music ou MP3 direto\nUm link por linha · até 20',
+                              'Spotify, Deezer, YouTube ou MP3 direto\nUm link por linha · até 20',
                           counterText: '')),
                   if (_saving)
                     Padding(

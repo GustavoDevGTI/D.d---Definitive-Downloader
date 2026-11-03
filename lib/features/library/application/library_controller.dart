@@ -15,6 +15,8 @@ import '../../importing/spotify_account_importer.dart';
 import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
 import '../data/library_repository.dart';
+import '../data/playlist_editor.dart';
+import '../../importing/music_link.dart';
 import '../domain/models.dart';
 import '../domain/matching.dart';
 import '../../workspace/data/workspace_repository.dart';
@@ -41,7 +43,7 @@ class LibraryController extends ChangeNotifier {
       repository.collections(offset: offset);
 
   Future<bool> addLinks(int collectionId, String input) async {
-    if (addingLinks || importing || preparing) return false;
+    if (addingLinks || importing || preparing || editing) return false;
     addingLinks = true;
     _additionDone = Completer<void>();
     notifyListeners();
@@ -68,6 +70,45 @@ class LibraryController extends ChangeNotifier {
       linkProgress = '';
       _additionDone?.complete();
       _additionDone = null;
+      notifyListeners();
+    }
+  }
+
+  bool editing = false;
+  Future<bool> editTrack(Track track,
+      {required String name,
+      required int position,
+      String? sourceInput,
+      MusicLinkKind? platform}) async {
+    if (busy) return false;
+    editing = true;
+    notifyListeners();
+    try {
+      ResolvedMusicLink? replacement;
+      if (sourceInput != null && platform != null) {
+        final link = MusicLink.fromIdentifier(platform, sourceInput);
+        replacement = (await MusicLinkService(
+                    linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify),
+                    music)
+                .resolve(link.url))
+            .single;
+      }
+      final requestedName = replacement != null &&
+              name.trim() == track.displayTitle &&
+              track.customTitle.isEmpty
+          ? replacement.draft.title
+          : name;
+      await PlaylistEditor(repository.database).edit(track.id,
+          name: requestedName, position: position, replacement: replacement);
+      offset = collectionQuery.isEmpty ? ((position - 1) ~/ 40) * 40 : 0;
+      message = 'Faixa atualizada.';
+      await refresh();
+      return true;
+    } catch (error) {
+      message = _message(error);
+      return false;
+    } finally {
+      editing = false;
       notifyListeners();
     }
   }
@@ -112,7 +153,8 @@ class LibraryController extends ChangeNotifier {
 
   int _searchGeneration = 0;
   int _refreshGeneration = 0;
-  bool get busy => importing || downloading || preparing || addingLinks;
+  bool get busy =>
+      importing || downloading || preparing || addingLinks || editing;
   bool get isExample => current?.source == 'Exemplo local';
   bool get allFilteredSelected =>
       page.total > 0 && page.filteredSelectedCount == page.total;
@@ -231,6 +273,28 @@ class LibraryController extends ChangeNotifier {
     if (track == null || busy) return;
     _searchGeneration++;
     try {
+      MusicLink? link;
+      try {
+        link = MusicLink.parse(value);
+      } on FormatException {/* Generic pages may remain pending below. */}
+      if (link != null) {
+        final resolved = (await MusicLinkService(
+                    linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify),
+                    music)
+                .resolve(link.url))
+            .single;
+        await MusicLinkRepository(repository.database)
+            .setSource(track.id, resolved);
+        message = resolved.ready
+            ? 'Fonte manual salva.'
+            : 'Fonte salva; aguardando conexão ou revisão.';
+        await refresh();
+        return;
+      }
+      if (mode == ManualSourceMode.originalAudio) {
+        throw const FormatException(
+            'Use um link de faixa, YouTube ou MP3 direto.');
+      }
       await repository.setManualSource(track.id, value, mode);
       message = mode == ManualSourceMode.extractAudio
           ? 'Fonte manual salva. A extração de páginas e vídeos ainda não está disponível.'
@@ -292,6 +356,7 @@ class LibraryController extends ChangeNotifier {
               track.status == TrackStatus.pending &&
               resolver.available &&
               (track.sourceKind == SourceKind.youtubeMusic ||
+                  track.sourceKind == SourceKind.youtube ||
                   (track.sourceKind == SourceKind.deezerFull &&
                       resolver.connection.connected))) {
             await repository.setStatus(track.id, TrackStatus.ready);
@@ -302,7 +367,7 @@ class LibraryController extends ChangeNotifier {
               track.sourceKind == SourceKind.localExample) {
             continue;
           }
-          activeTitle = track.title;
+          activeTitle = track.displayTitle;
           message =
               'Procurando faixas de áudio: ${track.position}/${collection.trackCount}';
           notifyListeners();
@@ -331,7 +396,7 @@ class LibraryController extends ChangeNotifier {
         after += batch.items.length;
       }
       message =
-          '$prepared faixa(s) preparada(s). $review para revisão. Videoclipes excluídos.';
+          '$prepared faixa(s) preparada(s). $review para revisão; videoclipes exigem aprovação.';
     } on DownloadCancelled {
       message =
           'Busca interrompida. As correspondências já conferidas foram mantidas.';
@@ -344,17 +409,24 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
-  Future<void> useMusicCandidate(Candidate candidate) async {
+  Future<void> useMusicCandidate(Candidate candidate,
+      {bool approveVideo = false}) async {
     if (focused == null ||
         focused!.hasManualSource ||
         busy ||
         music?.canUse(candidate) != true) {
       return;
     }
-    await repository.chooseMusicSource(focused!, candidate);
-    message =
-        'Faixa vinculada: ${candidate.kind == SourceKind.deezerFull ? 'Deezer' : 'YouTube Music'}. A versão escolhida será reconferida no download.';
-    await refresh();
+    try {
+      await repository.chooseMusicSource(focused!, candidate,
+          approveVideo: approveVideo);
+      message =
+          'Fonte vinculada: ${candidate.kind.musicProviderName ?? 'Fonte'}.';
+      await refresh();
+    } catch (error) {
+      message = _message(error);
+      notifyListeners();
+    }
   }
 
   Future<void> select(Track track, bool value) async {
@@ -424,7 +496,7 @@ class LibraryController extends ChangeNotifier {
             ? 'Nenhum resultado. Tente ajustar título ou artista.'
             : music == null
                 ? 'A Deezer oferece prévias nesta integração; os resultados não habilitam download de faixa completa.'
-                : 'Faixas de áudio em Deezer e YouTube Music. Videoclipes foram excluídos.';
+                : 'Fontes em Deezer e YouTube Music; videoclipes só como última alternativa e com aprovação.';
         if (music != null && focused != null) {
           await repository.saveCandidates(focused!.id, found);
         }
@@ -499,6 +571,7 @@ class LibraryController extends ChangeNotifier {
     final destinations = <int, String>{};
     var saved = 0;
     var failed = 0;
+    var reviewVideos = 0;
     final queue = WorkspaceRepository(repository.database);
     final run = '${DateTime.now().microsecondsSinceEpoch}';
     _activeRun = run;
@@ -534,7 +607,7 @@ class LibraryController extends ChangeNotifier {
             p.join(outputDirectory, '${safeSegment(owner.name)} [${owner.id}]');
         destinations[owner.id] = directory;
         activeTrackId = track.id;
-        activeTitle = track.title;
+        activeTitle = track.displayTitle;
         progress = null;
         await refresh();
         try {
@@ -573,11 +646,30 @@ class LibraryController extends ChangeNotifier {
             final alternatives = await repository.musicCandidates(track.id);
             final fallback = music!.automaticChoice(track, alternatives,
                 only: SourceKind.youtubeMusic);
-            if (fallback == null) rethrow;
+            if (fallback == null) {
+              final videos = await music!.searchVideos(
+                  track, '${track.artist} ${track.title}',
+                  cancellation: token);
+              if (videos.isEmpty) rethrow;
+              await repository.saveCandidates(
+                  track.id,
+                  [
+                    ...alternatives.where((c) => c.kind != SourceKind.youtube),
+                    ...videos
+                  ].take(24).toList());
+              await repository.markForReview(track.id);
+              await repository.setStatus(track.id, TrackStatus.pending,
+                  error:
+                      'Áudio indisponível. Videoclipe encontrado: aprove a versão na coleção.');
+              reviewVideos++;
+              await refresh();
+              continue;
+            }
             message =
                 'Deezer indisponível para esta faixa; tentando a correspondência de áudio no YouTube Music.';
             notifyListeners();
-            await repository.chooseMusicSource(track, fallback);
+            await repository.chooseMusicSource(track, fallback,
+                forFallback: true);
             final updated = await repository.trackById(track.id);
             await repository.setStatus(track.id, TrackStatus.downloading);
             path = await receive(updated!);
@@ -609,6 +701,10 @@ class LibraryController extends ChangeNotifier {
           : saved == 0 && failed == 0
               ? 'Selecione faixas com uma fonte vinculada. Itens já salvos não são baixados novamente.'
               : '$saved arquivo(s) salvo(s) com metadados. $failed falha(s). Playlist M3U8 na pasta da coleção.';
+      if (reviewVideos > 0) {
+        message +=
+            ' $reviewVideos videoclipe(s) aguardando aprovação na coleção.';
+      }
     } catch (error) {
       message = _message(error);
     } finally {

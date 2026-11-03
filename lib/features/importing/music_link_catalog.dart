@@ -119,14 +119,13 @@ class MusicLinkCatalog {
       final details = row['videoDetails'];
       if (details is! Map ||
           details['videoId'] != link.id ||
-          details['musicVideoType'] != 'MUSIC_VIDEO_TYPE_ATV' ||
           details['isLiveContent'] == true ||
           details['isLive'] == true ||
           details['isTvfilmVideo'] == true ||
           row['playabilityStatus'] is! Map ||
           row['playabilityStatus']['status'] != 'OK') {
         throw const FormatException(
-            'Somente faixas de áudio ATV disponíveis no YouTube Music são aceitas.');
+            'Este link do YouTube está indisponível ou é uma transmissão ao vivo.');
       }
       final thumbnails = details['thumbnail'] is Map
           ? details['thumbnail']['thumbnails']
@@ -138,17 +137,25 @@ class MusicLinkCatalog {
           album: '',
           durationMs: _duration(int.tryParse('${details['lengthSeconds']}'),
               seconds: true),
-          pageUrl: link.url,
+          pageUrl: link.kind == MusicLinkKind.youtubeMusic &&
+                  details['musicVideoType'] == 'MUSIC_VIDEO_TYPE_ATV'
+              ? link.url
+              : 'https://www.youtube.com/watch?v=${link.id}',
           previewUrl: '',
           coverUrl: thumbnails is List &&
                   thumbnails.isNotEmpty &&
                   thumbnails.last is Map
               ? _image(thumbnails.last['url'])
               : '',
-          kind: SourceKind.youtubeMusic,
-          recordingType: 'MUSIC_VIDEO_TYPE_ATV');
+          kind: link.kind == MusicLinkKind.youtubeMusic &&
+                  details['musicVideoType'] == 'MUSIC_VIDEO_TYPE_ATV'
+              ? SourceKind.youtubeMusic
+              : SourceKind.youtube,
+          recordingType: details['musicVideoType'] is String
+              ? details['musicVideoType'] as String
+              : '');
     }
-    if (!source.isFullRecording) {
+    if (!source.isFullRecording && source.kind != SourceKind.youtube) {
       throw const FormatException('Tipo de gravação não confirmado.');
     }
     return ResolvedMusicLink(

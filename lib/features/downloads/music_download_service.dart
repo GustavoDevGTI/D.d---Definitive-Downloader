@@ -14,7 +14,7 @@ class MusicDownloadService {
   Future<String> save(Track track, String directory, DownloadCancellation token,
       void Function(String) onStage) async {
     final candidate = Candidate(
-        title: track.outputTitle,
+        title: track.resolvedTitle.isEmpty ? track.title : track.resolvedTitle,
         artist: track.outputArtist,
         album: track.outputAlbum,
         durationMs: track.outputDurationMs ?? 0,
@@ -22,10 +22,18 @@ class MusicDownloadService {
         previewUrl: '',
         coverUrl: track.resolvedCoverUrl,
         kind: track.sourceKind,
-        recordingType: track.sourceKind == SourceKind.youtubeMusic
-            ? 'MUSIC_VIDEO_TYPE_ATV'
-            : 'DEEZER_TRACK');
-    if (!candidate.isFullRecording) {
+        recordingType: track.recordingType.isNotEmpty
+            ? track.recordingType
+            : track.sourceKind == SourceKind.youtubeMusic
+                ? 'MUSIC_VIDEO_TYPE_ATV'
+                : track.sourceKind == SourceKind.deezerFull
+                    ? 'DEEZER_TRACK'
+                    : '');
+    final allowedVideo = track.sourceKind == SourceKind.youtube &&
+        (track.sourceAuthorization == SourceAuthorization.manualLink ||
+            (track.sourceAuthorization == SourceAuthorization.approvedVideo &&
+                candidate.isVideoRecording));
+    if (!candidate.isFullRecording && !allowedVideo) {
       throw const FormatException('Não é uma fonte musical confirmada.');
     }
     final folder = Directory(directory);
@@ -35,6 +43,8 @@ class MusicDownloadService {
       final request = <String, dynamic>{
         'operation': 'download',
         'candidate': candidateJson(candidate),
+        'authorization': track.sourceAuthorization.name,
+        'outputTitle': track.customTitle,
         'directory': work.absolute.path
       };
       if (track.sourceKind == SourceKind.deezerFull) {
@@ -46,7 +56,13 @@ class MusicDownloadService {
       final actual = parseMusicCandidate(
           Map<String, dynamic>.from(result['actual'] as Map));
       final duration = result['durationMs'];
-      if (!actual.isFullRecording ||
+      if ((!actual.isFullRecording &&
+              !(allowedVideo && actual.kind == SourceKind.youtube)) ||
+          actual.kind != candidate.kind ||
+          (track.sourceAuthorization == SourceAuthorization.approvedVideo &&
+              !actual.isVideoRecording) ||
+          (track.customTitle.isNotEmpty &&
+              result['displayTitle'] != track.customTitle) ||
           actual.pageUrl != candidate.pageUrl ||
           result['decoded'] != true ||
           result['coverEmbedded'] != true ||
@@ -65,7 +81,7 @@ class MusicDownloadService {
             'O motor não entregou um arquivo validado.');
       }
       final name =
-          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(actual.artist)} - ${safeSegment(actual.title)}${actual.kind.musicProviderSuffix}';
+          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(actual.artist)} - ${safeSegment(track.customTitle.isEmpty ? actual.title : track.customTitle)}${actual.kind.musicProviderSuffix}';
       var output = File(p.join(folder.path, '$name.mp3'));
       if (await output.exists()) {
         output = File(p.join(folder.path, '$name [${track.id}].mp3'));

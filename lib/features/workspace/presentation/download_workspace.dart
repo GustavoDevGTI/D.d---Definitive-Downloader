@@ -108,6 +108,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       !library.addingLinks &&
                       !library.importing &&
                       !library.preparing &&
+                      !library.editing &&
                       library.current != null
                   ? () => unawaited(showAddMusicLinks(context, library))
                   : null,
@@ -207,7 +208,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                     onPressed: enabled && library.current != null
                         ? (library.addingLinks ||
                                 library.importing ||
-                                library.preparing
+                                library.preparing ||
+                                library.editing
                             ? null
                             : () =>
                                 unawaited(showAddMusicLinks(context, library)))
