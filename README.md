@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.16](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.16). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.17](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.17). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
-![Hover dos controles do D.d — captura de layout com dados isolados](docs/images/motion-0116-hover-desktop.png)
+![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0117-desktop.png)
+
+A versão **0.1.17** amplia a área útil de Downloads, fixa o cabeçalho azul-marinho e usa linhas alternadas em rosa suave e barras de rolagem framboesa. Filtros sem resultados mantêm a tabela vazia com cabeçalho. [Validação](docs/RELEASE_0_1_17.md).
 
 A versão **0.1.16** acrescenta animação de escala aos controles de Downloads e Adicionar links: crescimento no hover/foco, compressão ao pressionar e retorno suave, sem deslocar os outros controles. Respeita movimento reduzido e botões desabilitados. [Validação](docs/RELEASE_0_1_16.md).
 

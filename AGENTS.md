@@ -72,6 +72,8 @@
 - Tipografia legível, foco de teclado, atalhos, contraste e escala de texto adequados.
 - Layout adaptativo: compartilhar identidade, não reduzir mecanicamente a tela desktop para mobile.
 
+- Tabela de Downloads 0.1.17: ampliar a área útil, manter cabeçalho azul-marinho fixo na rolagem das linhas, alternância rosa suave e barras de rolagem framboesa. Filtro musical sem resultados mantém cabeçalho e corpo vazio, sem painel de orientações. Largura excedente favorece Nome sem sobrescrever as larguras salvas; detalhes em `docs/RELEASE_0_1_17.md`.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

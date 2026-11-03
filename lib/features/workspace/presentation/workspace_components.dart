@@ -132,15 +132,19 @@ class PageControls extends StatelessWidget {
       required this.count,
       required this.total,
       required this.onPage,
-      this.label = 'itens'});
+      this.label = 'itens',
+      this.showDivider = true});
   final int offset, count, total;
   final String label;
+  final bool showDivider;
   final ValueChanged<int> onPage;
   @override
   Widget build(BuildContext context) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.line))),
+      decoration: showDivider
+          ? const BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.line)))
+          : null,
       child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
         Flexible(
             child: Text(

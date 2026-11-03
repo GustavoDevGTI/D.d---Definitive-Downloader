@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
 import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -252,6 +253,10 @@ void main() {
         await tester.runAsync(() => Future<void>.delayed(Duration.zero));
         await tester.pump(const Duration(milliseconds: 16));
       }
+      if (width == 1360 && size.height == 820) {
+        expect(tester.getSize(find.byType(DownloadTable)).height,
+            greaterThan(400));
+      }
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
       expect(find.textContaining('MP3 vinculado'), findsOneWidget,
           reason:
@@ -259,13 +264,33 @@ void main() {
       final downloadSearch =
           find.byKey(const ValueKey('download-search-music'));
       await tester.enterText(downloadSearch, 'Nada com este nome');
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.runAsync(downloadsWidget.controller.refresh);
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester.runAsync(() =>
+          downloadsWidget.controller.searchDownloads('Nada com este nome'));
       await tester.pumpAndSettle();
+      for (var frame = 0;
+          frame < 30 && downloadsWidget.controller.downloads.total != 0;
+          frame++) {
+        await tester.runAsync(downloadsWidget.controller.refresh);
+        await tester.pump(const Duration(milliseconds: 50));
+      }
       expect(downloadsWidget.controller.downloads.total, 0);
+      expect(
+          find.byKey(const ValueKey('download-table-header')), findsOneWidget);
+      expect(find.text('Nenhum download neste filtro'), findsNothing);
+      expect(find.text('Adicione faixas em Músicas → Coleções.'), findsNothing);
+      await capture(tester, captureKey, 'empty-downloads-${width.toInt()}');
       await tester.tap(find.byTooltip('Limpar busca de downloads'));
-      await tester.runAsync(downloadsWidget.controller.refresh);
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester
+          .runAsync(() => downloadsWidget.controller.searchDownloads(''));
       await tester.pumpAndSettle();
+      for (var frame = 0;
+          frame < 30 && downloadsWidget.controller.downloads.total == 0;
+          frame++) {
+        await tester.runAsync(downloadsWidget.controller.refresh);
+        await tester.pump(const Duration(milliseconds: 50));
+      }
       expect(downloadsWidget.controller.downloadQuery, isEmpty);
       expect(downloadsWidget.controller.downloads.total, greaterThan(0));
       downloadsWidget.controller.selectPage(true);

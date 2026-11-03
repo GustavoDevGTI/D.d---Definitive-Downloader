@@ -40,204 +40,220 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: Listenable.merge([controller, controller.library]),
-      builder: (context, child) {
-        final c = controller, library = c.library;
-        final enabled = category == ContentCategory.music;
-        final page = enabled && c.category == category
-            ? c.downloads
-            : const DownloadPage([], 0);
-        final selected =
-            page.items.where((e) => c.selection.contains(e.track.id)).toList();
-        final canStart = enabled &&
-            !library.busy &&
-            selected.any((e) =>
-                e.track.canDownload &&
-                [TrackStatus.ready, TrackStatus.failed]
-                    .contains(e.track.status));
-        final canCancel = library.downloading && enabled;
-        final canPrioritize = selected.any((e) =>
-            [TrackStatus.ready, TrackStatus.failed].contains(e.track.status));
-        final content =
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            const Expanded(
-                child: Text('Gerenciador de downloads',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
-            Text('${page.total} registros',
-                style: const TextStyle(fontSize: 11, color: AppColors.muted))
-          ]),
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-                child: TextField(
-              key: ValueKey('download-search-${category.name}'),
-              controller: _query,
-              enabled: enabled,
-              maxLength: 200,
-              decoration: InputDecoration(
-                  counterText: '',
-                  hintText: 'Buscar nos downloads…',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _query.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Limpar busca de downloads',
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            _searchTimer?.cancel();
-                            _query.clear();
-                            setState(() {});
-                            unawaited(c.searchDownloads(''));
-                          })),
-              onChanged: (value) {
-                setState(() {});
-                _searchTimer?.cancel();
-                _searchTimer = Timer(const Duration(milliseconds: 300),
-                    () => unawaited(c.searchDownloads(value)));
-              },
-            )),
-            const SizedBox(width: 8),
-            IconButton(
-                tooltip: 'Restaurar colunas',
-                onPressed: () => unawaited(c.resetColumnWidths()),
-                icon: const Icon(Icons.view_column_outlined,
-                    color: AppColors.accent)),
-          ]),
-          const SizedBox(height: 12),
-          DownloadToolbar(
-              onAdd: enabled &&
-                      !library.addingLinks &&
-                      !library.importing &&
-                      !library.preparing &&
-                      !library.editing &&
-                      library.current != null
-                  ? () => unawaited(showAddMusicLinks(context, library))
-                  : null,
-              paused: library.pauseMode,
-              onStart: canStart || (enabled && library.pauseMode)
-                  ? () => unawaited(c.start())
-                  : null,
-              onPause: canCancel ? library.togglePause : null,
-              onCancel: canCancel ? library.cancel : null,
-              onUp:
-                  canPrioritize && selected.any((e) => e.track.queuePriority < 4)
-                      ? () => unawaited(c.changePriority(1))
-                      : null,
-              onDown: canPrioritize &&
-                      selected.any((e) => e.track.queuePriority > -4)
-                  ? () => unawaited(c.changePriority(-1))
-                  : null,
-              onOpen: selected.length == 1 &&
-                      selected.single.track.localPath.isNotEmpty
-                  ? () => unawaited(c.reveal(selected.single.track.localPath))
-                  : null,
-              onRetry: canStart &&
-                      selected.any((e) => e.track.status == TrackStatus.failed)
-                  ? () => unawaited(c.start(failedOnly: true))
-                  : null,
-              onRemove: enabled &&
-                      selected
-                          .any((e) => e.track.status != TrackStatus.downloading)
-                  ? () => unawaited(_remove(context))
-                  : null),
-          const SizedBox(height: 10),
-          if (c.message.isNotEmpty)
-            Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(c.message,
-                    style: const TextStyle(color: AppColors.ink))),
-          Wrap(spacing: 4, runSpacing: 4, children: [
-            for (final filter in DownloadFilter.values)
-              TextButton(
-                  style: TextButton.styleFrom(
-                      shape: const StadiumBorder(),
-                      foregroundColor: AppColors.muted,
-                      backgroundColor: c.filter == filter
-                          ? AppColors.accentSoft
-                          : Colors.transparent),
-                  onPressed: () => unawaited(c.setFilter(filter)),
-                  child: Text(switch (filter) {
-                    DownloadFilter.all => 'Todos',
-                    DownloadFilter.downloading => 'Baixando',
-                    DownloadFilter.queued => 'Na fila',
-                    DownloadFilter.paused => 'Pausado',
-                    DownloadFilter.completed => 'Concluído',
-                    DownloadFilter.failed => 'Erro',
-                  }))
-          ]),
-          const SizedBox(height: 10),
-          Expanded(
-              child: WorkspacePanel(
-                  child: page.items.isEmpty
-                      ? WorkspaceNotice(
-                          title: enabled
-                              ? 'Nenhum download neste filtro'
-                              : 'Fila de vídeos e fotos',
-                          message: enabled
-                              ? 'Adicione faixas em Músicas → Coleções.'
-                              : 'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
-                      : DownloadTable(
-                          entries: page.items,
-                          widths: c.columnWidths,
-                          onResize: c.resizeColumn,
-                          onResizeEnd: () => unawaited(c.saveColumnWidths()),
-                          selection: c.selection,
-                          onSelect: c.select,
-                          onSelectPage: c.selectPage,
-                          activeId: library.activeTrackId,
-                          progress: library.progress,
-                          paused: library.pauseMode,
-                          output: library.outputDirectory))),
-          PageControls(
-              offset: c.downloadOffset,
-              count: page.items.length,
-              total: page.total,
-              onPage: (v) => unawaited(c.turnDownloads(v))),
-          const SizedBox(height: 6),
-          Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: 12,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text('${c.selection.length} selecionados',
-                    style:
-                        const TextStyle(fontSize: 11, color: AppColors.muted)),
-                ButtonHoverMotion(
-                    builder: (states) => OutlinedButton.icon(
-                        statesController: states,
-                        style: downloadActionStyle(DownloadActionColors.add)
-                            .copyWith(
-                                shape: const WidgetStatePropertyAll(
-                                    StadiumBorder())),
-                        onPressed: enabled && library.current != null
-                            ? (library.addingLinks ||
-                                    library.importing ||
-                                    library.preparing ||
-                                    library.editing
-                                ? null
-                                : () => unawaited(
-                                    showAddMusicLinks(context, library)))
-                            : onCapture,
-                        icon: const Icon(Icons.add, size: 16),
-                        label: Text(enabled
-                            ? 'Adicionar links'
-                            : 'Capturar novo link'))),
-              ]),
-        ]);
-        return LayoutBuilder(builder: (context, constraints) {
-          final minimumHeight = constraints.maxWidth < 600
-              ? (MediaQuery.textScalerOf(context).scale(12) > 14
-                  ? 820.0
-                  : 700.0)
-              : 540.0;
-          return constraints.maxHeight < minimumHeight
-              ? SingleChildScrollView(
-                  child: SizedBox(height: minimumHeight, child: content))
-              : content;
-        });
-      });
+      builder: (context, child) =>
+          LayoutBuilder(builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1040;
+            final c = controller, library = c.library;
+            final enabled = category == ContentCategory.music;
+            final page = enabled && c.category == category
+                ? c.downloads
+                : const DownloadPage([], 0);
+            final selected = page.items
+                .where((e) => c.selection.contains(e.track.id))
+                .toList();
+            final canStart = enabled &&
+                !library.busy &&
+                selected.any((e) =>
+                    e.track.canDownload &&
+                    [TrackStatus.ready, TrackStatus.failed]
+                        .contains(e.track.status));
+            final canCancel = library.downloading && enabled;
+            final canPrioritize = selected.any((e) => [
+                  TrackStatus.ready,
+                  TrackStatus.failed
+                ].contains(e.track.status));
+            final heading = Row(children: [
+              const Expanded(
+                  child: Text('Gerenciador de downloads',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600))),
+              Text('${page.total} registros',
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted))
+            ]);
+            final search = Row(children: [
+              Expanded(
+                  child: TextField(
+                key: ValueKey('download-search-${category.name}'),
+                controller: _query,
+                enabled: enabled,
+                maxLength: 200,
+                decoration: InputDecoration(
+                    counterText: '',
+                    hintText: 'Buscar nos downloads…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _query.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Limpar busca de downloads',
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              _searchTimer?.cancel();
+                              _query.clear();
+                              setState(() {});
+                              unawaited(c.searchDownloads(''));
+                            })),
+                onChanged: (value) {
+                  setState(() {});
+                  _searchTimer?.cancel();
+                  _searchTimer = Timer(const Duration(milliseconds: 300),
+                      () => unawaited(c.searchDownloads(value)));
+                },
+              )),
+              const SizedBox(width: 8),
+              IconButton(
+                  tooltip: 'Restaurar colunas',
+                  onPressed: () => unawaited(c.resetColumnWidths()),
+                  icon: const Icon(Icons.view_column_outlined,
+                      color: AppColors.accent)),
+            ]);
+            final toolbar = DownloadToolbar(
+                onAdd: enabled &&
+                        !library.addingLinks &&
+                        !library.importing &&
+                        !library.preparing &&
+                        !library.editing &&
+                        library.current != null
+                    ? () => unawaited(showAddMusicLinks(context, library))
+                    : null,
+                paused: library.pauseMode,
+                onStart: canStart || (enabled && library.pauseMode)
+                    ? () => unawaited(c.start())
+                    : null,
+                onPause: canCancel ? library.togglePause : null,
+                onCancel: canCancel ? library.cancel : null,
+                onUp: canPrioritize && selected.any((e) => e.track.queuePriority < 4)
+                    ? () => unawaited(c.changePriority(1))
+                    : null,
+                onDown: canPrioritize && selected.any((e) => e.track.queuePriority > -4)
+                    ? () => unawaited(c.changePriority(-1))
+                    : null,
+                onOpen: selected.length == 1 &&
+                        selected.single.track.localPath.isNotEmpty
+                    ? () => unawaited(c.reveal(selected.single.track.localPath))
+                    : null,
+                onRetry:
+                    canStart && selected.any((e) => e.track.status == TrackStatus.failed)
+                        ? () => unawaited(c.start(failedOnly: true))
+                        : null,
+                onRemove: enabled &&
+                        selected.any((e) => e.track.status != TrackStatus.downloading)
+                    ? () => unawaited(_remove(context))
+                    : null);
+            final filters = Wrap(spacing: 4, runSpacing: 4, children: [
+              for (final filter in DownloadFilter.values)
+                TextButton(
+                    style: TextButton.styleFrom(
+                        shape: const StadiumBorder(),
+                        foregroundColor: AppColors.muted,
+                        backgroundColor: c.filter == filter
+                            ? AppColors.accentSoft
+                            : Colors.transparent),
+                    onPressed: () => unawaited(c.setFilter(filter)),
+                    child: Text(switch (filter) {
+                      DownloadFilter.all => 'Todos',
+                      DownloadFilter.downloading => 'Baixando',
+                      DownloadFilter.queued => 'Na fila',
+                      DownloadFilter.paused => 'Pausado',
+                      DownloadFilter.completed => 'Concluído',
+                      DownloadFilter.failed => 'Erro',
+                    }))
+            ]);
+            final pagination = PageControls(
+                offset: c.downloadOffset,
+                showDivider: !wide,
+                count: page.items.length,
+                total: page.total,
+                onPage: (v) => unawaited(c.turnDownloads(v)));
+            final footer = Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('${c.selection.length} selecionados',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.muted)),
+                  ButtonHoverMotion(
+                      builder: (states) => OutlinedButton.icon(
+                          statesController: states,
+                          style: downloadActionStyle(DownloadActionColors.add)
+                              .copyWith(
+                                  shape: const WidgetStatePropertyAll(
+                                      StadiumBorder())),
+                          onPressed: enabled && library.current != null
+                              ? (library.addingLinks ||
+                                      library.importing ||
+                                      library.preparing ||
+                                      library.editing
+                                  ? null
+                                  : () => unawaited(
+                                      showAddMusicLinks(context, library)))
+                              : onCapture,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: Text(enabled
+                              ? 'Adicionar links'
+                              : 'Capturar novo link'))),
+                ]);
+            final content = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (wide)
+                    Row(children: [
+                      Expanded(child: heading),
+                      const SizedBox(width: 12),
+                      SizedBox(width: 360, child: search)
+                    ])
+                  else ...[heading, const SizedBox(height: 8), search],
+                  const SizedBox(height: 8),
+                  if (wide)
+                    Row(children: [
+                      toolbar,
+                      const SizedBox(width: 12),
+                      Expanded(child: filters)
+                    ])
+                  else ...[toolbar, const SizedBox(height: 8), filters],
+                  if (c.message.isNotEmpty)
+                    Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(c.message)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                      child: WorkspacePanel(
+                          child: !enabled
+                              ? WorkspaceNotice(
+                                  title: 'Fila de vídeos e fotos',
+                                  message:
+                                      'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
+                              : DownloadTable(
+                                  entries: page.items,
+                                  widths: c.columnWidths,
+                                  onResize: c.resizeColumn,
+                                  onResizeEnd: () =>
+                                      unawaited(c.saveColumnWidths()),
+                                  selection: c.selection,
+                                  onSelect: c.select,
+                                  onSelectPage: c.selectPage,
+                                  activeId: library.activeTrackId,
+                                  progress: library.progress,
+                                  paused: library.pauseMode,
+                                  output: library.outputDirectory))),
+                  if (wide)
+                    Row(children: [
+                      Expanded(child: footer),
+                      SizedBox(width: 260, child: pagination)
+                    ])
+                  else ...[pagination, const SizedBox(height: 6), footer],
+                ]);
+            final minimumHeight = constraints.maxWidth < 600
+                ? (MediaQuery.textScalerOf(context).scale(12) > 14
+                    ? 820.0
+                    : 700.0)
+                : 540.0;
+            return constraints.maxHeight < minimumHeight
+                ? SingleChildScrollView(
+                    child: SizedBox(height: minimumHeight, child: content))
+                : content;
+          }));
   Future<void> _remove(BuildContext context) async {
     final accepted = await showDialog<bool>(
         context: context,
