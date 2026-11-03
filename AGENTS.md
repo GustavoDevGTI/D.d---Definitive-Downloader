@@ -72,7 +72,9 @@
 - Tipografia legível, foco de teclado, atalhos, contraste e escala de texto adequados.
 - Layout adaptativo: compartilhar identidade, não reduzir mecanicamente a tela desktop para mobile.
 
-- Tabela de Downloads 0.1.17: ampliar a área útil, manter cabeçalho azul-marinho fixo na rolagem das linhas, alternância rosa suave e barras de rolagem framboesa. Filtro musical sem resultados mantém cabeçalho e corpo vazio, sem painel de orientações. Largura excedente favorece Nome sem sobrescrever as larguras salvas; detalhes em `docs/RELEASE_0_1_17.md`.
+- Tabela de Downloads 0.1.17: ampliar a área útil, manter cabeçalho fixo na rolagem das linhas, alternância rosa suave e barras de rolagem framboesa. Filtro musical sem resultados mantém cabeçalho e corpo vazio, sem painel de orientações. Largura excedente favorece Nome sem sobrescrever as larguras salvas; detalhes em `docs/RELEASE_0_1_17.md`.
+
+- Cabeçalho de Downloads 0.1.18: rosa suave oficial `#FDE7ED`, texto grafite `#1E293B` e seleção azul acinzentado `#5B6B85`, conforme pedido posterior de clarear o cabeçalho. Substitui o fundo azul-marinho da 0.1.17; preservar dimensões e rolagem.
 
 ## Validação e entrega
 

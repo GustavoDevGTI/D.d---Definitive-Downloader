@@ -110,7 +110,7 @@ class _DownloadTableState extends State<DownloadTable> {
                                     entries.every(
                                         (e) => selection.contains(e.track.id)),
                                 side: const BorderSide(
-                                    color: Colors.white70, width: 1.2),
+                                    color: AppColors.secondary, width: 1.2),
                                 onChanged: entries.isEmpty
                                     ? null
                                     : (v) => onSelectPage(v ?? false)),
@@ -139,7 +139,7 @@ class _DownloadTableState extends State<DownloadTable> {
                                       style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.white))),
+                                          color: AppColors.ink))),
                           ], widths: widths, header: true),
                           Expanded(
                               child: ListView.builder(
@@ -255,7 +255,7 @@ class _DownloadTableState extends State<DownloadTable> {
         constraints: const BoxConstraints(minHeight: 56),
         decoration: BoxDecoration(
             color: header
-                ? AppColors.navigation
+                ? AppColors.accentSoft
                 : selected
                     ? AppColors.accentSoft
                     : hovered
