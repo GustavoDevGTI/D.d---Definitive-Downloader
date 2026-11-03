@@ -59,6 +59,7 @@ Future<void> expectHandleBackground(
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   final output = Platform.environment['DD_LAYOUT_OUTPUT'];
   if (output == null) return;
+  await tester.pumpAndSettle();
   await tester.runAsync(() async {
     final boundary =
         key.currentContext!.findRenderObject() as RenderRepaintBoundary;
@@ -109,6 +110,24 @@ void main() {
       await tester.pumpAndSettle();
       final header = find.byKey(const ValueKey('download-table-header'));
       final before = tester.getRect(header);
+      await tester.runAsync(() async {
+        final boundary = captureKey.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
+        final img = await boundary.toImage();
+        try {
+          final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+          final bytes = data!.buffer.asUint8List();
+          final offset = (28 * img.width + img.width - 2) * 4;
+          expect(
+              Color.fromARGB(bytes[offset + 3], bytes[offset],
+                  bytes[offset + 1], bytes[offset + 2]),
+              AppColors.navigation,
+              reason:
+                  'Cabeçalho deve colorir também a faixa reservada à barra vertical.');
+        } finally {
+          img.dispose();
+        }
+      });
       await capture(tester, captureKey, 'table-top-${width.toInt()}');
       if (width > 600) expect(before.width, closeTo(width - 12, .01));
       expect(find.byKey(const ValueKey('download-row-1')), findsOneWidget);
@@ -196,6 +215,53 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets('clique alterna ordenação e arraste não dispara ordenação',
+      (tester) async {
+    DownloadSort? sort;
+    var descending = false, clicks = 0;
+    var widths = downloadColumns.map((c) => c.width).toList();
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme(),
+        home: Scaffold(
+            body: StatefulBuilder(
+                builder: (context, setState) => DownloadTable(
+                    entries: [entry(1)],
+                    widths: widths,
+                    sort: sort,
+                    descending: descending,
+                    onSort: (value) => setState(() {
+                          descending = value == sort ? !descending : false;
+                          sort = value;
+                          clicks++;
+                        }),
+                    onResize: (values) => setState(() => widths = values),
+                    onResizeEnd: () {},
+                    selection: const {},
+                    onSelect: (_, value) {},
+                    onSelectPage: (_) {},
+                    output: '')))));
+    final name = find.byKey(const ValueKey('sort-download-name'));
+    await tester.tap(name);
+    await tester.pumpAndSettle();
+    expect(sort, DownloadSort.name);
+    expect(descending, isFalse);
+    expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+    await tester.tap(name);
+    await tester.pumpAndSettle();
+    expect(descending, isTrue);
+    expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+    await tester.drag(find.byKey(const ValueKey('resize-download-name')),
+        const Offset(-30, 0));
+    await tester.pumpAndSettle();
+    expect(clicks, 2);
+    await tester.tap(find.byKey(const ValueKey('sort-download-provider')));
+    await tester.pumpAndSettle();
+    expect(sort, DownloadSort.provider);
+    expect(descending, isFalse);
+    expect(find.byKey(const ValueKey('sort-download-size')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'filtro vazio mantém cabeçalho sem mensagem ou seleção disponível',
       (tester) async {

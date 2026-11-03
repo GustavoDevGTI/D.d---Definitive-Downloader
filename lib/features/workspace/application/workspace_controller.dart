@@ -17,6 +17,8 @@ class WorkspaceController extends ChangeNotifier {
   HistoryPage history = const HistoryPage([], [], 0);
   ContentCategory category = ContentCategory.music;
   DownloadFilter filter = DownloadFilter.all;
+  DownloadSort? downloadSort;
+  bool downloadDescending = false;
   int downloadOffset = 0;
   int historyOffset = 0;
   String downloadQuery = '';
@@ -47,7 +49,10 @@ class WorkspaceController extends ChangeNotifier {
           filter: filter,
           query: downloadQuery,
           offset: downloadOffset,
-          pauseMode: library.pauseMode),
+          pauseMode: library.pauseMode,
+          sort: downloadSort,
+          descending: downloadDescending,
+          outputDirectory: library.outputDirectory),
       repository.history(
           folder: folder, query: historyQuery, offset: historyOffset),
       if (!_layoutLoaded) repository.columnWidths(),
@@ -67,7 +72,10 @@ class WorkspaceController extends ChangeNotifier {
           filter: filter,
           query: downloadQuery,
           offset: downloadOffset,
-          pauseMode: library.pauseMode);
+          pauseMode: library.pauseMode,
+          sort: downloadSort,
+          descending: downloadDescending,
+          outputDirectory: library.outputDirectory);
       if (_disposed || generation != _generation) return;
     }
     downloads = downloadPage;
@@ -82,6 +90,14 @@ class WorkspaceController extends ChangeNotifier {
     availability.clear();
     availability.addEntries(states);
     notifyListeners();
+  }
+
+  Future<void> sortDownloads(DownloadSort value) async {
+    downloadDescending = downloadSort == value ? !downloadDescending : false;
+    downloadSort = value;
+    downloadOffset = 0;
+    selection.clear();
+    await refresh();
   }
 
   void resizeColumn(int index, double width) {

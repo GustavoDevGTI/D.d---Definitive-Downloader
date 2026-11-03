@@ -23,3 +23,20 @@ double boundedColumnWidth(int index, double value) {
   }
   return value.clamp(downloadColumns[index].minimum, 1200).toDouble();
 }
+
+// Sorting changes only the paginated view, never occurrence or queue priority.
+enum DownloadSort {
+  name(1),
+  provider(3),
+  status(4),
+  destination(9);
+
+  const DownloadSort(this.column);
+  final int column;
+  static DownloadSort? forColumn(int column) {
+    for (final sort in values) {
+      if (sort.column == column) return sort;
+    }
+    return null;
+  }
+}

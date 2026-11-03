@@ -258,6 +258,32 @@ void main() {
             greaterThan(400));
       }
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
+      if (width == 1360 || width == 390) {
+        final c = downloadsWidget.controller;
+        c.selectPage(true);
+        c.downloadOffset = 40;
+        await tester.pumpAndSettle();
+        final nameHeader = find.byKey(const ValueKey('sort-download-name'));
+        await tester.ensureVisible(nameHeader);
+        await tester.runAsync(() => tester.tap(nameHeader));
+        await tester.runAsync(c.refresh);
+        await tester.pumpAndSettle();
+        expect(c.downloadSort, DownloadSort.name);
+        expect(c.downloadDescending, isFalse);
+        expect(c.downloadOffset, 0);
+        expect(c.selection, isEmpty);
+        await capture(tester, captureKey, 'music-sorted-name-${width.toInt()}');
+        await tester.runAsync(() => tester.tap(nameHeader));
+        await tester.runAsync(c.refresh);
+        await tester.pumpAndSettle();
+        expect(c.downloadDescending, isTrue);
+        await capture(tester, captureKey, 'music-sorted-desc-${width.toInt()}');
+        c.downloadSort = null;
+        c.downloadDescending = false;
+        await tester.runAsync(c.refresh);
+        await tester.pumpAndSettle();
+      }
+
       expect(find.textContaining('MP3 vinculado'), findsOneWidget,
           reason:
               '${downloadsWidget.controller.category}: ${downloadsWidget.controller.downloads.items.map((e) => e.track.sourceLabel).join(', ')}');

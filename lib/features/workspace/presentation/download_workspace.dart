@@ -226,6 +226,10 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                       'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
                               : DownloadTable(
                                   entries: page.items,
+                                  sort: c.downloadSort,
+                                  descending: c.downloadDescending,
+                                  onSort: (value) =>
+                                      unawaited(c.sortDownloads(value)),
                                   widths: c.columnWidths,
                                   onResize: c.resizeColumns,
                                   onResizeEnd: () =>

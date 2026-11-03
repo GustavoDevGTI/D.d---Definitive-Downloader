@@ -1,3 +1,4 @@
+import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +36,86 @@ void main() {
                 durationMs: 180000)))));
     return (await library.page(id, limit: 100)).items;
   }
+
+  test(
+      'ordenação cobre páginas e filtros sem alterar ocorrências ou prioridade',
+      () async {
+    final rows = await seed(45);
+    await library.database.run((db) {
+      for (var i = 0; i < rows.length; i++) {
+        db.execute(
+            "UPDATE tracks SET title=?,source_kind='directMp3',media_url='https://example.org/a.mp3',queue_priority=? WHERE id=?",
+            ['Faixa ${(44 - i) ~/ 3}', i % 5, rows[i].id]);
+      }
+    });
+    Future<List<DownloadEntry>> ordered(bool descending) async {
+      final first = await workspace.downloads(ContentCategory.music,
+          sort: DownloadSort.name, descending: descending);
+      final second = await workspace.downloads(ContentCategory.music,
+          sort: DownloadSort.name, descending: descending, offset: 40);
+      expect(first.total, 45);
+      expect(first.items.length, 40);
+      expect(second.items.length, 5);
+      return [...first.items, ...second.items];
+    }
+
+    final asc = await ordered(false), desc = await ordered(true);
+    final names = asc.map((e) => e.track.title).toList();
+    expect(names,
+        [...names]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase())));
+    expect(desc.map((e) => e.track.title), names.reversed);
+    expect(asc.map((e) => e.track.id).toSet().length, 45);
+    expect((await ordered(false)).map((e) => e.track.id),
+        asc.map((e) => e.track.id));
+    final duplicates = asc
+        .where((e) => e.track.title == 'Faixa 0')
+        .map((e) => e.track.position)
+        .toList();
+    expect(duplicates, [...duplicates]..sort());
+    final filtered = await workspace.downloads(ContentCategory.music,
+        query: 'Faixa 1', sort: DownloadSort.name, descending: true);
+    expect(
+        filtered.items.every((e) => e.track.title.contains('Faixa 1')), isTrue);
+    final unchanged =
+        (await library.page(rows.first.collectionId, limit: 100)).items;
+    expect(unchanged.map((t) => t.id), rows.map((t) => t.id));
+    expect(unchanged.map((t) => t.position), List.generate(45, (i) => i + 1));
+    expect(
+        unchanged.map((t) => t.queuePriority), List.generate(45, (i) => i % 5));
+  });
+
+  test('ordena valores exibidos de nome, servidor, status e pasta', () async {
+    final rows = await seed(3);
+    await library.database.run((db) {
+      db.execute(
+          "UPDATE tracks SET source_kind='directMp3',media_url='https://example.org/a.mp3',title='Zulu',custom_title='Alpha',status='ready' WHERE id=?",
+          [rows[0].id]);
+      db.execute(
+          "UPDATE tracks SET source_kind='deezerFull',media_url='https://example.org/b.mp3',title='Alpha',status='completed',local_path=? WHERE id=?",
+          [r'C:\Zulu\beta.mp3', rows[1].id]);
+      db.execute(
+          "UPDATE tracks SET source_kind='youtubeMusic',media_url='https://example.org/c.mp3',title='Charlie',status='failed',local_path='/Alpha/zeta.mp3' WHERE id=?",
+          [rows[2].id]);
+    });
+    Future<List<int>> ids(DownloadSort sort, [bool descending = false]) async =>
+        (await workspace.downloads(ContentCategory.music,
+                sort: sort, descending: descending, outputDirectory: '/Middle'))
+            .items
+            .map((e) => e.track.id)
+            .toList();
+    expect(await ids(DownloadSort.name), rows.map((t) => t.id));
+    expect(await ids(DownloadSort.name, true), rows.reversed.map((t) => t.id));
+    expect(
+        await ids(DownloadSort.provider), [rows[1].id, rows[0].id, rows[2].id]);
+    expect(await ids(DownloadSort.status), rows.map((t) => t.id));
+    expect(
+        await ids(DownloadSort.status, true), rows.reversed.map((t) => t.id));
+    expect(await ids(DownloadSort.destination),
+        [rows[2].id, rows[0].id, rows[1].id]);
+    final filtered = await workspace.downloads(ContentCategory.music,
+        filter: DownloadFilter.completed, sort: DownloadSort.name);
+    expect(filtered.items.single.track.id, rows[1].id);
+  });
 
   test('prioridade e remoção persistem sem perder ocorrências ou histórico',
       () async {

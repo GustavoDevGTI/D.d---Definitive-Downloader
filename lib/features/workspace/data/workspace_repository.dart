@@ -1,3 +1,5 @@
+import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 import '../../../core/storage/database.dart';
 import '../../library/data/library_repository.dart';
 import '../../library/domain/models.dart';
@@ -12,7 +14,10 @@ class WorkspaceRepository {
           {DownloadFilter filter = DownloadFilter.all,
           int offset = 0,
           String query = '',
-          bool pauseMode = false}) =>
+          bool pauseMode = false,
+          DownloadSort? sort,
+          bool descending = false,
+          String outputDirectory = ''}) =>
       database.run((db) {
         if (offset < 0 || query.length > 200) {
           throw ArgumentError('Pesquisa ou página inválida.');
@@ -42,9 +47,42 @@ class WorkspaceRepository {
         final count = db
             .select('SELECT COUNT(*) AS n $from WHERE $where', args)
             .first['n'] as int;
+        var order = 't.queue_priority DESC,t.collection_id,t.position,t.id';
+        if (sort != null) {
+          db.createCollation(
+              name: 'download_text',
+              function: (a, b) =>
+                  (a ?? '').toLowerCase().compareTo((b ?? '').toLowerCase()));
+          db.createFunction(
+              functionName: 'download_basename',
+              argumentCount: const AllowedArgumentCount(1),
+              deterministic: true,
+              function: (args) => p.posix
+                  .basename((args.first as String).replaceAll(r'\', '/')));
+          db.createFunction(
+              functionName: 'download_folder',
+              argumentCount: const AllowedArgumentCount(1),
+              deterministic: true,
+              function: (args) => (args.first as String).isEmpty
+                  ? outputDirectory
+                  : p.posix
+                      .dirname((args.first as String).replaceAll(r'\', '/')));
+          final expression = switch (sort) {
+            DownloadSort.name =>
+              "CASE WHEN t.local_path!='' THEN download_basename(t.local_path) ELSE COALESCE(NULLIF(t.custom_title,''),t.title) END COLLATE download_text",
+            DownloadSort.provider =>
+              "CASE t.source_kind WHEN 'none' THEN 'A conferir' WHEN 'localExample' THEN 'Exemplo local' WHEN 'directMp3' THEN 'MP3 vinculado' WHEN 'preview' THEN 'Prévia Deezer' WHEN 'deezerFull' THEN 'Deezer' WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'youtube' THEN 'YouTube' ELSE t.source_kind END COLLATE download_text",
+            DownloadSort.status =>
+              "CASE t.status WHEN 'pending' THEN 0 WHEN 'ready' THEN 1 WHEN 'downloading' THEN 2 WHEN 'completed' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END",
+            DownloadSort.destination =>
+              'download_folder(t.local_path) COLLATE download_text',
+          };
+          final direction = descending ? 'DESC' : 'ASC';
+          order = '$expression $direction,t.collection_id,t.position,t.id';
+        }
         final rows = db.select(
             'SELECT t.*,c.name AS collection_name $from WHERE $where '
-            'ORDER BY t.queue_priority DESC,t.collection_id,t.position LIMIT 40 OFFSET ?',
+            'ORDER BY $order LIMIT 40 OFFSET ?',
             [...args, offset]);
         return DownloadPage(
             rows

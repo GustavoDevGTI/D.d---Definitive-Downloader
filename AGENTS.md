@@ -84,6 +84,8 @@
 
 - Correção 0.1.21: foco/arraste das divisórias não pinta bloco claro sobre o cabeçalho. Manter área de toque transparente e destacar apenas a linha (branca e 3 px no cabeçalho), preservando foco de teclado, sem deslocar células.
 
+- Downloads 0.1.22: clique em Nome, Servidor, Status e Salvar em alterna ordenação crescente/decrescente com seta. Ordenar no SQLite antes da paginação, com desempate estável, sem alterar posição da playlist ou prioridade. Colunas sem métricas disponíveis não simulam ordenação. Cabeçalho azul deve preencher também a faixa reservada à barra vertical.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.
