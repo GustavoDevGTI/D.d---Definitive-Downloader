@@ -4,6 +4,7 @@ import '../../../app/theme.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
+import '../../workspace/presentation/link_entry_panel.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
 
@@ -70,32 +71,21 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
       });
     }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
-      const Text('Importar playlist',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 12),
-      TextField(
-          key: const ValueKey('playlist-url'),
+      LinkEntryPanel(
+          title: 'Importar playlist',
+          fieldLabel: 'Link da playlist',
+          hintText: 'Link de playlist do Spotify',
           controller: _url,
           focusNode: _urlFocus,
+          inputKey: const ValueKey('playlist-url'),
           enabled: !c.busy,
-          keyboardType: TextInputType.url,
-          decoration:
-              const InputDecoration(hintText: 'Link de playlist do Spotify'),
-          onSubmitted: (value) => unawaited(_import(value))),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
+          onSubmitted: c.busy ? null : (value) => unawaited(_import(value)),
+          actionLabel: 'Importar por link',
+          actionIcon: Icons.playlist_add_rounded,
+          onAction: c.busy ? null : () => unawaited(_import(_url.text)),
+          secondaryActions: [
             OutlinedButton(
-                style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                onPressed: c.busy ? null : () => unawaited(_import(_url.text)),
-                child: const Text('Importar por link')),
-            OutlinedButton(
-                style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                onPressed: widget.onConnections,
-                child: const Text('Conexões')),
+                onPressed: widget.onConnections, child: const Text('Conexões')),
             IconButton(
                 tooltip: 'Importar CSV · Ctrl+O',
                 onPressed: c.busy ? null : () => unawaited(c.importCsv()),

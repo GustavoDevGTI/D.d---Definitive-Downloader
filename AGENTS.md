@@ -64,6 +64,7 @@
 - Poucas ações principais, linguagem direta em português e estados de erro/ausência com orientação concreta.
 - Evitar orientações estáticas e explicações repetidas: o usuário as considera poluição visual (03/11). Não recriar o painel informativo de Conferência. Preferir rótulos claros, estados curtos e ajuda contextual; preservar erros, indisponibilidade real e informações necessárias à decisão.
 - Coleções e pastas clicáveis devem ter destaque da paleta, conforme 03/11 e `docs/RELEASE_0_1_10.md` / `docs/RELEASE_0_1_11.md`: fundo rosa suave, contorno/ícones rosa e hover/foco vinho com conteúdo branco. Não usar o mesmo cinza dos painéis informativos nem adicionar explicações permanentes.
+- Funções parecidas devem compartilhar componentes e hierarquia visual (03/11). Importação de playlist e captura de áudio/mídias usam `LinkEntryPanel`, com mesmo painel, campo, espaçamentos e ações. Distinguir rótulos e capacidades reais, sem estilos paralelos para o mesmo padrão; detalhes em `docs/RELEASE_0_1_12.md`.
 - Tipografia legível, foco de teclado, atalhos, contraste e escala de texto adequados.
 - Layout adaptativo: compartilhar identidade, não reduzir mecanicamente a tela desktop para mobile.
 

@@ -32,8 +32,8 @@ void main() {
       expect(button.top, greaterThan(input.bottom + 6));
       expect(
           tester
-              .widget<OutlinedButton>(
-                  find.widgetWithText(OutlinedButton, 'Analisar link'))
+              .widget<FilledButton>(
+                  find.widgetWithText(FilledButton, 'Analisar link'))
               .onPressed,
           isNull);
       await tester.scrollUntilVisible(
