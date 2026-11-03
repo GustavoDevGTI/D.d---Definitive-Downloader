@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
 import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
+import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -366,17 +367,63 @@ void main() {
       expect(tester.takeException(), isNull);
       await capture(
           tester, captureKey, 'music-columns-compact-${width.toInt()}');
-      await tester.runAsync(downloadsWidget.controller.resetColumnWidths);
+      final c = downloadsWidget.controller;
+      final previousRevision = c.tableRevision;
+      final summaryBeforeReset = await tester.runAsync(c.repository.summary);
+      await tester.enterText(
+          find.byKey(const ValueKey('download-search-music')),
+          'busca temporária');
+      c.downloadSort = DownloadSort.provider;
+      c.downloadDescending = true;
+      c.filter = DownloadFilter.failed;
+      c.downloadOffset = 40;
+      await tester.ensureVisible(find.byTooltip('Resetar tabela'));
+      await tester.runAsync(() => tester.tap(find.byTooltip('Resetar tabela')));
+      await tester.runAsync(c.refresh);
+      await tester.pump(const Duration(milliseconds: 650));
       await tester.pumpAndSettle();
+      expect(c.columnWidths, downloadColumns.map((column) => column.width));
+      expect(await tester.runAsync(c.repository.columnWidths), c.columnWidths);
+      expect(c.downloadQuery, isEmpty);
+      expect(c.filter, DownloadFilter.all);
+      expect(c.downloadSort, isNull);
+      expect(c.downloadDescending, isFalse);
+      expect(c.downloadOffset, 0);
+      expect(c.tableRevision, previousRevision + 1);
+      expect(c.selection, isEmpty);
+      final summaryAfterReset = await tester.runAsync(c.repository.summary);
+      expect(summaryAfterReset!.records, summaryBeforeReset!.records);
+      expect(summaryAfterReset.completed, summaryBeforeReset.completed);
+      final tableScrolls = find.descendant(
+          of: find.byType(DownloadTable), matching: find.byType(Scrollable));
+      for (final scroll in tableScrolls.evaluate()) {
+        expect(
+            ((scroll as StatefulElement).state as ScrollableState)
+                .position
+                .pixels,
+            0);
+      }
+      expect(
+          tester
+              .widget<TextField>(
+                  find.byKey(const ValueKey('download-search-music')))
+              .controller!
+              .text,
+          isEmpty);
+      expect(find.byTooltip('Aumentar prioridade'), findsNothing);
+      expect(find.byTooltip('Diminuir prioridade'), findsNothing);
+      expect(find.byTooltip('Restaurar colunas'), findsNothing);
+      expect(find.byTooltip('Adicionar links'), findsOneWidget);
+      expect(find.text('Adicionar links'), findsNothing);
 
       downloadsWidget.controller.selectPage(false);
       await tester.pumpAndSettle();
       expect(find.byTooltip('Pausar fila'), findsOneWidget);
       final tools = find.descendant(
           of: find.byType(DownloadToolbar), matching: find.byType(IconButton));
-      expect(tools, findsNWidgets(9));
+      expect(tools, findsNWidgets(8));
       final toolY = tester.getRect(tools.first).center.dy;
-      for (var index = 1; index < 9; index++) {
+      for (var index = 1; index < 8; index++) {
         expect(tester.getRect(tools.at(index)).center.dy, toolY);
       }
       await tester.ensureVisible(find.byTooltip('Remover da fila'));
@@ -386,8 +433,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
-      await tester.ensureVisible(find.text('Adicionar links'));
-      await tester.tap(find.text('Adicionar links'));
+      await tester.ensureVisible(find.byTooltip('Adicionar links'));
+      await tester.tap(find.byTooltip('Adicionar links'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('extra-music-links')), findsOneWidget);
       expect(tester.takeException(), isNull);

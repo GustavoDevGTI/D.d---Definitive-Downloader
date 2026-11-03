@@ -86,6 +86,8 @@
 
 - Downloads 0.1.22: clique em Nome, Servidor, Status e Salvar em alterna ordenação crescente/decrescente com seta. Ordenar no SQLite antes da paginação, com desempate estável, sem alterar posição da playlist ou prioridade. Colunas sem métricas disponíveis não simulam ordenação. Cabeçalho azul deve preencher também a faixa reservada à barra vertical.
 
+- Downloads 0.1.23: único Adicionar links na barra; remover setas de prioridade e seu grupo, sem espaço reservado. Resetar tabela pertence ao mesmo grupo de abrir pasta, retry e remover: restaura larguras, busca, filtros, ordenação, seleção, página e rolagens, sem excluir dados ou alterar execução/prioridade. Coluna Baixado em usa o registro de conclusão do arquivo atual, UTC convertido para horário local; clique começa pelos mais recentes e inverte. Sem registro fica —, sempre no fim. Detalhes em `docs/RELEASE_0_1_23.md`.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

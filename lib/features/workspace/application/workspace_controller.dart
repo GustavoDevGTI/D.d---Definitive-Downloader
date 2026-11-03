@@ -19,6 +19,7 @@ class WorkspaceController extends ChangeNotifier {
   DownloadFilter filter = DownloadFilter.all;
   DownloadSort? downloadSort;
   bool downloadDescending = false;
+  int tableRevision = 0;
   int downloadOffset = 0;
   int historyOffset = 0;
   String downloadQuery = '';
@@ -93,7 +94,9 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   Future<void> sortDownloads(DownloadSort value) async {
-    downloadDescending = downloadSort == value ? !downloadDescending : false;
+    downloadDescending = downloadSort == value
+        ? !downloadDescending
+        : value == DownloadSort.downloadedAt;
     downloadSort = value;
     downloadOffset = 0;
     selection.clear();
@@ -130,6 +133,21 @@ class WorkspaceController extends ChangeNotifier {
     columnWidths = downloadColumns.map((c) => c.width).toList();
     notifyListeners();
     await saveColumnWidths();
+  }
+
+  Future<void> resetDownloadTable() async {
+    message = '';
+    downloadSort = null;
+    downloadDescending = false;
+    downloadQuery = '';
+    filter = DownloadFilter.all;
+    downloadOffset = 0;
+    selection.clear();
+    tableRevision++;
+    columnWidths = downloadColumns.map((c) => c.width).toList();
+    notifyListeners();
+    await saveColumnWidths();
+    await refresh();
   }
 
   Future<void> searchDownloads(String value) async {

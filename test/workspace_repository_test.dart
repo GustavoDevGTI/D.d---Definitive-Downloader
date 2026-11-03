@@ -117,6 +117,94 @@ void main() {
     expect(filtered.items.single.track.id, rows[1].id);
   });
 
+  test(
+      'Baixado em ordena conclusões entre páginas e deixa desconhecidos no fim',
+      () async {
+    final rows = await seed(45);
+    final origin = DateTime.utc(2026, 11, 3, 12);
+    await library.database.run((db) {
+      for (var i = 0; i < rows.length; i++) {
+        final completed = i < 43;
+        final file = '/Fixture/${rows[i].id}.mp3';
+        db.execute(
+            "UPDATE tracks SET source_kind='directMp3',media_url='https://example.org/a.mp3',status=?,local_path=? WHERE id=?",
+            [
+              completed ? 'completed' : 'ready',
+              completed ? file : '',
+              rows[i].id
+            ]);
+        if (i < 42) {
+          db.execute(
+              'INSERT INTO download_history(track_id,name,local_path,folder,source,created_at) VALUES(?,?,?,?,?,?)',
+              [
+                rows[i].id,
+                '${rows[i].id}.mp3',
+                file,
+                '/Fixture',
+                'directMp3',
+                origin.add(Duration(minutes: 41 - i)).toIso8601String()
+              ]);
+        }
+      }
+    });
+    Future<List<DownloadEntry>> pages(bool descending) async {
+      final first = await workspace.downloads(ContentCategory.music,
+          sort: DownloadSort.downloadedAt, descending: descending);
+      final second = await workspace.downloads(ContentCategory.music,
+          sort: DownloadSort.downloadedAt, descending: descending, offset: 40);
+      expect(first.total, 45);
+      expect(first.items.length, 40);
+      expect(second.items.length, 5);
+      return [...first.items, ...second.items];
+    }
+
+    final asc = await pages(false), desc = await pages(true);
+    expect(asc.map((e) => e.track.id), [
+      ...rows.take(42).map((t) => t.id).toList().reversed,
+      ...rows.skip(42).map((t) => t.id)
+    ]);
+    expect(desc.map((e) => e.track.id), rows.map((t) => t.id));
+    expect(asc.first.downloadedAt, origin);
+    expect(desc.first.downloadedAt, origin.add(const Duration(minutes: 41)));
+    expect(asc.skip(42).every((e) => e.downloadedAt == null), isTrue);
+    final filtered = await workspace.downloads(ContentCategory.music,
+        filter: DownloadFilter.completed, sort: DownloadSort.downloadedAt);
+    expect(filtered.total, 43);
+    expect(
+        (await library.page(rows.first.collectionId, limit: 100))
+            .items
+            .map((t) => t.id),
+        rows.map((t) => t.id));
+  });
+
+  test(
+      'data SQLite é UTC e empate usa sequência do histórico sem apagar ocultos',
+      () async {
+    final rows = await seed(3);
+    for (final t in rows) {
+      await library.linkSource(t,
+          url: 'https://example.org/${t.id}.mp3', kind: SourceKind.directMp3);
+    }
+    // Completion sequence deliberately differs from playlist position.
+    for (final t in [rows[2], rows[0], rows[1]]) {
+      await library.setStatus(t.id, TrackStatus.completed,
+          localPath: '/Fixture/${t.id}.mp3');
+    }
+    await library.database.run((db) => db.execute(
+        "UPDATE download_history SET created_at='2026-11-03 14:00:00',hidden=1"));
+    final asc = await workspace.downloads(ContentCategory.music,
+        sort: DownloadSort.downloadedAt);
+    final desc = await workspace.downloads(ContentCategory.music,
+        sort: DownloadSort.downloadedAt, descending: true);
+    expect(
+        asc.items.map((e) => e.track.id), [rows[2].id, rows[0].id, rows[1].id]);
+    expect(desc.items.map((e) => e.track.id),
+        [rows[1].id, rows[0].id, rows[2].id]);
+    expect(
+        asc.items.every((e) => e.downloadedAt == DateTime.utc(2026, 11, 3, 14)),
+        isTrue);
+  });
+
   test('prioridade e remoção persistem sem perder ocorrências ou histórico',
       () async {
     final rows = await seed(3);

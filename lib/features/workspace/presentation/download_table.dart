@@ -219,6 +219,20 @@ class _DownloadTableState extends State<DownloadTable> {
                                                         minHeight: 6)
                                                     : const Text('—'),
                                             Tooltip(
+                                                message: e.downloadedAt == null
+                                                    ? 'Sem registro de conclusão.'
+                                                    : 'Concluído em ${_completionLabel(e.downloadedAt!)} (horário local)',
+                                                child: Text(
+                                                    e.downloadedAt == null
+                                                        ? '—'
+                                                        : _completionLabel(
+                                                            e.downloadedAt!),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                        fontSize: 12))),
+                                            Tooltip(
                                                 message: t.localPath.isEmpty
                                                     ? output
                                                     : p.dirname(t.localPath),
@@ -283,6 +297,12 @@ class _DownloadTableState extends State<DownloadTable> {
                         child: _resizeHandle(i, widths)),
                 ]))
         ]));
+  }
+
+  String _completionLabel(DateTime date) {
+    final local = date.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)}/${local.year} ${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
   }
 
   Widget _headerCell(int index) {

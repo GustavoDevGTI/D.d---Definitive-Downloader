@@ -14,6 +14,7 @@ const downloadColumns = [
   DownloadColumn('remaining', 'Tempo restante', 110, 48),
   DownloadColumn('received', 'Baixado', 90, 40),
   DownloadColumn('progress', 'Progresso', 120, 48),
+  DownloadColumn('downloadedAt', 'Baixado em', 160, 64),
   DownloadColumn('destination', 'Salvar em', 230, 64),
 ];
 
@@ -29,7 +30,8 @@ enum DownloadSort {
   name(1),
   provider(3),
   status(4),
-  destination(9);
+  downloadedAt(9),
+  destination(10);
 
   const DownloadSort(this.column);
   final int column;

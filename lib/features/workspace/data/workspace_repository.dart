@@ -43,7 +43,9 @@ class WorkspaceRepository {
             " OR instr(lower(t.custom_title),lower(?))>0 OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
             " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)";
         final args = List<Object?>.filled(8, search);
-        const from = 'FROM tracks t JOIN collections c ON c.id=t.collection_id';
+        const from = "FROM tracks t JOIN collections c ON c.id=t.collection_id "
+            "LEFT JOIN download_history h ON h.local_path=t.local_path AND h.track_id=t.id "
+            "AND h.category='music' AND t.status='completed'";
         final count = db
             .select('SELECT COUNT(*) AS n $from WHERE $where', args)
             .first['n'] as int;
@@ -74,23 +76,38 @@ class WorkspaceRepository {
               "CASE t.source_kind WHEN 'none' THEN 'A conferir' WHEN 'localExample' THEN 'Exemplo local' WHEN 'directMp3' THEN 'MP3 vinculado' WHEN 'preview' THEN 'Prévia Deezer' WHEN 'deezerFull' THEN 'Deezer' WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'youtube' THEN 'YouTube' ELSE t.source_kind END COLLATE download_text",
             DownloadSort.status =>
               "CASE t.status WHEN 'pending' THEN 0 WHEN 'ready' THEN 1 WHEN 'downloading' THEN 2 WHEN 'completed' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END",
+            DownloadSort.downloadedAt => 'julianday(h.created_at)',
             DownloadSort.destination =>
               'download_folder(t.local_path) COLLATE download_text',
           };
           final direction = descending ? 'DESC' : 'ASC';
-          order = '$expression $direction,t.collection_id,t.position,t.id';
+          order = sort == DownloadSort.downloadedAt
+              ? 'CASE WHEN julianday(h.created_at) IS NULL THEN 1 ELSE 0 END ASC,$expression $direction,h.id $direction,t.collection_id,t.position,t.id'
+              : '$expression $direction,t.collection_id,t.position,t.id';
         }
         final rows = db.select(
-            'SELECT t.*,c.name AS collection_name $from WHERE $where '
+            'SELECT t.*,c.name AS collection_name,h.created_at AS downloaded_at $from WHERE $where '
             'ORDER BY $order LIMIT 40 OFFSET ?',
             [...args, offset]);
         return DownloadPage(
             rows
                 .map((r) => DownloadEntry(LibraryRepository.readTrack(r),
-                    r['collection_name'] as String))
+                    r['collection_name'] as String,
+                    downloadedAt:
+                        _readCompletionDate(r['downloaded_at'] as String?)))
                 .toList(),
             count);
       });
+
+  static DateTime? _readCompletionDate(String? value) {
+    if (value == null || value.isEmpty) return null;
+    // SQLite CURRENT_TIMESTAMP is UTC, even though it omits the timezone.
+    final normalized = value.replaceFirst(' ', 'T');
+    return DateTime.tryParse(
+        RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(normalized)
+            ? normalized
+            : '${normalized}Z');
+  }
 
   Future<List<double>> columnWidths() => database.run((db) {
         final widths = downloadColumns.map((c) => c.width).toList();

@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.22](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.22). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.23](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.23). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
-![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0122-desktop.png)
+![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0123-desktop.png)
+
+A versão **0.1.23** mantém um único Adicionar links, remove as setas de prioridade e inclui Resetar tabela no grupo de utilitários. A coluna Baixado em usa o histórico de conclusão e permite alternar entre mais recentes e antigos. [Validação](docs/RELEASE_0_1_23.md).
 
 A versão **0.1.22** permite ordenar Downloads clicando em Nome, Servidor, Status e Salvar em, alternando crescente/decrescente com seta. A ordenação cobre todas as páginas do filtro, sem alterar playlist ou prioridade. O cabeçalho azul agora ocupa também a ponta junto à barra vertical. [Validação](docs/RELEASE_0_1_22.md).
 

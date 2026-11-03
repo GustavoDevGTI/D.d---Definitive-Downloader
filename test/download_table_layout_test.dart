@@ -10,7 +10,7 @@ import 'package:definitive_downloader/features/workspace/domain/download_columns
 import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
 import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
 
-DownloadEntry entry(int i) => DownloadEntry(
+DownloadEntry entry(int i, {DateTime? downloadedAt}) => DownloadEntry(
     Track(
         id: i,
         collectionId: 1,
@@ -24,13 +24,15 @@ DownloadEntry entry(int i) => DownloadEntry(
         sourceUrl: '',
         mediaUrl: 'https://example.org/$i.mp3',
         sourceKind: SourceKind.directMp3,
-        status: TrackStatus.ready,
+        status:
+            downloadedAt == null ? TrackStatus.ready : TrackStatus.completed,
         selected: false,
         localPath: '',
         error: '',
         resolvedTitle: '',
         resolvedArtist: ''),
-    'Fixture');
+    'Fixture',
+    downloadedAt: downloadedAt);
 
 Future<void> expectHandleBackground(
     WidgetTester tester, GlobalKey key, Finder handle) async {
@@ -212,6 +214,56 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(saves, 2);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final width in [1100.0, 390.0]) {
+    testWidgets('Baixado em exibe data, desconhecido e inversão a $width px',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 500);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final captureKey = GlobalKey();
+      var descending = true;
+      final widths = downloadColumns.map((c) => c.minimum).toList();
+      widths[1] = 180;
+      widths[9] = 160;
+      await tester.pumpWidget(RepaintBoundary(
+          key: captureKey,
+          child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: appTheme(),
+              home: Scaffold(
+                  body: StatefulBuilder(
+                      builder: (context, setState) => DownloadTable(
+                          entries: [
+                            entry(1,
+                                downloadedAt: DateTime.utc(2026, 11, 3, 14)),
+                            entry(2)
+                          ],
+                          widths: widths,
+                          sort: DownloadSort.downloadedAt,
+                          descending: descending,
+                          onSort: (value) =>
+                              setState(() => descending = !descending),
+                          onResize: (_) {},
+                          onResizeEnd: () {},
+                          selection: const {},
+                          onSelect: (_, value) {},
+                          onSelectPage: (_) {},
+                          output: 'C:/Fixture'))))));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('03/11/2026'), findsOneWidget);
+      expect(find.byTooltip('Sem registro de conclusão.'), findsOneWidget);
+      final header = find.byKey(const ValueKey('sort-download-downloadedAt'));
+      await tester.ensureVisible(header);
+      await tester.pumpAndSettle();
+      await capture(tester, captureKey, 'table-completed-${width.toInt()}');
+      await tester.tap(header);
+      await tester.pumpAndSettle();
+      expect(descending, isFalse);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

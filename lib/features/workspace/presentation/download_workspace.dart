@@ -58,10 +58,6 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                     [TrackStatus.ready, TrackStatus.failed]
                         .contains(e.track.status));
             final canCancel = library.downloading && enabled;
-            final canPrioritize = selected.any((e) => [
-                  TrackStatus.ready,
-                  TrackStatus.failed
-                ].contains(e.track.status));
             final heading = Row(children: [
               const Expanded(
                   child: Text('Gerenciador de downloads',
@@ -99,12 +95,6 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       () => unawaited(c.searchDownloads(value)));
                 },
               )),
-              const SizedBox(width: 8),
-              IconButton(
-                  tooltip: 'Restaurar colunas',
-                  onPressed: () => unawaited(c.resetColumnWidths()),
-                  icon: const Icon(Icons.view_column_outlined,
-                      color: AppColors.accent)),
             ]);
             final toolbar = DownloadToolbar(
                 onAdd: enabled &&
@@ -121,22 +111,26 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                     : null,
                 onPause: canCancel ? library.togglePause : null,
                 onCancel: canCancel ? library.cancel : null,
-                onUp: canPrioritize && selected.any((e) => e.track.queuePriority < 4)
-                    ? () => unawaited(c.changePriority(1))
-                    : null,
-                onDown: canPrioritize && selected.any((e) => e.track.queuePriority > -4)
-                    ? () => unawaited(c.changePriority(-1))
+                onReset: enabled
+                    ? () {
+                        _searchTimer?.cancel();
+                        _query.clear();
+                        setState(() {});
+                        unawaited(c.resetDownloadTable());
+                      }
                     : null,
                 onOpen: selected.length == 1 &&
                         selected.single.track.localPath.isNotEmpty
                     ? () => unawaited(c.reveal(selected.single.track.localPath))
                     : null,
-                onRetry:
-                    canStart && selected.any((e) => e.track.status == TrackStatus.failed)
-                        ? () => unawaited(c.start(failedOnly: true))
-                        : null,
+                onRetry: canStart &&
+                        selected
+                            .any((e) => e.track.status == TrackStatus.failed)
+                    ? () => unawaited(c.start(failedOnly: true))
+                    : null,
                 onRemove: enabled &&
-                        selected.any((e) => e.track.status != TrackStatus.downloading)
+                        selected.any(
+                            (e) => e.track.status != TrackStatus.downloading)
                     ? () => unawaited(_remove(context))
                     : null);
             final filters = Wrap(spacing: 4, runSpacing: 4, children: [
@@ -173,26 +167,17 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                   Text('${c.selection.length} selecionados',
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.muted)),
-                  ButtonHoverMotion(
-                      builder: (states) => OutlinedButton.icon(
-                          statesController: states,
-                          style: downloadActionStyle(DownloadActionColors.add)
-                              .copyWith(
-                                  shape: const WidgetStatePropertyAll(
-                                      StadiumBorder())),
-                          onPressed: enabled && library.current != null
-                              ? (library.addingLinks ||
-                                      library.importing ||
-                                      library.preparing ||
-                                      library.editing
-                                  ? null
-                                  : () => unawaited(
-                                      showAddMusicLinks(context, library)))
-                              : onCapture,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: Text(enabled
-                              ? 'Adicionar links'
-                              : 'Capturar novo link'))),
+                  if (!enabled)
+                    ButtonHoverMotion(
+                        builder: (states) => OutlinedButton.icon(
+                            statesController: states,
+                            style: downloadActionStyle(DownloadActionColors.add)
+                                .copyWith(
+                                    shape: const WidgetStatePropertyAll(
+                                        StadiumBorder())),
+                            onPressed: onCapture,
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Capturar novo link'))),
                 ]);
             final content = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,6 +210,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                   message:
                                       'A captura e o download de vídeos e fotos ainda não estão disponíveis.')
                               : DownloadTable(
+                                  key: ValueKey(
+                                      'download-table-${c.tableRevision}'),
                                   entries: page.items,
                                   sort: c.downloadSort,
                                   descending: c.downloadDescending,
@@ -284,8 +271,7 @@ class DownloadToolbar extends StatelessWidget {
       this.onStart,
       this.onPause,
       this.onCancel,
-      this.onUp,
-      this.onDown,
+      this.onReset,
       this.onOpen,
       this.onRetry,
       this.onRemove,
@@ -294,8 +280,7 @@ class DownloadToolbar extends StatelessWidget {
       onStart,
       onPause,
       onCancel,
-      onUp,
-      onDown,
+      onReset,
       onOpen,
       onRetry,
       onRemove;
@@ -340,15 +325,6 @@ class DownloadToolbar extends StatelessWidget {
                         onCancel,
                         color: DownloadActionColors.stop),
                     _separator(),
-                    _button(
-                        Icons.arrow_upward_rounded,
-                        'Aumentar prioridade',
-                        'Aumentar a prioridade sem alterar a ordem da playlist.',
-                        onUp),
-                    const SizedBox(width: 6),
-                    _button(Icons.arrow_downward_rounded, 'Diminuir prioridade',
-                        'Diminuir a prioridade dos selecionados.', onDown),
-                    _separator(),
                     _button(Icons.folder_open_rounded, 'Abrir pasta',
                         'Abrir a pasta do arquivo selecionado.', onOpen),
                     const SizedBox(width: 6),
@@ -364,6 +340,12 @@ class DownloadToolbar extends StatelessWidget {
                         'Preservar a coleção, os arquivos e o histórico.',
                         onRemove,
                         color: DownloadActionColors.stop),
+                    const SizedBox(width: 6),
+                    _button(
+                        Icons.settings_backup_restore_rounded,
+                        'Resetar tabela',
+                        'Restaurar larguras, busca, filtros e ordenação.',
+                        onReset),
                     _separator(),
                     _button(Icons.add_link_rounded, 'Adicionar links',
                         'Acrescentar faixas ao final da coleção.', onAdd,
