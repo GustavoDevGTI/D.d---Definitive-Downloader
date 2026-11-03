@@ -283,6 +283,9 @@ class _DownloadTableState extends State<DownloadTable> {
         child: Row(children: [
           for (var i = 0; i < cells.length; i++)
             SizedBox(
+                key: header
+                    ? ValueKey('download-column-${downloadColumns[i].key}')
+                    : null,
                 width: widths[i],
                 child: Stack(children: [
                   Padding(
@@ -315,9 +318,11 @@ class _DownloadTableState extends State<DownloadTable> {
         Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
     if (sort == null) {
       return Tooltip(
-          message: index == 8
-              ? 'Progresso sem ordenação disponível.'
-              : '$label: medição indisponível.',
+          message: switch (index) {
+            7 => 'Volume de dados recebidos, em bytes. Medição indisponível.',
+            8 => 'Progresso sem ordenação disponível.',
+            _ => '$label: medição indisponível.',
+          },
           child: text);
     }
     return Tooltip(

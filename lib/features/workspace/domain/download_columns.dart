@@ -6,15 +6,15 @@ class DownloadColumn {
 
 const downloadColumns = [
   DownloadColumn('selection', '', 40, 40),
-  DownloadColumn('name', 'Nome', 300, 64),
-  DownloadColumn('size', 'Tamanho', 80, 40),
-  DownloadColumn('provider', 'Servidor', 120, 48),
-  DownloadColumn('status', 'Status', 150, 48),
-  DownloadColumn('speed', 'Velocidade', 90, 40),
-  DownloadColumn('remaining', 'Tempo restante', 110, 48),
-  DownloadColumn('received', 'Baixado', 90, 40),
-  DownloadColumn('progress', 'Progresso', 120, 48),
-  DownloadColumn('downloadedAt', 'Baixado em', 160, 64),
+  DownloadColumn('name', 'Nome', 200, 64),
+  DownloadColumn('size', 'Tamanho', 74, 40),
+  DownloadColumn('provider', 'Servidor', 88, 48),
+  DownloadColumn('status', 'Status', 96, 48),
+  DownloadColumn('speed', 'Velocidade', 88, 40),
+  DownloadColumn('remaining', 'Tempo restante', 100, 48),
+  DownloadColumn('received', 'Recebido', 80, 40),
+  DownloadColumn('progress', 'Progresso', 92, 48),
+  DownloadColumn('downloadedAt', 'Baixado em', 150, 64),
   DownloadColumn('destination', 'Salvar em', 230, 64),
 ];
 

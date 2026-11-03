@@ -258,6 +258,26 @@ void main() {
         expect(tester.getSize(find.byType(DownloadTable)).height,
             greaterThan(400));
       }
+      if (width >= 1360) {
+        final viewport = tester.getRect(find.byType(DownloadTable));
+        for (final column in downloadColumns.take(downloadColumns.length - 1)) {
+          final cell = tester
+              .getRect(find.byKey(ValueKey('download-column-${column.key}')));
+          expect(cell.left, greaterThanOrEqualTo(viewport.left),
+              reason: column.key);
+          expect(cell.right, lessThanOrEqualTo(viewport.right - 12 + .01),
+              reason: '${column.key} deve aparecer sem rolagem horizontal.');
+        }
+        expect(find.text('Recebido'), findsOneWidget);
+        if (width == 1360) {
+          expect(
+              tester
+                  .getRect(
+                      find.byKey(const ValueKey('download-column-destination')))
+                  .right,
+              greaterThan(viewport.right));
+        }
+      }
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
       if (width == 1360 || width == 390) {
         final c = downloadsWidget.controller;

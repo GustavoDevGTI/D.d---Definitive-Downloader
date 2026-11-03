@@ -88,6 +88,8 @@
 
 - Downloads 0.1.23: único Adicionar links na barra; remover setas de prioridade e seu grupo, sem espaço reservado. Resetar tabela pertence ao mesmo grupo de abrir pasta, retry e remover: restaura larguras, busca, filtros, ordenação, seleção, página e rolagens, sem excluir dados ou alterar execução/prioridade. Coluna Baixado em usa o registro de conclusão do arquivo atual, UTC convertido para horário local; clique começa pelos mais recentes e inverte. Sem registro fica —, sempre no fim. Detalhes em `docs/RELEASE_0_1_23.md`.
 
+- Downloads 0.1.24: larguras padrão compactas somam 1008 px até Baixado em; em 1360 px desktop todas essas colunas devem aparecer inicialmente, deixando apenas Salvar em além da borda. Manter ajuste manual e tooltips, fonte de 12 px e rolagem mobile. Recebido substitui o rótulo Baixado para o volume em bytes, ainda sem medição. Nesta entrega, o pedido explícito autoriza aplicar uma única vez as larguras compactas às preferências locais atuais, com backup; não criar redefinição automática em inicializações.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.
