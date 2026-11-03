@@ -82,6 +82,8 @@
 
 - Pedido posterior na 0.1.20 restaura o cabeçalho azul-marinho `#23273F` com texto e divisórias claros, substituindo o vinho da 0.1.19. Preservar redimensionamento nos dois sentidos, demais cores e funções da tabela.
 
+- Correção 0.1.21: foco/arraste das divisórias não pinta bloco claro sobre o cabeçalho. Manter área de toque transparente e destacar apenas a linha (branca e 3 px no cabeçalho), preservando foco de teclado, sem deslocar células.
+
 ## Validação e entrega
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

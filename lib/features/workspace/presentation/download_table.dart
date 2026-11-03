@@ -305,6 +305,7 @@ class _DownloadTableState extends State<DownloadTable> {
         minimumWidth: minimum,
         maximumWidth: maximum,
         color: Colors.white70,
+        activeColor: Colors.white,
         onResize: (value) {
           // Materialize the displayed widths together so automatic Name growth
           // cannot counteract the pointer movement on compact layouts.

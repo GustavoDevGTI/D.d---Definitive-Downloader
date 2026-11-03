@@ -11,10 +11,11 @@ class ColumnResizeHandle extends StatefulWidget {
       required this.minimumWidth,
       this.maximumWidth = 1200,
       this.color = AppColors.line,
+      this.activeColor = AppColors.accent,
       required this.onResize,
       required this.onEnd});
   final String label;
-  final Color color;
+  final Color color, activeColor;
   final double width, defaultWidth, minimumWidth, maximumWidth;
   final ValueChanged<double> onResize;
   final VoidCallback onEnd;
@@ -86,13 +87,12 @@ class _ColumnResizeHandleState extends State<ColumnResizeHandle> {
                         width: 22,
                         height: 40,
                         alignment: Alignment.center,
-                        color: _focused
-                            ? AppColors.accentSoft
-                            : Colors.transparent,
+                        color: Colors.transparent,
                         child: Container(
-                            width: 2,
+                            width: _focused ? 3 : 2,
                             height: 18,
-                            color: _focused ? AppColors.accent : widget.color)),
+                            color:
+                                _focused ? widget.activeColor : widget.color)),
                   )),
             )),
       ));

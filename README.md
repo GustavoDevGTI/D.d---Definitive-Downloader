@@ -2,9 +2,11 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.20](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.20). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.21](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.21). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
 
 ![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0120-desktop.png)
+
+A versão **0.1.21** corrige o bloco claro que aparecia na divisória ao ajustar colunas: o fundo continua azul e apenas a linha fica branca e mais espessa no foco, mantendo teclado e arraste. [Validação](docs/RELEASE_0_1_21.md).
 
 A versão **0.1.20** restaura o cabeçalho azul-marinho `#23273F`, com texto e divisórias claros, conforme pedido posterior. Preserva o redimensionamento nos dois sentidos e as demais funções da tabela. [Validação](docs/RELEASE_0_1_20.md).
 

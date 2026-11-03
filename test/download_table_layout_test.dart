@@ -32,6 +32,30 @@ DownloadEntry entry(int i) => DownloadEntry(
         resolvedArtist: ''),
     'Fixture');
 
+Future<void> expectHandleBackground(
+    WidgetTester tester, GlobalKey key, Finder handle) async {
+  final point = tester.getCenter(handle) -
+      tester.getTopLeft(find.byKey(key)) -
+      const Offset(8, 0);
+  await tester.runAsync(() async {
+    final boundary =
+        key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final img = await boundary.toImage();
+    try {
+      final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final offset = (point.dy.floor() * img.width + point.dx.floor()) * 4;
+      final bytes = data!.buffer.asUint8List();
+      final color = Color.fromARGB(bytes[offset + 3], bytes[offset],
+          bytes[offset + 1], bytes[offset + 2]);
+      expect(color, AppColors.navigation,
+          reason:
+              'Foco da divisória não pode cobrir o cabeçalho com um bloco claro.');
+    } finally {
+      img.dispose();
+    }
+  });
+}
+
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   final output = Platform.environment['DD_LAYOUT_OUTPUT'];
   if (output == null) return;
@@ -109,26 +133,31 @@ void main() {
       widths[1] = 200;
       widths[2] = 140;
       var saves = 0;
-      await tester.pumpWidget(MaterialApp(
-          theme: appTheme(),
-          home: Scaffold(
-              body: StatefulBuilder(
-                  builder: (context, setState) => DownloadTable(
-                      entries: [entry(1)],
-                      widths: widths,
-                      onResize: (values) => setState(() => widths = values),
-                      onResizeEnd: () => saves++,
-                      selection: const {},
-                      onSelect: (_, value) {},
-                      onSelectPage: (_) {},
-                      output: 'C:/Fixture')))));
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(RepaintBoundary(
+          key: captureKey,
+          child: MaterialApp(
+              theme: appTheme(),
+              home: Scaffold(
+                  body: StatefulBuilder(
+                      builder: (context, setState) => DownloadTable(
+                          entries: [entry(1)],
+                          widths: widths,
+                          onResize: (values) => setState(() => widths = values),
+                          onResizeEnd: () => saves++,
+                          selection: const {},
+                          onSelect: (_, value) {},
+                          onSelectPage: (_) {},
+                          output: 'C:/Fixture'))))));
       await tester.pumpAndSettle();
       final handle = find.byKey(const ValueKey('resize-download-name'));
-      final gesture = await tester.startGesture(tester.getCenter(handle));
+      var gesture = await tester.startGesture(tester.getCenter(handle));
       await gesture.moveBy(const Offset(30, 0));
       await tester.pump();
       await gesture.moveBy(const Offset(10, 0));
       await tester.pump();
+      await expectHandleBackground(tester, captureKey, handle);
+      await capture(tester, captureKey, 'table-resize-drag-${width.toInt()}');
       final start = widths[1], right = widths[2];
       final position = tester.getCenter(handle).dx;
       final total = widths.fold<double>(0, (a, b) => a + b);
@@ -143,6 +172,13 @@ void main() {
       expect(widths[2], closeTo(right + 30, .01));
       expect(tester.getCenter(handle).dx, closeTo(position - 30, .01));
       expect(widths.fold<double>(0, (a, b) => a + b), closeTo(total, .01));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      await expectHandleBackground(tester, captureKey, handle);
+      await capture(tester, captureKey, 'table-resize-focus-${width.toInt()}');
+      gesture = await tester.startGesture(tester.getCenter(handle));
+      await gesture.moveBy(const Offset(30, 0));
+      await tester.pump();
       await gesture.moveBy(const Offset(1500, 0));
       await tester.pump();
       expect(widths[2], downloadColumns[2].minimum);
@@ -156,7 +192,7 @@ void main() {
       expect(widths[2], downloadColumns[2].minimum + 25);
       await gesture.up();
       await tester.pumpAndSettle();
-      expect(saves, 1);
+      expect(saves, 2);
       expect(tester.takeException(), isNull);
     });
   }
