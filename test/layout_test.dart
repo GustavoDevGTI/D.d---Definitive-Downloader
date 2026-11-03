@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -270,6 +271,45 @@ void main() {
       downloadsWidget.controller.selectPage(true);
       await tester.pumpAndSettle();
       await capture(tester, captureKey, 'music-tools-active-${width.toInt()}');
+      final startButton = find
+          .descendant(
+              of: find.byType(DownloadToolbar),
+              matching: find.byType(IconButton))
+          .first;
+      await tester.ensureVisible(startButton);
+      await tester.pumpAndSettle();
+      final startMaterial = find
+          .descendant(of: startButton, matching: find.byType(Material))
+          .first;
+      final restingColor = tester.widget<Material>(startMaterial).color;
+      final hoverPointer =
+          await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+      await hoverPointer.addPointer(location: Offset.zero);
+      await hoverPointer.moveTo(tester.getCenter(startButton));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Material>(startMaterial).color, isNot(restingColor));
+      await capture(tester, captureKey, 'music-play-hover-${width.toInt()}');
+      final addButton = find.descendant(
+          of: find.byType(DownloadToolbar),
+          matching: find.byTooltip('Adicionar links'));
+      await tester.ensureVisible(addButton);
+      await tester.pumpAndSettle();
+      await hoverPointer.moveTo(tester.getCenter(addButton));
+      await tester.pumpAndSettle();
+      await capture(tester, captureKey, 'music-add-hover-${width.toInt()}');
+      await hoverPointer.removePointer();
+      await tester.pumpAndSettle();
+      for (var column = 1; column < downloadColumns.length; column++) {
+        downloadsWidget.controller.resizeColumn(column, 0);
+      }
+      await tester.runAsync(downloadsWidget.controller.saveColumnWidths);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await capture(
+          tester, captureKey, 'music-columns-compact-${width.toInt()}');
+      await tester.runAsync(downloadsWidget.controller.resetColumnWidths);
+      await tester.pumpAndSettle();
+
       downloadsWidget.controller.selectPage(false);
       await tester.pumpAndSettle();
       expect(find.byTooltip('Pausar fila'), findsOneWidget);

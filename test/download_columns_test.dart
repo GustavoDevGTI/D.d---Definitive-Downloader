@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/features/workspace/presentation/column_resize_handle.dart';
 
@@ -17,9 +18,9 @@ void main() {
                         label: 'Nome',
                         width: width,
                         defaultWidth: 300,
-                        minimumWidth: 140,
-                        onResize: (value) =>
-                            setState(() => width = value.clamp(140, 1200)),
+                        minimumWidth: downloadColumns[1].minimum,
+                        onResize: (value) => setState(() => width =
+                            value.clamp(downloadColumns[1].minimum, 1200)),
                         onEnd: () => saves++))))));
     final handle = find.byType(ColumnResizeHandle);
     await tester.drag(handle, const Offset(160, 0));
@@ -39,6 +40,10 @@ void main() {
     await tester.tap(handle);
     await tester.pumpAndSettle();
     expect(width, 300);
+    await tester.drag(handle, const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    expect(width, downloadColumns[1].minimum);
+    expect(width, lessThan(140));
     expect(tester.takeException(), isNull);
   });
 }

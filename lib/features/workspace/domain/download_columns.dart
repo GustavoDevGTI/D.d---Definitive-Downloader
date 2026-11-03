@@ -6,15 +6,15 @@ class DownloadColumn {
 
 const downloadColumns = [
   DownloadColumn('selection', '', 40, 40),
-  DownloadColumn('name', 'Nome', 300, 140),
-  DownloadColumn('size', 'Tamanho', 80, 70),
-  DownloadColumn('provider', 'Servidor', 120, 90),
-  DownloadColumn('status', 'Status', 150, 100),
-  DownloadColumn('speed', 'Velocidade', 90, 80),
-  DownloadColumn('remaining', 'Tempo restante', 110, 100),
-  DownloadColumn('received', 'Baixado', 90, 75),
-  DownloadColumn('progress', 'Progresso', 120, 90),
-  DownloadColumn('destination', 'Salvar em', 230, 140),
+  DownloadColumn('name', 'Nome', 300, 64),
+  DownloadColumn('size', 'Tamanho', 80, 40),
+  DownloadColumn('provider', 'Servidor', 120, 48),
+  DownloadColumn('status', 'Status', 150, 48),
+  DownloadColumn('speed', 'Velocidade', 90, 40),
+  DownloadColumn('remaining', 'Tempo restante', 110, 48),
+  DownloadColumn('received', 'Baixado', 90, 40),
+  DownloadColumn('progress', 'Progresso', 120, 48),
+  DownloadColumn('destination', 'Salvar em', 230, 64),
 ];
 
 double boundedColumnWidth(int index, double value) {

@@ -58,9 +58,11 @@ class DownloadTable extends StatelessWidget {
                 message: switch (label) {
                   'Velocidade' => 'Medição de velocidade indisponível.',
                   'Tempo restante' => 'Estimativa de tempo indisponível.',
-                  _ => '',
+                  _ => label,
                 },
                 child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w500))),
         ], header: true),
@@ -78,7 +80,7 @@ class DownloadTable extends StatelessWidget {
                         onChanged: (v) => onSelect(t.id, v ?? false)),
                     Tooltip(
                         message:
-                            '${t.displayTitle} · ${e.collectionName} · Prioridade ${t.queuePriority}',
+                            '${t.localPath.isEmpty ? t.displayTitle : p.basename(t.localPath)} · ${e.collectionName} · Prioridade ${t.queuePriority}',
                         child: Text(
                             t.localPath.isEmpty
                                 ? t.displayTitle
@@ -87,20 +89,30 @@ class DownloadTable extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 11))),
                     const Text('—'),
-                    Text(t.sourceKind.musicProviderName ?? t.sourceLabel,
-                        style: const TextStyle(fontSize: 11)),
                     Tooltip(
-                        message: t.error,
+                        message:
+                            t.sourceKind.musicProviderName ?? t.sourceLabel,
+                        child: Text(
+                            t.sourceKind.musicProviderName ?? t.sourceLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11))),
+                    Tooltip(
+                        message: t.error.isEmpty ? e.statusLabel : t.error,
                         child: Text(
                             t.id == activeId && paused
                                 ? 'Pausado · 10 KiB/s'
                                 : e.statusLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 11))),
                     const Text('—'),
                     const Text('—'),
                     const Text('—'),
                     t.status == TrackStatus.completed
                         ? const Text('Concluído',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 11))
                         : t.id == activeId
                             ? LinearProgressIndicator(

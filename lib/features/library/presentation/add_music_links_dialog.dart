@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../workspace/presentation/download_action_button.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 
@@ -171,6 +172,8 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
               onPressed: _saving ? null : () => Navigator.pop(context),
               child: const Text('Cancelar')),
           FilledButton.icon(
+              style:
+                  downloadActionStyle(DownloadActionColors.add, primary: true),
               onPressed:
                   _saving || _loading || _collectionId == null ? null : _add,
               icon: const Icon(Icons.add_link_rounded, size: 18),

@@ -6,6 +6,7 @@ import '../application/workspace_controller.dart';
 import '../domain/workspace_models.dart';
 import 'workspace_components.dart';
 import 'download_table.dart';
+import 'download_action_button.dart';
 import '../../library/presentation/add_music_links_dialog.dart';
 
 class DownloadWorkspace extends StatefulWidget {
@@ -203,8 +204,10 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                     style:
                         const TextStyle(fontSize: 11, color: AppColors.muted)),
                 OutlinedButton.icon(
-                    style:
-                        OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                    style: downloadActionStyle(DownloadActionColors.add)
+                        .copyWith(
+                            shape:
+                                const WidgetStatePropertyAll(StadiumBorder())),
                     onPressed: enabled && library.current != null
                         ? (library.addingLinks ||
                                 library.importing ||
@@ -292,6 +295,7 @@ class DownloadToolbar extends StatelessWidget {
                     paused ? 'Continuar fila' : 'Iniciar selecionados',
                     'Arquivos incompletos reiniciam do começo.',
                     onStart,
+                    color: DownloadActionColors.start,
                     primary: true),
                 const SizedBox(width: 6),
                 _button(
@@ -299,13 +303,15 @@ class DownloadToolbar extends StatelessWidget {
                     paused ? 'Retomar' : 'Pausar fila',
                     'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
                     onPause,
+                    color: DownloadActionColors.pause,
                     active: paused),
                 const SizedBox(width: 6),
                 _button(
                     Icons.stop_rounded,
                     'Parar fila',
                     'Interromper a operação ativa e preservar os arquivos concluídos.',
-                    onCancel),
+                    onCancel,
+                    color: DownloadActionColors.stop),
                 _separator(),
                 _button(
                     Icons.arrow_upward_rounded,
@@ -322,14 +328,13 @@ class DownloadToolbar extends StatelessWidget {
                 _button(Icons.refresh_rounded, 'Tentar novamente',
                     'Reiniciar somente os selecionados que falharam.', onRetry),
                 const SizedBox(width: 6),
-                _button(
-                    Icons.delete_outline_rounded,
-                    'Remover da fila',
-                    'Preservar a coleção, os arquivos e o histórico.',
-                    onRemove),
+                _button(Icons.delete_outline_rounded, 'Remover da fila',
+                    'Preservar a coleção, os arquivos e o histórico.', onRemove,
+                    color: DownloadActionColors.stop),
                 _separator(),
                 _button(Icons.add_link_rounded, 'Adicionar links',
-                    'Acrescentar faixas ao final da coleção.', onAdd),
+                    'Acrescentar faixas ao final da coleção.', onAdd,
+                    color: DownloadActionColors.add),
               ]))));
 
   Widget _separator() => const SizedBox(
@@ -337,47 +342,15 @@ class DownloadToolbar extends StatelessWidget {
 
   Widget _button(
           IconData icon, String label, String description, VoidCallback? action,
-          {bool primary = false, bool active = false}) =>
-      Semantics(
-          hint: description,
-          child: IconButton(
-              tooltip: label,
-              onPressed: action,
-              isSelected: active,
-              style: IconButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      visualDensity: VisualDensity.standard,
-                      side: BorderSide(
-                          color: AppColors.accent
-                              .withAlpha(action == null ? 65 : 125)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      foregroundColor: primary || active
-                          ? Colors.white
-                          : AppColors.accentActive,
-                      backgroundColor: primary
-                          ? AppColors.accent
-                          : active
-                              ? AppColors.accentSoft
-                              : Colors.transparent,
-                      disabledForegroundColor: AppColors.muted,
-                      disabledBackgroundColor:
-                          primary ? AppColors.background : Colors.transparent)
-                  .copyWith(backgroundColor:
-                      WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.disabled)) {
-                  return AppColors.accentSoft.withAlpha(115);
-                }
-                if (!primary) {
-                  return active ? AppColors.accentActive : AppColors.accentSoft;
-                }
-                return states.any((state) => const {
-                          WidgetState.hovered,
-                          WidgetState.focused,
-                          WidgetState.pressed
-                        }.contains(state))
-                    ? AppColors.accentActive
-                    : AppColors.accent;
-              })),
-              icon: Icon(icon, size: 22)));
+          {bool primary = false,
+          bool active = false,
+          Color color = DownloadActionColors.utility}) =>
+      DownloadActionButton(
+          icon: icon,
+          label: label,
+          description: description,
+          onPressed: action,
+          color: color,
+          primary: primary,
+          active: active);
 }
