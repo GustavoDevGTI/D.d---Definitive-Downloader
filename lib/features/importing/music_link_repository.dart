@@ -205,13 +205,18 @@ class MusicLinkRepository {
   Future<void> setSource(int id, ResolvedMusicLink entry) => database.run((db) {
         db.execute('BEGIN IMMEDIATE');
         try {
-          final rows = db.select('SELECT status FROM tracks WHERE id=?', [id]);
+          final rows = db.select(
+              'SELECT status,redownload_state FROM tracks WHERE id=?', [id]);
           if (rows.isEmpty ||
               ['downloading', 'completed'].contains(rows.first['status'])) {
             throw const FormatException(
                 'Não é possível trocar a fonte de uma faixa em transferência ou concluída.');
           }
           replaceSource(db, id, entry);
+          if (rows.first['redownload_state'] != '') {
+            db.execute('UPDATE tracks SET redownload_state=? WHERE id=?',
+                [entry.pinned && entry.ready ? 'approved' : 'review', id]);
+          }
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

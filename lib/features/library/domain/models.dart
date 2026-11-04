@@ -115,6 +115,7 @@ class Track {
       this.manualMode = ManualSourceMode.originalAudio,
       this.resolvedCoverUrl = '',
       this.queuePriority = 0,
+      this.redownloadState = '',
       this.customTitle = '',
       this.recordingType = '',
       this.sourceAuthorization = SourceAuthorization.catalog});
@@ -128,6 +129,8 @@ class Track {
   }
 
   final int queuePriority;
+  final String redownloadState;
+  bool get redownloadReview => redownloadState == 'review';
   bool get orderLocked =>
       trackOrderLocked(status: status.name, localPath: localPath);
   final MatchStatus matchStatus;
@@ -151,10 +154,12 @@ class Track {
   final TrackStatus status;
   bool get needsReview =>
       status != TrackStatus.completed &&
-      (matchStatus == MatchStatus.pending ||
+      (redownloadReview ||
+          matchStatus == MatchStatus.pending ||
           matchStatus == MatchStatus.review ||
           sourceKind == SourceKind.none);
   bool get needsAutomaticMatching =>
+      redownloadState.isEmpty &&
       status == TrackStatus.pending &&
       matchStatus == MatchStatus.pending &&
       sourceKind == SourceKind.none &&
@@ -166,7 +171,8 @@ class Track {
   final String resolvedArtist;
   final String resolvedAlbum;
   final int? resolvedDurationMs;
-  bool get canDownload =>
+  bool get canDownload => !redownloadReview && hasDownloadableSource;
+  bool get hasDownloadableSource =>
       sourceKind != SourceKind.none &&
       mediaUrl.isNotEmpty &&
       (sourceKind != SourceKind.youtube ||

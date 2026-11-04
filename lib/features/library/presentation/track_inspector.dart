@@ -17,6 +17,8 @@ class TrackInspector extends StatefulWidget {
 class _TrackInspectorState extends State<TrackInspector> {
   final _query = TextEditingController();
   int? _trackId;
+  int _revision = -1;
+  TrackStatus? _status;
   int _tab = 0;
   @override
   void dispose() {
@@ -27,11 +29,15 @@ class _TrackInspectorState extends State<TrackInspector> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller, t = c.focused;
-    if (_trackId != t?.id) {
+    if (_trackId != t?.id ||
+        _revision != c.inspectorRevision ||
+        (_status != t?.status && t?.status == TrackStatus.completed)) {
       _trackId = t?.id;
-      _tab = 0;
+      _revision = c.inspectorRevision;
+      _tab = t?.status == TrackStatus.completed ? 1 : 0;
       _query.text = t == null ? '' : '${t.artist} ${t.title}';
     }
+    _status = t?.status;
     return Material(
         color: Colors.white,
         child:
@@ -73,7 +79,11 @@ class _TrackInspectorState extends State<TrackInspector> {
                           const SizedBox(height: 16),
                           _line(
                               'Duração esperada', formatDuration(t.durationMs)),
-                          _line('Correspondência', t.matchStatus.label),
+                          _line(
+                              'Correspondência',
+                              t.redownloadReview
+                                  ? 'Escolher fonte novamente'
+                                  : t.matchStatus.label),
                           _line(
                               'Fonte identificada',
                               t.hasManualSource
@@ -152,7 +162,9 @@ class _TrackInspectorState extends State<TrackInspector> {
                               const SizedBox(height: 8),
                               SelectableText(t.manualUrl,
                                   style: const TextStyle(fontSize: 12)),
-                            ] else if (t.status != TrackStatus.completed) ...[
+                            ],
+                            if ((!t.hasManualSource || t.redownloadReview) &&
+                                t.status != TrackStatus.completed) ...[
                               TextField(
                                   controller: _query,
                                   decoration: InputDecoration(
@@ -182,7 +194,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
                                 child: TrackReviewActions(controller: c)),
-                            if (!t.hasManualSource &&
+                            if ((!t.hasManualSource || t.redownloadReview) &&
                                 t.status != TrackStatus.completed)
                               RadioGroup<Candidate>(
                                   groupValue: c.selectedCandidate,

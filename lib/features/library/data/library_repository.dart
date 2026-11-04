@@ -119,7 +119,7 @@ class LibraryRepository {
       });
 
   Future<bool> needsAutomaticMatching(int id) => database.run((db) => db.select(
-      "SELECT 1 FROM tracks WHERE collection_id=? AND status='pending' AND match_status='pending' AND source_kind='none' AND manual_url='' LIMIT 1",
+      "SELECT 1 FROM tracks WHERE collection_id=? AND status='pending' AND match_status='pending' AND source_kind='none' AND manual_url='' AND redownload_state='' LIMIT 1",
       [id]).isNotEmpty);
 
   Future<TrackPage> page(int id,
@@ -215,7 +215,7 @@ class LibraryRepository {
   Future<Track?> nextSelected(int id, {int afterPosition = 0}) =>
       database.run((db) {
         final rows = db.select(
-            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND match_status!='review' AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo')) AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed') ORDER BY position LIMIT 1",
+            "SELECT * FROM tracks WHERE collection_id=? AND position>? AND selected=1 AND source_kind!='none' AND match_status!='review' AND redownload_state!='review' AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo')) AND NOT(manual_url!='' AND manual_mode='extractAudio') AND status IN ('ready','failed') ORDER BY position LIMIT 1",
             [id, afterPosition]);
         return rows.isEmpty ? null : readTrack(rows.first);
       });
@@ -225,22 +225,31 @@ class LibraryRepository {
         db.execute('BEGIN IMMEDIATE');
         try {
           db.execute(
-              'UPDATE tracks SET status=?,error=?,local_path=CASE WHEN ?=\'\' THEN local_path ELSE ? END WHERE id=?',
-              [status.name, error, localPath, localPath, id]);
+              'UPDATE tracks SET status=?,error=?,local_path=CASE WHEN ?=\'\' THEN local_path ELSE ? END,redownload_state=CASE WHEN ?=\'completed\' AND ?!=\'\' THEN \'\' ELSE redownload_state END WHERE id=?',
+              [
+                status.name,
+                error,
+                localPath,
+                localPath,
+                status.name,
+                localPath,
+                id
+              ]);
           if (status == TrackStatus.completed && localPath.isNotEmpty) {
             final row =
                 db.select('SELECT * FROM tracks WHERE id=?', [id]).first;
-            db.execute(
-                '''INSERT OR IGNORE INTO download_history
-            (track_id,name,local_path,folder,source,duration_ms) VALUES(?,?,?,?,?,?)''',
-                [
-                  id,
-                  p.basename(localPath),
-                  localPath,
-                  p.dirname(localPath),
-                  row['source_kind'],
-                  row['resolved_duration_ms'] ?? row['duration_ms']
-                ]);
+            db.execute('''INSERT INTO download_history
+            (track_id,name,local_path,folder,source,duration_ms) VALUES(?,?,?,?,?,?)
+            ON CONFLICT(local_path) DO UPDATE SET name=excluded.name,folder=excluded.folder,
+              source=excluded.source,duration_ms=excluded.duration_ms,created_at=CURRENT_TIMESTAMP,hidden=0
+            WHERE download_history.track_id=excluded.track_id''', [
+              id,
+              p.basename(localPath),
+              localPath,
+              p.dirname(localPath),
+              row['source_kind'],
+              row['resolved_duration_ms'] ?? row['duration_ms']
+            ]);
           }
           db.execute('COMMIT');
         } catch (_) {
@@ -267,6 +276,7 @@ class LibraryRepository {
           .toList());
 
   static Track readTrack(Map<String, Object?> r) => Track(
+      redownloadState: r['redownload_state'] as String? ?? '',
       customTitle: r['custom_title'] as String? ?? '',
       recordingType: r['recording_type'] as String? ?? '',
       sourceAuthorization: SourceAuthorization.values
@@ -358,7 +368,9 @@ class LibraryRepository {
       .toList());
 
   Future<void> chooseMusicSource(Track track, Candidate candidate,
-          {bool approveVideo = false, bool forFallback = false}) =>
+          {bool approveVideo = false,
+          bool forFallback = false,
+          bool userSelected = false}) =>
       database.run((db) {
         if (!candidate.isFullRecording &&
             !(approveVideo && candidate.isVideoRecording)) {
@@ -367,9 +379,17 @@ class LibraryRepository {
         db.execute('BEGIN IMMEDIATE');
         try {
           final rows = db.select(
-              'SELECT status,manual_url,source_kind FROM tracks WHERE id=?',
+              'SELECT status,manual_url,source_kind,redownload_state FROM tracks WHERE id=?',
               [track.id]);
-          if (rows.isNotEmpty && rows.first['manual_url'] != '') {
+          final replacement =
+              rows.isNotEmpty && rows.first['redownload_state'] != '';
+          if (replacement && (!userSelected || forFallback)) {
+            throw const FormatException(
+                'Escolha a fonte na conferência para baixar novamente.');
+          }
+          if (rows.isNotEmpty &&
+              rows.first['manual_url'] != '' &&
+              !replacement) {
             db.execute('COMMIT');
             return;
           }
@@ -411,6 +431,11 @@ class LibraryRepository {
                 candidate.isVideoRecording ? 'approvedVideo' : 'catalog',
                 track.id
               ]);
+          if (replacement) {
+            db.execute(
+                "UPDATE tracks SET redownload_state='approved',manual_url=?,manual_mode='originalAudio' WHERE id=?",
+                [candidate.pageUrl, track.id]);
+          }
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');
@@ -440,7 +465,7 @@ class LibraryRepository {
           '''UPDATE tracks SET manual_url=?,manual_mode=?,match_status='manual',queue_hidden=0,
         media_url=?,source_kind=?,resolved_title='',resolved_artist='',resolved_album='',resolved_duration_ms=NULL,
         resolved_cover_url='',error='',status=CASE WHEN status='completed' THEN status WHEN ?='originalAudio' THEN 'ready' ELSE 'pending' END
-        WHERE id=? AND status!='downloading' ''',
+        WHERE id=? AND status NOT IN ('downloading','completed') ''',
           [
             uri.toString(),
             mode.name,
@@ -449,20 +474,24 @@ class LibraryRepository {
             mode.name,
             id
           ]);
+      db.execute(
+          "UPDATE tracks SET redownload_state=? WHERE id=? AND redownload_state!='' AND status NOT IN ('downloading','completed')",
+          [mode == ManualSourceMode.originalAudio ? 'approved' : 'review', id]);
     });
   }
 
   Future<void> removeManualSource(int id) => database.run((db) {
         db.execute(
             '''UPDATE tracks SET manual_url='',manual_mode='originalAudio',match_status='pending',
+      redownload_state=CASE WHEN redownload_state!='' THEN 'review' ELSE '' END,
       media_url='',source_kind='none',resolved_title='',resolved_artist='',resolved_album='',resolved_duration_ms=NULL,
-      resolved_cover_url='',error='',status=CASE WHEN status='completed' THEN status ELSE 'pending' END WHERE id=? AND status!='downloading' ''',
+      resolved_cover_url='',error='',status=CASE WHEN status='completed' THEN status ELSE 'pending' END WHERE id=? AND status NOT IN ('downloading','completed') ''',
             [id]);
       });
 
   Future<void> markForReview(int id) => database.run((db) {
         db.execute(
-            "UPDATE tracks SET match_status='review' WHERE id=? AND status!='downloading'",
+            "UPDATE tracks SET match_status='review',redownload_state=CASE WHEN redownload_state!='' THEN 'review' ELSE '' END WHERE id=? AND status!='downloading'",
             [id]);
       });
 

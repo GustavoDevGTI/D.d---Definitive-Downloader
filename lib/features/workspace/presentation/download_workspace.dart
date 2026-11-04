@@ -54,9 +54,12 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
             final canStart = enabled &&
                 !library.busy &&
                 selected.any((e) =>
-                    e.track.canDownload &&
-                    [TrackStatus.ready, TrackStatus.failed]
-                        .contains(e.track.status));
+                    e.track.redownloadReview ||
+                    (e.track.status == TrackStatus.completed &&
+                        e.fileBytes == null) ||
+                    (e.track.canDownload &&
+                        [TrackStatus.ready, TrackStatus.failed]
+                            .contains(e.track.status)));
             final canCancel = library.downloading && enabled;
             final heading = Row(children: [
               const Expanded(

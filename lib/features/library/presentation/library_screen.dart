@@ -38,9 +38,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
   late AppSection _section =
       widget.initialPlaylist.isEmpty ? AppSection.home : AppSection.music;
   int _musicTab = 0, _mediaTab = 0;
+  int _inspectorRequest = 0;
   @override
   void initState() {
     super.initState();
+    _inspectorRequest = widget.controller.inspectorRequest;
+    widget.controller.addListener(_requestInspector);
     unawaited(_workspace.refresh());
     if (widget.showConnectionsOnStart && widget.connections != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -51,8 +54,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_requestInspector);
     _workspace.dispose();
     super.dispose();
+  }
+
+  void _requestInspector() {
+    if (!mounted || _inspectorRequest == widget.controller.inspectorRequest) {
+      return;
+    }
+    _inspectorRequest = widget.controller.inspectorRequest;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _section = AppSection.music;
+          _musicTab = 0;
+        });
+      }
+    });
   }
 
   void _showConnections() {

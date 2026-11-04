@@ -1,5 +1,7 @@
 import 'package:definitive_downloader/features/library/domain/track_listing.dart';
 import 'widget_io.dart';
+import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
+import 'package:definitive_downloader/features/workspace/presentation/workspace_components.dart';
 import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'dart:ui' as ui;
@@ -397,6 +399,13 @@ void main() {
               controller.focused!.id, 'completed');
           await controller.refresh();
         });
+        await tester.pumpAndSettle();
+        expect(find.text('Álbum original'), findsOneWidget);
+        final inspectorTabs = find.descendant(
+            of: find.byType(TrackInspector),
+            matching: find.byType(CategoryTabs));
+        await tester.tap(find.descendant(
+            of: inspectorTabs, matching: find.text('Correspondência')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byTooltip('Ver fonte vinculada'));
         await tester.tap(find.byTooltip('Ver fonte vinculada'));

@@ -34,8 +34,29 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   final _urlFocus = FocusNode();
   Timer? _timer;
   bool _detail = false;
+  bool _wide = false;
+  bool _inspectorOpen = false;
+  int _inspectorRequest = 0;
+  @override
+  void initState() {
+    super.initState();
+    _inspectorRequest = widget.controller.inspectorRequest;
+    widget.controller.addListener(_requestInspector);
+  }
+
+  void _requestInspector() {
+    final c = widget.controller;
+    if (!mounted || c.inspectorRequest == _inspectorRequest) return;
+    _inspectorRequest = c.inspectorRequest;
+    setState(() => _detail = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_wide && c.focused != null) _showInspector();
+    });
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_requestInspector);
     _timer?.cancel();
     _url.dispose();
     _query.dispose();
@@ -49,6 +70,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     if (_detail && c.current != null) {
       return LayoutBuilder(builder: (context, constraints) {
         final wide = constraints.maxWidth >= 880;
+        _wide = wide;
         final panel =
             Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(flex: 8, child: WorkspacePanel(child: _tracks(c, wide))),
@@ -155,10 +177,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                   primary: true,
                   onPressed: c.busy || c.page.selectedCount == 0
                       ? null
-                      : () {
-                          unawaited(c.downloadSelected());
-                          widget.onDownloads();
-                        }),
+                      : () => unawaited(_startDownloads())),
               const SizedBox(width: 6),
               DownloadActionButton(
                   label: 'Adicionar links',
@@ -280,17 +299,27 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
       ]);
   void _focus(Track track, bool wide) {
     widget.controller.focus(track);
-    if (!wide) {
-      unawaited(showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          builder: (context) => SizedBox(
-              height: MediaQuery.sizeOf(context).height * .9,
-              child: ListenableBuilder(
-                  listenable: widget.controller,
-                  builder: (context, child) =>
-                      TrackInspector(controller: widget.controller)))));
-    }
+    if (!wide) _showInspector();
+  }
+
+  Future<void> _startDownloads() async {
+    final started = await widget.controller.startDownloads();
+    if (mounted && started) widget.onDownloads();
+  }
+
+  void _showInspector() {
+    if (_inspectorOpen) return;
+    _inspectorOpen = true;
+    unawaited(showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            builder: (context) => SizedBox(
+                height: MediaQuery.sizeOf(context).height * .9,
+                child: ListenableBuilder(
+                    listenable: widget.controller,
+                    builder: (context, child) =>
+                        TrackInspector(controller: widget.controller))))
+        .whenComplete(() => _inspectorOpen = false));
   }
 }

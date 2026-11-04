@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 10) {
+      if (version > 11) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -253,6 +253,18 @@ class AppDatabase {
           db.execute(
               'CREATE INDEX collections_group_id ON collections(group_id,id DESC)');
           db.execute('PRAGMA user_version = 10');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 10) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN redownload_state TEXT NOT NULL DEFAULT '' CHECK(redownload_state IN ('','review','approved'))");
+          db.execute('PRAGMA user_version = 11');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

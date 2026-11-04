@@ -21,9 +21,9 @@ class TrackListingQuery {
       'downloads' => " AND status IN ('ready','downloading','failed')",
       'files' => " AND status='completed'",
       'review' =>
-        " AND status!='completed' AND (match_status IN ('pending','review') OR source_kind='none')",
+        " AND status!='completed' AND (redownload_state='review' OR match_status IN ('pending','review') OR source_kind='none')",
       'ready' =>
-        " AND status IN ('ready','failed') AND match_status IN ('confirmed','manual') AND source_kind!='none' AND media_url!='' AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo')) AND NOT(manual_url!='' AND manual_mode='extractAudio')",
+        " AND status IN ('ready','failed') AND redownload_state!='review' AND match_status IN ('confirmed','manual') AND source_kind!='none' AND media_url!='' AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo')) AND NOT(manual_url!='' AND manual_mode='extractAudio')",
       _ => '',
     };
     if (query.trim().isNotEmpty) {
@@ -42,7 +42,7 @@ class TrackListingQuery {
         "CASE WHEN custom_title='' THEN title ELSE custom_title END COLLATE track_text",
       TrackSort.duration => 'duration_ms',
       TrackSort.correspondence =>
-        "CASE WHEN status!='completed' AND (match_status IN ('pending','review') OR source_kind='none') THEN 0 WHEN status='completed' THEN 3 WHEN match_status='manual' THEN 2 ELSE 1 END",
+        "CASE WHEN status!='completed' AND (redownload_state='review' OR match_status IN ('pending','review') OR source_kind='none') THEN 0 WHEN status='completed' THEN 3 WHEN match_status='manual' THEN 2 ELSE 1 END",
     };
     final missing = sort == TrackSort.duration
         ? 'CASE WHEN duration_ms IS NULL OR duration_ms<=0 THEN 1 ELSE 0 END,'

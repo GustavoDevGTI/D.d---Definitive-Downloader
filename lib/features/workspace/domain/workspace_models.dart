@@ -13,13 +13,15 @@ class DownloadEntry {
   final DateTime? downloadedAt;
   final Track track;
   final String collectionName;
-  String get statusLabel => switch (track.status) {
-        TrackStatus.pending => 'Aguardando fonte',
-        TrackStatus.ready => track.canDownload ? 'Na fila' : 'Conferir fonte',
-        TrackStatus.downloading => 'Baixando / processando',
-        TrackStatus.completed => 'Concluído',
-        TrackStatus.failed => 'Erro',
-      };
+  String get statusLabel => track.redownloadReview
+      ? 'Escolher fonte'
+      : switch (track.status) {
+          TrackStatus.pending => 'Aguardando fonte',
+          TrackStatus.ready => track.canDownload ? 'Na fila' : 'Conferir fonte',
+          TrackStatus.downloading => 'Baixando / processando',
+          TrackStatus.completed => 'Concluído',
+          TrackStatus.failed => 'Erro',
+        };
 }
 
 class DownloadPage {

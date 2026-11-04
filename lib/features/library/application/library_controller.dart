@@ -16,6 +16,8 @@ import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
 import '../data/library_repository.dart';
 import '../data/playlist_editor.dart';
+import '../data/redownload_repository.dart';
+import 'download_selection_check.dart';
 import '../../importing/music_link.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
@@ -39,13 +41,20 @@ class LibraryController extends ChangeNotifier {
   String linkProgress = '';
   String? _activeRun;
   bool _startingRun = false;
+  bool _checkingDownloads = false;
+  int inspectorRequest = 0, inspectorRevision = 0;
   Completer<void>? _additionDone;
 
   Future<List<Collection>> collectionChoices(int offset) =>
       repository.collections(offset: offset);
 
   Future<bool> addLinks(int collectionId, String input) async {
-    if (addingLinks || importing || preparing || editing || _startingRun) {
+    if (addingLinks ||
+        importing ||
+        preparing ||
+        editing ||
+        _startingRun ||
+        _checkingDownloads) {
       return false;
     }
     addingLinks = true;
@@ -209,9 +218,15 @@ class LibraryController extends ChangeNotifier {
       preparing ||
       addingLinks ||
       editing ||
-      _startingRun;
+      _startingRun ||
+      _checkingDownloads;
   bool get reorderingBusy =>
-      importing || preparing || addingLinks || editing || _startingRun;
+      importing ||
+      preparing ||
+      addingLinks ||
+      editing ||
+      _startingRun ||
+      _checkingDownloads;
   bool get isExample => current?.source == 'Exemplo local';
   bool get allFilteredSelected =>
       page.total > 0 && page.filteredSelectedCount == page.total;
@@ -330,6 +345,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   void focus(Track track) {
+    inspectorRevision++;
     focused = track;
     candidates = [];
     selectedCandidate = null;
@@ -419,8 +435,20 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> confirmSource() async {
     if (focused == null || busy) return;
-    await repository.confirmSource(focused!.id);
-    await refresh();
+    try {
+      if (focused!.redownloadReview) {
+        await RedownloadRepository(repository.database).approvePrevious(
+            focused!.id,
+            url: focused!.mediaUrl,
+            kind: focused!.sourceKind);
+      } else {
+        await repository.confirmSource(focused!.id);
+      }
+      await refresh();
+    } catch (error) {
+      message = _message(error);
+      notifyListeners();
+    }
   }
 
   Future<void> _loadMusicCandidates(Track track) async {
@@ -466,6 +494,7 @@ class LibraryController extends ChangeNotifier {
         if (batch.items.isEmpty) break;
         for (final track in batch.items) {
           cancellation.check();
+          if (track.redownloadState.isNotEmpty) continue;
           if (onlyPending && !track.needsAutomaticMatching) continue;
           if (track.hasManualSource &&
               track.status == TrackStatus.pending &&
@@ -533,14 +562,14 @@ class LibraryController extends ChangeNotifier {
   Future<void> useMusicCandidate(Candidate candidate,
       {bool approveVideo = false}) async {
     if (focused == null ||
-        focused!.hasManualSource ||
+        (focused!.hasManualSource && !focused!.redownloadReview) ||
         busy ||
         music?.canUse(candidate) != true) {
       return;
     }
     try {
       await repository.chooseMusicSource(focused!, candidate,
-          approveVideo: approveVideo);
+          approveVideo: approveVideo, userSelected: true);
       message =
           'Fonte vinculada: ${candidate.kind.musicProviderName ?? 'Fonte'}.';
       await refresh();
@@ -644,10 +673,13 @@ class LibraryController extends ChangeNotifier {
   Future<void> usePreview(Candidate candidate) async {
     final track = focused;
     if (track == null ||
-        track.hasManualSource ||
+        (track.hasManualSource && !track.redownloadReview) ||
         candidate.previewUrl.isEmpty ||
         busy) {
       return;
+    }
+    if (track.redownloadReview && track.hasManualSource) {
+      await repository.removeManualSource(track.id);
     }
     await repository.linkSource(track,
         url: candidate.previewUrl,
@@ -656,6 +688,10 @@ class LibraryController extends ChangeNotifier {
         artist: candidate.artist,
         album: candidate.album,
         coverUrl: candidate.coverUrl);
+    if (track.redownloadReview) {
+      await RedownloadRepository(repository.database).approvePrevious(track.id,
+          url: candidate.previewUrl, kind: SourceKind.preview);
+    }
     message =
         'Prévia vinculada. O arquivo será identificado como prévia, com a fonte real.';
     await refresh();
@@ -690,7 +726,73 @@ class LibraryController extends ChangeNotifier {
         {'q': '${focused!.artist} ${focused!.title}'}));
   }
 
+  Future<bool> startDownloads(
+      {List<int>? queueIds, bool failedOnly = false}) async {
+    if (!await _checkDownloadSelection(
+        queueIds: queueIds, failedOnly: failedOnly)) {
+      return false;
+    }
+    unawaited(_downloadSelected(queueIds: queueIds, failedOnly: failedOnly));
+    return true;
+  }
+
   Future<void> downloadSelected(
+      {List<int>? queueIds, bool failedOnly = false}) async {
+    if (await _checkDownloadSelection(
+        queueIds: queueIds, failedOnly: failedOnly)) {
+      await _downloadSelected(queueIds: queueIds, failedOnly: failedOnly);
+    }
+  }
+
+  Future<bool> _checkDownloadSelection(
+      {List<int>? queueIds, bool failedOnly = false}) async {
+    if (busy || (current == null && queueIds == null)) return false;
+    _checkingDownloads = true;
+    notifyListeners();
+    try {
+      final result = await DownloadSelectionCheck(repository, files).check(
+          collectionId: current?.id, ids: queueIds, failedOnly: failedOnly);
+      if (result.error != null) {
+        message = result.error!;
+        return false;
+      }
+      if (result.reviewId != null) {
+        await _openDownloadReview(result.reviewId!);
+        return false;
+      }
+      if (result.existingId != null &&
+          !await RedownloadRepository(repository.database).hasWork(
+              collectionId: current?.id,
+              ids: queueIds,
+              failedOnly: failedOnly)) {
+        await _openDownloadReview(result.existingId!);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      message = _message(error);
+      return false;
+    } finally {
+      _checkingDownloads = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _openDownloadReview(int id) async {
+    final track = await repository.trackById(id);
+    if (track == null) return;
+    final owner = await repository.collectionById(track.collectionId);
+    if (owner == null) return;
+    await repository.selectFromClick(owner.id, id, extend: false);
+    await openCollection(owner);
+    offset = ((track.position - 1) ~/ 40) * 40;
+    await refresh();
+    focus((await repository.trackById(id))!);
+    inspectorRequest++;
+    notifyListeners();
+  }
+
+  Future<void> _downloadSelected(
       {List<int>? queueIds, bool failedOnly = false}) async {
     final collection = current;
     if ((collection == null && queueIds == null) || busy) return;
@@ -782,7 +884,8 @@ class LibraryController extends ChangeNotifier {
             rethrow;
           } catch (error) {
             token.check();
-            if (track.hasManualSource ||
+            if (track.redownloadState.isNotEmpty ||
+                track.hasManualSource ||
                 track.sourceKind != SourceKind.deezerFull ||
                 music == null) {
               rethrow;

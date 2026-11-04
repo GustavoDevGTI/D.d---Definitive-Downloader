@@ -23,17 +23,22 @@ class TrackReviewActions extends StatelessWidget {
           onPressed: () => unawaited(showAppNotice(context,
               title: 'Fonte da faixa concluída',
               message:
-                  '${track.sourceKind.musicProviderName ?? track.sourceLabel}${track.hasManualSource ? '\n${track.manualUrl}' : ''}\nEste arquivo já foi concluído. Para baixar outra versão, adicione um novo link à coleção.')));
+                  '${track.sourceKind.musicProviderName ?? track.sourceLabel}\n${track.hasManualSource ? track.manualUrl : track.mediaUrl}')));
     }
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      if (!track.hasManualSource) ...[
+      if (!track.hasManualSource || track.redownloadReview) ...[
         DownloadActionButton(
-            label: candidate?.isVideoRecording == true
-                ? 'Aprovar videoclipe'
-                : 'Confirmar correspondência',
+            label: track.redownloadReview && candidate == null
+                ? 'Usar fonte anterior'
+                : candidate?.isVideoRecording == true
+                    ? 'Aprovar videoclipe'
+                    : 'Confirmar correspondência',
             icon: Icons.check_rounded,
             color: AppColors.success,
             onPressed: c.busy ||
+                    (track.redownloadReview &&
+                        candidate == null &&
+                        !track.hasDownloadableSource) ||
                     (candidate == null &&
                         track.sourceKind == SourceKind.none) ||
                     (candidate != null &&

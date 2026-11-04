@@ -62,7 +62,7 @@ class LibrarySidebar extends StatelessWidget {
         ])),
         const Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Versão 0.1.32 · local',
+            child: Text('Versão 0.1.33 · local',
                 style: TextStyle(
                     fontSize: 11, height: 1.8, color: Colors.white70))),
       ]));

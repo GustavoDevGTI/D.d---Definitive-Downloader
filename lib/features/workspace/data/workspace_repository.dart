@@ -245,7 +245,7 @@ class WorkspaceRepository {
               ? 'collection_id=? AND selected=1'
               : 'id IN (${List.filled(ids.length, '?').join(',')})';
           final rows = db.select('''SELECT id FROM tracks WHERE ($scope)
-        AND queue_hidden=0 AND source_kind!='none' AND match_status!='review'
+        AND queue_hidden=0 AND source_kind!='none' AND match_status!='review' AND redownload_state!='review'
         AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo'))
         AND NOT(manual_url!='' AND manual_mode='extractAudio')
         AND status IN ('ready','failed') ${failedOnly ? "AND status='failed'" : ''}
@@ -295,7 +295,7 @@ class WorkspaceRepository {
         LEFT JOIN download_run_additions a ON a.track_id=t.id AND a.run=?
         WHERE t.queue_run!=? AND t.queue_hidden=0
         AND $scope
-        AND t.source_kind!='none' AND t.match_status!='review'
+        AND t.source_kind!='none' AND t.match_status!='review' AND t.redownload_state!='review'
         AND (t.source_kind!='youtube' OR t.source_authorization IN ('manualLink','approvedVideo'))
         AND NOT(t.manual_url!='' AND t.manual_mode='extractAudio')
         AND t.status IN ('ready','failed')
@@ -333,7 +333,7 @@ class WorkspaceRepository {
       COALESCE(SUM(source_kind!='none' OR manual_url!='' OR queue_added=1),0) AS records,
       COALESCE(SUM(status='downloading'),0) AS active,
       COALESCE(SUM(selected=1 AND status IN ('ready','failed') AND source_kind!='none'
-        AND match_status!='review' AND NOT(manual_url!='' AND manual_mode='extractAudio')),0) AS queued
+        AND match_status!='review' AND redownload_state!='review' AND NOT(manual_url!='' AND manual_mode='extractAudio')),0) AS queued
       FROM tracks WHERE queue_hidden=0''').first;
         final completed = db
             .select('SELECT COUNT(*) AS n FROM download_history WHERE hidden=0')
