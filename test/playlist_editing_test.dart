@@ -46,6 +46,98 @@ void main() {
                 sourceKind: SourceKind.directMp3)))));
   });
   tearDown(() => temp.delete(recursive: true));
+  test('arraste renumera sem trocar IDs, nomes ou fontes e preserva repetições',
+      () async {
+    final before = (await library.page(owner, limit: 100)).items;
+    expect(
+        await editor.move(owner, before.first.id,
+            targetId: before.last.id, after: true),
+        85);
+    var after = (await library.page(owner, limit: 100)).items;
+    expect(after.map((t) => t.id),
+        [...before.skip(1).map((t) => t.id), before.first.id]);
+    expect(after.map((t) => t.position), List.generate(85, (i) => i + 1));
+    expect(after.last.title, before.first.title);
+    expect(after.last.mediaUrl, before.first.mediaUrl);
+    await editor.move(owner, before.first.id,
+        targetId: before[1].id, after: false);
+    after = (await library.page(owner, limit: 100)).items;
+    expect(after.map((t) => t.id), before.map((t) => t.id));
+  });
+  test(
+      'arraste de seleção não contígua abrange outras páginas e mantém ordem interna',
+      () async {
+    final before = (await library.page(owner, limit: 100)).items;
+    final selected = [before[0], before[2], before[44], before[84]];
+    for (final track in selected) {
+      await library.select(track.id, true);
+    }
+    await editor.move(owner, before[44].id,
+        targetId: before[50].id, after: true, selectedGroup: true);
+    final expected = before
+        .where((t) => !selected.any((s) => s.id == t.id))
+        .map((t) => t.id)
+        .toList();
+    expected.insertAll(
+        expected.indexOf(before[50].id) + 1, selected.map((t) => t.id));
+    final after = (await library.page(owner, limit: 100)).items;
+    expect(after.map((t) => t.id), expected);
+    expect(after.where((t) => t.selected).map((t) => t.id),
+        selected.map((t) => t.id));
+    expect(after.map((t) => t.position), List.generate(85, (i) => i + 1));
+    await editor.move(owner, selected.first.id,
+        targetId: selected.last.id, after: false, selectedGroup: true);
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
+        expected);
+    await library.database.initialize();
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
+        expected);
+  });
+  test(
+      'Ctrl alterna seleção entre páginas; clique simples substitui só na coleção atual',
+      () async {
+    final rows = (await library.page(owner, limit: 100)).items;
+    await library.selectFromClick(owner, rows.first.id, extend: false);
+    await library.selectFromClick(owner, rows.last.id, extend: true);
+    expect((await library.page(owner, offset: 80)).selectedCount, 2);
+    await library.selectFromClick(owner, rows.first.id, extend: true);
+    expect((await library.page(owner)).selectedCount, 1);
+    await library.selectFromClick(owner, rows[40].id, extend: false);
+    expect((await library.page(owner)).selectedCount, 1);
+    expect(
+        (await library.page(owner, offset: 40)).items.first.selected, isTrue);
+    await expectLater(library.selectFromClick(owner, -1, extend: false),
+        throwsFormatException);
+    expect((await library.page(owner)).selectedCount, 1);
+  });
+  test(
+      'arraste rejeita coleção bloqueada e alvo de outra coleção, com rollback integral',
+      () async {
+    final before = (await library.page(owner, limit: 100)).items;
+    final other = await library.importCollection(ImportedCollection(
+        name: 'Outra',
+        source: 'Fixture',
+        sourceUrl: '',
+        tracks:
+            Stream.value(const TrackDraft(title: 'Outra', artist: 'Pessoa'))));
+    final foreign = (await library.page(other)).items.single;
+    await expectLater(
+        editor.move(owner, before.first.id, targetId: foreign.id, after: false),
+        throwsFormatException);
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
+        before.map((t) => t.id));
+    await library.select(before.first.id, true);
+    await queue.claimNext(run: 'locked', ids: [before.first.id]);
+    await expectLater(
+        editor.move(owner, before[1].id, targetId: before.last.id, after: true),
+        throwsFormatException);
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
+        before.map((t) => t.id));
+    expect(
+        await library.database
+            .run((db) => db.select('PRAGMA quick_check').first.values.first),
+        'ok');
+  });
   test(
       'move através de páginas em ambos os sentidos preservando repetições e identidade',
       () async {

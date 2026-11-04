@@ -277,12 +277,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
         Expanded(
             child: TrackTable(
                 controller: c, onFocus: (track) => _focus(track, wide))),
-        PageControls(
-            offset: c.offset,
-            count: c.page.items.length,
-            total: c.page.total,
-            onPage: (v) => unawaited(c.turnPage(v)),
-            label: 'faixas'),
       ]);
   void _focus(Track track, bool wide) {
     widget.controller.focus(track);

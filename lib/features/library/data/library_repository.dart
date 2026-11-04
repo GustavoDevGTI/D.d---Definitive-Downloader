@@ -157,6 +157,31 @@ class LibraryRepository {
         db.execute(
             'UPDATE tracks SET selected=? WHERE id=?', [value ? 1 : 0, id]);
       });
+
+  Future<void> selectFromClick(int collectionId, int id,
+          {required bool extend}) =>
+      database.run((db) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          if (db.select('SELECT id FROM tracks WHERE id=? AND collection_id=?',
+              [id, collectionId]).isEmpty) {
+            throw const FormatException('Faixa não encontrada nesta coleção.');
+          }
+          if (extend) {
+            db.execute(
+                'UPDATE tracks SET selected=1-selected WHERE id=? AND collection_id=?',
+                [id, collectionId]);
+          } else {
+            db.execute(
+                'UPDATE tracks SET selected=CASE WHEN id=? THEN 1 ELSE 0 END WHERE collection_id=? AND (selected=1 OR id=?)',
+                [id, collectionId, id]);
+          }
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
   Future<void> selectPage(List<int> ids, bool value) => database.run((db) {
         if (ids.isEmpty) return;
         if (ids.length > 100) throw ArgumentError('Seleção deve ser paginada.');

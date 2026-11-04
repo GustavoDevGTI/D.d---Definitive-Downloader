@@ -1,6 +1,7 @@
 import 'package:definitive_downloader/features/library/domain/track_listing.dart';
 import 'widget_io.dart';
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'dart:ui' as ui;
 import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
 import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
@@ -315,9 +316,10 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await capture(tester, captureKey, 'music-library-${width.toInt()}');
-      await tester.tap(find.byTooltip('Editar faixa').first);
+      await tester.tap(find.text('1. Abertura'),
+          buttons: kSecondaryMouseButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Editar nome, link / ID e posição'));
+      await tester.tap(find.text('Editar faixa'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('edit-track-position')), findsOneWidget);
       await capture(tester, captureKey, 'edit-track-${width.toInt()}');
@@ -326,9 +328,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('1. Abertura'));
       await tester.tap(find.text('1. Abertura'));
-      await tester.pumpAndSettle();
+      await ioUntil(
+          tester,
+          () =>
+              controller.page.selectedCount == 1 &&
+              find.text('Conferência').evaluate().isNotEmpty);
       expect(find.text('Conferência'), findsOneWidget);
-      expect(controller.page.selectedCount, 0);
+      expect(controller.page.selectedCount, 1);
       await capture(tester, captureKey, 'verification-${width.toInt()}');
       await tester.runAsync(() async {
         final track = controller.focused!;
@@ -409,7 +415,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      expect(controller.page.selectedCount, 0);
+      expect(controller.page.selectedCount, 1);
       if (width < 1360) {
         await tester.tap(find.byTooltip('Fechar conferência'));
         await tester.pumpAndSettle();

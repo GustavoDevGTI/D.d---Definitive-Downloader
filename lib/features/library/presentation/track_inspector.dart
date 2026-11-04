@@ -5,6 +5,7 @@ import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'track_review_actions.dart';
+import 'edit_track_dialog.dart';
 
 class TrackInspector extends StatefulWidget {
   const TrackInspector({super.key, required this.controller});
@@ -106,6 +107,20 @@ class _TrackInspectorState extends State<TrackInspector> {
                             _line('Plataforma original',
                                 c.current?.source ?? '—'),
                             _line('Posição', t.position.toString()),
+                            if (MediaQuery.sizeOf(context).width < 780)
+                              TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6))),
+                                  onPressed:
+                                      c.busy || c.current?.editingLocked == true
+                                          ? null
+                                          : () => unawaited(
+                                              showEditTrack(context, c, t)),
+                                  icon:
+                                      const Icon(Icons.edit_outlined, size: 18),
+                                  label: const Text('Editar faixa')),
                             _line(
                                 'Artista da fonte',
                                 t.resolvedArtist.isEmpty

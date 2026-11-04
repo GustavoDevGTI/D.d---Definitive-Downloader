@@ -76,6 +76,40 @@ class LibraryController extends ChangeNotifier {
   }
 
   bool editing = false;
+  Future<bool> clickTrack(Track track, {required bool extend}) async {
+    if (busy || current?.id != track.collectionId) return false;
+    await repository.selectFromClick(track.collectionId, track.id,
+        extend: extend);
+    await refresh();
+    return true;
+  }
+
+  Future<void> moveTracks(int trackId,
+      {required int collectionId,
+      required int targetId,
+      required bool after,
+      required bool selectedGroup}) async {
+    if (busy || current?.id != collectionId) return;
+    editing = true;
+    notifyListeners();
+    try {
+      final position = await PlaylistEditor(repository.database).move(
+          collectionId, trackId,
+          targetId: targetId, after: after, selectedGroup: selectedGroup);
+      trackSort = TrackSort.position;
+      trackDescending = false;
+      offset = collectionQuery.isEmpty && view == 'collections'
+          ? ((position - 1) ~/ 40) * 40
+          : 0;
+      await refresh();
+    } catch (error) {
+      message = _message(error);
+    } finally {
+      editing = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> editTrack(Track track,
       {required String name,
       required int position,

@@ -5,6 +5,84 @@ import '../../importing/music_link_repository.dart';
 class PlaylistEditor {
   const PlaylistEditor(this.database);
   final AppDatabase database;
+
+  /// Reorders occurrences, including a selection spanning several pages.
+  /// IDs and metadata stay intact; only the contiguous playlist positions change.
+  Future<int> move(int collectionId, int trackId,
+          {required int targetId,
+          required bool after,
+          bool selectedGroup = false}) =>
+      database.run((db) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          final owner = db.select(
+              'SELECT editing_locked FROM collections WHERE id=?',
+              [collectionId]);
+          if (owner.isEmpty) {
+            throw const FormatException('Coleção não encontrada.');
+          }
+          if (owner.first['editing_locked'] == 1 ||
+              db.select(
+                  "SELECT 1 FROM tracks WHERE collection_id=? AND status IN ('downloading','completed') LIMIT 1",
+                  [collectionId]).isNotEmpty) {
+            throw const FormatException(
+                'Nomes e ordem ficam bloqueados após o início dos downloads.');
+          }
+          // Only the IDs, positions and selection of this bounded collection
+          // are loaded for an edit, never the library or track metadata.
+          final rows = db.select(
+              'SELECT id,position,selected FROM tracks WHERE collection_id=? ORDER BY position LIMIT 10001',
+              [collectionId]);
+          if (rows.length > 10000) {
+            throw const FormatException('Limite de 10.000 faixas por coleção.');
+          }
+          final dragged = rows.where((r) => r['id'] == trackId).firstOrNull;
+          if (dragged == null || !rows.any((r) => r['id'] == targetId)) {
+            throw const FormatException(
+                'A faixa ou o destino não pertence mais a esta coleção.');
+          }
+          if (selectedGroup && dragged['selected'] != 1) {
+            throw const FormatException('A seleção mudou. Arraste novamente.');
+          }
+          final moving = rows
+              .where((r) =>
+                  selectedGroup ? r['selected'] == 1 : r['id'] == trackId)
+              .map((r) => r['id'] as int)
+              .toList();
+          final movingSet = moving.toSet();
+          if (movingSet.contains(targetId)) {
+            db.execute('COMMIT');
+            return dragged['position'] as int;
+          }
+          final remaining = rows
+              .map((r) => r['id'] as int)
+              .where((id) => !movingSet.contains(id))
+              .toList();
+          final insertion = remaining.indexOf(targetId) + (after ? 1 : 0);
+          final order = [
+            ...remaining.take(insertion),
+            ...moving,
+            ...remaining.skip(insertion)
+          ];
+          db.execute(
+              'UPDATE tracks SET position=-position WHERE collection_id=?',
+              [collectionId]);
+          final update = db.prepare(
+              'UPDATE tracks SET position=? WHERE id=? AND collection_id=?');
+          try {
+            for (var i = 0; i < order.length; i++) {
+              update.execute([i + 1, order[i], collectionId]);
+            }
+          } finally {
+            update.dispose();
+          }
+          db.execute('COMMIT');
+          return order.indexOf(trackId) + 1;
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
   Future<void> edit(int trackId,
           {required String name,
           required int position,
