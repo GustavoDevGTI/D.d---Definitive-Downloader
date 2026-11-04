@@ -14,16 +14,20 @@ class LibraryRepository {
       COALESCE(SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END),0) AS completed
     FROM collections c LEFT JOIN tracks t ON t.collection_id=c.id
     GROUP BY c.id ORDER BY c.id DESC LIMIT 30 OFFSET ?''', [offset])
-          .map((r) => Collection(
-              id: r['id'] as int,
-              name: r['name'] as String,
-              source: r['source'] as String,
-              sourceUrl: r['source_url'] as String,
-              trackCount: r['total'] as int,
-              completedCount: r['completed'] as int,
-              isPartial: r['partial'] == 1,
-              editingLocked: r['editing_locked'] == 1))
+          .map(readCollection)
           .toList());
+
+  static Collection readCollection(Map<String, Object?> r) => Collection(
+      id: r['id'] as int,
+      name: r['name'] as String,
+      source: r['source'] as String,
+      sourceUrl: r['source_url'] as String,
+      trackCount: r['total'] as int,
+      completedCount: r['completed'] as int,
+      isPartial: r['partial'] == 1,
+      editingLocked: r['editing_locked'] == 1,
+      groupId: r['group_id'] as int?,
+      storageName: r['storage_name'] as String? ?? '');
 
   Future<int> importCollection(ImportedCollection collection) async {
     final id = await _createCollection(
@@ -61,8 +65,8 @@ class LibraryRepository {
   Future<int> _createCollection(String name, String source, String sourceUrl) =>
       database.run((db) {
         db.execute(
-            'INSERT INTO collections(name,source,source_url,partial) VALUES(?,?,?,?)',
-            [name, source, sourceUrl, 1]);
+            'INSERT INTO collections(name,source,source_url,partial,storage_name) VALUES(?,?,?,?,?)',
+            [name, source, sourceUrl, 1, name]);
         return db.lastInsertRowId;
       });
 
@@ -452,16 +456,7 @@ class LibraryRepository {
       LEFT JOIN tracks t ON t.collection_id=c.id WHERE c.id=? GROUP BY c.id''',
             [id]);
         if (rows.isEmpty) return null;
-        final r = rows.first;
-        return Collection(
-            id: id,
-            name: r['name'] as String,
-            source: r['source'] as String,
-            sourceUrl: r['source_url'] as String,
-            trackCount: r['total'] as int,
-            completedCount: r['completed'] as int,
-            isPartial: r['partial'] == 1,
-            editingLocked: r['editing_locked'] == 1);
+        return readCollection(rows.first);
       });
 
   Future<void> selectCollection(int id, bool value, {String query = ''}) =>

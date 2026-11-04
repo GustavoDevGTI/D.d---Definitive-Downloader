@@ -1,3 +1,4 @@
+import 'widget_io.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
@@ -143,6 +144,13 @@ void main() {
           .tap(find.descendant(of: nav, matching: find.text('Músicas')));
       await tester.pumpAndSettle();
       expect(find.text('Minhas coleções'), findsOneWidget);
+      await ioUntil(
+          tester,
+          () => find
+              .byKey(ValueKey(
+                  'collection-open-${controller.collections.first.id}'))
+              .evaluate()
+              .isNotEmpty);
       if (width == 1360 || width == 390) {
         for (var attempt = 0; attempt < 2; attempt++) {
           await tester.enterText(find.byKey(const ValueKey('playlist-url')),

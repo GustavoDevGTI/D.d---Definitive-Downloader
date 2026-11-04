@@ -1,3 +1,4 @@
+import 'schema_fixtures.dart';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
@@ -158,6 +159,7 @@ void main() {
         tracks:
             Stream.value(const TrackDraft(title: 'Nova', artist: 'Pessoa'))));
     await library.database.run((db) {
+      removeOrganizationSchema(db);
       db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
       for (final c in [
         'custom_title',

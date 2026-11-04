@@ -45,7 +45,12 @@ class Collection {
       required this.trackCount,
       required this.completedCount,
       required this.isPartial,
-      this.editingLocked = false});
+      this.editingLocked = false,
+      this.groupId,
+      this.storageName = ''});
+  final int? groupId;
+  final String storageName;
+  String get outputFolderName => storageName.isEmpty ? name : storageName;
   final int id;
   final String name;
   final String source;

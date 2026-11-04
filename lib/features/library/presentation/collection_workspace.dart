@@ -6,6 +6,7 @@ import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import '../../workspace/presentation/link_entry_panel.dart';
+import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
 import 'add_music_links_dialog.dart';
@@ -95,59 +96,15 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                 icon: const Icon(Icons.upload_file_outlined, size: 19)),
           ]),
       const SizedBox(height: 12),
-      Row(children: [
-        const Expanded(
-            child: Text('Minhas coleções',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
-        TextButton(
-            onPressed: c.busy
-                ? null
-                : () {
-                    _urlFocus.requestFocus();
-                  },
-            child: const Text('+ Nova'))
-      ]),
-      const SizedBox(height: 8),
-      if (c.collections.isEmpty)
-        const WorkspacePanel(
-            padding: EdgeInsets.all(16),
-            child: Text(
-                'Nenhuma coleção importada. Use um link do Spotify ou um arquivo CSV.',
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.muted, height: 1.6))),
-      for (final collection in c.collections)
-        Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _collectionButton(collection)),
-      if (c.collectionOffset > 0 || c.collections.length == 30)
-        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-          IconButton(
-              tooltip: 'Coleções anteriores',
-              onPressed: c.collectionOffset > 0
-                  ? () => unawaited(c.turnCollections(-1))
-                  : null,
-              icon: const Icon(Icons.chevron_left)),
-          IconButton(
-              tooltip: 'Mais coleções',
-              onPressed: c.collections.length == 30
-                  ? () => unawaited(c.turnCollections(1))
-                  : null,
-              icon: const Icon(Icons.chevron_right)),
-        ]),
+      CollectionManager(
+          library: c,
+          onOpen: (collection) {
+            _query.clear();
+            setState(() => _detail = true);
+            unawaited(c.openCollection(collection));
+          }),
     ]);
   }
-
-  Widget _collectionButton(Collection collection) => WorkspaceNavigationButton(
-      key: ValueKey('collection-open-${collection.id}'),
-      title: collection.name,
-      subtitle:
-          '${collection.trackCount} faixas · ${collection.source}${collection.isPartial ? ' · parcial' : ''}',
-      icon: Icons.library_music_outlined,
-      onPressed: () {
-        _query.clear();
-        setState(() => _detail = true);
-        unawaited(widget.controller.openCollection(collection));
-      });
 
   Widget _back() => Align(
       alignment: Alignment.centerLeft,

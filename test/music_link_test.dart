@@ -1,3 +1,4 @@
+import 'schema_fixtures.dart';
 import 'dart:io';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/matching/music_engine.dart';
@@ -253,6 +254,7 @@ void main() {
         'migração v7 preserva ocorrências e acrescenta apenas controle de extras',
         () async {
       await library.database.run((db) {
+        removeOrganizationSchema(db);
         db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
         for (final column in [
           'custom_title',
@@ -270,7 +272,7 @@ void main() {
       expect(
           await library.database
               .run((db) => db.select('PRAGMA user_version').first.values.first),
-          9);
+          10);
       expect(
           await library.database
               .run((db) => db.select('PRAGMA quick_check').first.values.first),

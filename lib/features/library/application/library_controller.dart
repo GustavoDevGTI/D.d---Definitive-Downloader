@@ -609,8 +609,8 @@ class LibraryController extends ChangeNotifier {
         }
         final owner = await repository.collectionById(track.collectionId);
         if (owner == null) continue;
-        final directory =
-            p.join(outputDirectory, '${safeSegment(owner.name)} [${owner.id}]');
+        final directory = p.join(outputDirectory,
+            '${safeSegment(owner.outputFolderName)} [${owner.id}]');
         destinations[owner.id] = directory;
         activeTrackId = track.id;
         activeTitle = track.displayTitle;

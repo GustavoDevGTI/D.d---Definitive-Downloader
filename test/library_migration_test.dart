@@ -1,3 +1,4 @@
+import 'schema_fixtures.dart';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
@@ -82,6 +83,7 @@ void main() {
       // Simulate the actual v2 schema, not a current schema with a false version.
       db.execute('DROP TABLE music_candidates');
       db.execute('DROP TABLE music_source_attempts');
+      removeOrganizationSchema(db);
       db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
       for (final column in [
         'custom_title',

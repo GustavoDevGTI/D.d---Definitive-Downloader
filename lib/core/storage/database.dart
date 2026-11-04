@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 9) {
+      if (version > 10) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -234,6 +234,25 @@ class AppDatabase {
             AND (t.queue_run!='' OR t.status IN ('downloading','completed') OR t.local_path!=''
               OR EXISTS(SELECT 1 FROM download_history h WHERE h.track_id=t.id)))""");
           db.execute('PRAGMA user_version = 9');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 9) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute('''CREATE TABLE collection_groups (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE)''');
+          db.execute(
+              'ALTER TABLE collections ADD COLUMN group_id INTEGER REFERENCES collection_groups(id) ON DELETE SET NULL');
+          db.execute(
+              "ALTER TABLE collections ADD COLUMN storage_name TEXT NOT NULL DEFAULT ''");
+          db.execute('UPDATE collections SET storage_name=name');
+          db.execute(
+              'CREATE INDEX collections_group_id ON collections(group_id,id DESC)');
+          db.execute('PRAGMA user_version = 10');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

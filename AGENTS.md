@@ -94,6 +94,8 @@
 
 ## Validação e entrega
 
+- Gestão local 0.1.26: criar playlists vazias, renomear, buscar por nome e agrupar em Músicas → Coleções, conforme `docs/RELEASE_0_1_26.md`. Módulo `organization`; schema 10 com grupos de nível único (até 100), vínculo opcional e nome estável da pasta (`storage_name`). Remover grupo apenas desvincula playlists; nunca exclui ocorrências ou arquivos. Nome da coleção é distinto dos nomes das faixas bloqueadas; renomear a biblioteca não move mídia nem altera o destino dos próximos downloads. Busca/grupo antes da paginação de 30; resultados antigos não substituem filtro novo. Gestão local não implica criação/edição em contas externas.
+
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.
 - Testar principalmente contratos e riscos: ordem/repetição, matching incorreto, paginação, persistência, interrupção e segurança de arquivos.
 - Testes de provedores reais separados de fixtures; nunca chamar teste offline de download real.

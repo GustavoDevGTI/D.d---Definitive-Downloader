@@ -1,3 +1,4 @@
+import 'schema_fixtures.dart';
 import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -274,6 +275,7 @@ void main() {
     await library.setStatus(rows[0].id, TrackStatus.completed,
         localPath: '${directory.path}/original.mp3');
     await library.database.run((db) {
+      removeOrganizationSchema(db);
       db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
       for (final column in [
         'custom_title',
@@ -298,7 +300,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        9);
+        10);
   });
 
   test('fonte manual persiste por ocorrência e protege contra busca automática',
@@ -440,6 +442,7 @@ void main() {
     await library.database.run((db) {
       db.execute('DROP TABLE download_history');
       db.execute('DROP INDEX tracks_transfer_status');
+      removeOrganizationSchema(db);
       db.execute('ALTER TABLE collections DROP COLUMN editing_locked');
       for (final column in [
         'custom_title',
