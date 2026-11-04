@@ -164,16 +164,6 @@ class _AudioTrack extends CustomPainter {
       canvas.drawCircle(
           Offset(x, y), highlighted ? 5 : 4, Paint()..color = Colors.white);
     }
-    if (highlighted && enabled) {
-      canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(2, 2, size.width - 4, size.height - 4),
-              const Radius.circular(4)),
-          Paint()
-            ..color = Colors.white38
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1);
-    }
   }
 
   @override
