@@ -98,6 +98,7 @@ void main() {
       await tester.pumpWidget(RepaintBoundary(
           key: captureKey,
           child: MaterialApp(
+              debugShowCheckedModeBanner: false,
               theme: appTheme(),
               home: Scaffold(
                   body: DownloadTable(
@@ -112,6 +113,9 @@ void main() {
       await tester.pumpAndSettle();
       final header = find.byKey(const ValueKey('download-table-header'));
       final before = tester.getRect(header);
+      final bodyBounds =
+          tester.getRect(find.byKey(const ValueKey('download-scroll-body')));
+      expect(bodyBounds.top, before.bottom);
       await tester.runAsync(() async {
         final boundary = captureKey.currentContext!.findRenderObject()
             as RenderRepaintBoundary;
@@ -126,6 +130,17 @@ void main() {
               AppColors.navigation,
               reason:
                   'Cabeçalho deve colorir também a faixa reservada à barra vertical.');
+          final thumbRows = <int>[];
+          for (var y = 0; y < img.height; y++) {
+            final pixel = (y * img.width + img.width - 5) * 4;
+            final red = bytes[pixel],
+                green = bytes[pixel + 1],
+                blue = bytes[pixel + 2];
+            if (red > green + 50 && red > blue + 35) thumbRows.add(y);
+          }
+          expect(thumbRows, isNotEmpty);
+          expect(thumbRows.first, greaterThanOrEqualTo(bodyBounds.top + 8));
+          expect(thumbRows.last, lessThan(bodyBounds.bottom - 8));
         } finally {
           img.dispose();
         }

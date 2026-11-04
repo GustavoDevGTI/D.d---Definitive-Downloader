@@ -178,80 +178,91 @@ class _DownloadTableState extends State<DownloadTable> {
                                             _headerCell(i),
                                         ], widths: widths, header: true))))),
                         Expanded(
-                            child: RawScrollbar(
-                                controller: _vertical,
-                                thumbVisibility: true,
-                                trackVisibility: true,
-                                interactive: true,
-                                thumbColor: AppColors.accent.withAlpha(210),
-                                trackColor: AppColors.surface,
-                                trackBorderColor: AppColors.line,
-                                thickness: 10,
-                                radius: const Radius.circular(6),
-                                padding: const EdgeInsets.only(right: 1),
-                                notificationPredicate: (n) =>
-                                    n.metrics.axis == Axis.vertical,
-                                child: Padding(
+                            child: ClipRect(
+                                key: const ValueKey('download-scroll-body'),
+                                child: RawScrollbar(
+                                    key: const ValueKey(
+                                        'download-vertical-scrollbar'),
+                                    controller: _vertical,
+                                    thumbVisibility: true,
+                                    trackVisibility: true,
+                                    interactive: true,
+                                    thumbColor: AppColors.accent.withAlpha(210),
+                                    trackColor: AppColors.surface,
+                                    trackBorderColor: AppColors.line,
+                                    thickness: 10,
+                                    radius: const Radius.circular(6),
                                     padding:
-                                        const EdgeInsets.only(right: _rail),
-                                    child: SingleChildScrollView(
-                                        key: const ValueKey(
-                                            'download-horizontal-rows'),
-                                        controller: _horizontal,
-                                        scrollDirection: Axis.horizontal,
-                                        child: SizedBox(
-                                            width: widths.fold<double>(
-                                                0, (sum, w) => sum + w),
-                                            child: ListView.builder(
-                                                key: const ValueKey(
-                                                    'download-rows'),
-                                                controller: _vertical,
-                                                primary: false,
-                                                itemCount: entries.length,
-                                                itemBuilder: (context, index) {
-                                                  final e = entries[index],
-                                                      t = e.track;
-                                                  final live = t.id == activeId
-                                                      ? widget.transfer
-                                                      : null;
-                                                  return MouseRegion(
-                                                      key: ValueKey(
-                                                          'download-row-${t.id}'),
-                                                      onEnter: (_) => setState(
-                                                          () =>
-                                                              _hovered = t.id),
-                                                      onExit: (_) {
-                                                        if (_hovered == t.id) {
-                                                          setState(() =>
-                                                              _hovered = null);
-                                                        }
-                                                      },
-                                                      child: _row(
-                                                          downloadRowCells(
-                                                              entry: e,
-                                                              selected:
-                                                                  selection
+                                        const EdgeInsets.fromLTRB(0, 8, 1, 8),
+                                    notificationPredicate: (n) =>
+                                        n.metrics.axis == Axis.vertical,
+                                    child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: _rail),
+                                        child: SingleChildScrollView(
+                                            key: const ValueKey(
+                                                'download-horizontal-rows'),
+                                            controller: _horizontal,
+                                            scrollDirection: Axis.horizontal,
+                                            child: SizedBox(
+                                                width: widths.fold<double>(
+                                                    0, (sum, w) => sum + w),
+                                                child: ListView.builder(
+                                                    key: const ValueKey(
+                                                        'download-rows'),
+                                                    controller: _vertical,
+                                                    primary: false,
+                                                    itemCount: entries.length,
+                                                    itemBuilder:
+                                                        (context, index) {
+                                                      final e = entries[index],
+                                                          t = e.track;
+                                                      final live =
+                                                          t.id == activeId
+                                                              ? widget.transfer
+                                                              : null;
+                                                      return MouseRegion(
+                                                          key: ValueKey(
+                                                              'download-row-${t.id}'),
+                                                          onEnter: (_) =>
+                                                              setState(() =>
+                                                                  _hovered =
+                                                                      t.id),
+                                                          onExit: (_) {
+                                                            if (_hovered ==
+                                                                t.id) {
+                                                              setState(() =>
+                                                                  _hovered =
+                                                                      null);
+                                                            }
+                                                          },
+                                                          child: _row(
+                                                              downloadRowCells(
+                                                                  entry: e,
+                                                                  selected: selection
                                                                       .contains(
                                                                           t.id),
-                                                              onSelect:
-                                                                  onSelect,
-                                                              paused: paused,
-                                                              activeId:
-                                                                  activeId,
-                                                              progress:
-                                                                  progress,
-                                                              live: live,
-                                                              output: output),
-                                                          widths: widths,
-                                                          index: index,
-                                                          hovered:
-                                                              _hovered == t.id,
-                                                          selected: selection
-                                                                  .contains(
-                                                                      t.id) ||
-                                                              t.id ==
-                                                                  activeId));
-                                                })))))),
+                                                                  onSelect:
+                                                                      onSelect,
+                                                                  paused:
+                                                                      paused,
+                                                                  activeId:
+                                                                      activeId,
+                                                                  progress:
+                                                                      progress,
+                                                                  live: live,
+                                                                  output:
+                                                                      output),
+                                                              widths: widths,
+                                                              index: index,
+                                                              hovered:
+                                                                  _hovered ==
+                                                                      t.id,
+                                                              selected: selection
+                                                                      .contains(
+                                                                          t.id) ||
+                                                                  t.id == activeId));
+                                                    }))))))),
                         const SizedBox(height: _rail),
                       ])),
                 ])));

@@ -59,10 +59,10 @@ void main() {
       final state = tester.state<RawScrollbarState>(bar);
       final barRect = tester.getRect(bar);
       final bodyRect = tester.getRect(rows);
-      // The track must cover the bottom of the row viewport, rather than
-      // subtracting the fixed header from an already shortened scroll metric.
+      // The inset belongs to the body. It must not subtract the header again
+      // or prevent dragging through the full row viewport.
       final bottom =
-          Offset(barRect.width - 5, bodyRect.bottom - barRect.top - 3);
+          Offset(barRect.width - 5, bodyRect.bottom - barRect.top - 11);
       // Inspect painter geometry only in this regression test.
       expect(
           // ignore: invalid_use_of_protected_member

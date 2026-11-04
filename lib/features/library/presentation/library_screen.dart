@@ -152,18 +152,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                     onSelect: (value) => _navigate(value))
                                 : null,
                             body: SafeArea(
-                                child: Column(children: [
-                              Expanded(
-                                  child: Row(
-                                      key: const ValueKey('app-edge-to-edge'),
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                    if (!mobile)
-                                      LibrarySidebar(
-                                          selected: _section,
-                                          onSelect: (value) =>
-                                              _navigate(value)),
+                                child: Row(
+                                    key: const ValueKey('app-edge-to-edge'),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                  if (!mobile)
+                                    LibrarySidebar(
+                                        selected: _section,
+                                        onSelect: (value) => _navigate(value)),
+                                  Expanded(
+                                      child: Column(children: [
                                     Expanded(
                                         child: Padding(
                                             padding: EdgeInsets.fromLTRB(
@@ -182,11 +181,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                                       controller:
                                                           widget.controller),
                                                 ]))),
+                                    if (widget.player != null &&
+                                        _section == AppSection.music)
+                                      PlayerBar(player: widget.player!)
                                   ])),
-                              if (widget.player != null &&
-                                  _section == AppSection.music)
-                                PlayerBar(player: widget.player!)
-                            ])));
+                                ])));
                       })))));
 
   Widget _heading(bool mobile) {

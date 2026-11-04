@@ -20,7 +20,7 @@ import 'player_fixtures.dart';
 import 'widget_io.dart';
 
 void main() {
-  for (final width in [1360.0, 390.0]) {
+  for (final width in [1360.0, 900.0, 390.0]) {
     testWidgets('player pertence a Músicas e pausa ao sair a $width px',
         (tester) async {
       tester.view.physicalSize = Size(width, 820);
@@ -67,10 +67,28 @@ void main() {
       final nav = width < 780
           ? find.byType(MobileNavigation)
           : find.byType(LibrarySidebar);
+      final versionBounds = width >= 780
+          ? tester.getRect(find.byKey(const ValueKey('sidebar-version')))
+          : null;
       await tester
           .tap(find.descendant(of: nav, matching: find.text('Músicas')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('player-play-pause')), findsOneWidget);
+      final playerBounds =
+          tester.getRect(find.byKey(const ValueKey('music-player-bar')));
+      if (width >= 780) {
+        final sidebarBounds = tester.getRect(nav);
+        expect(playerBounds.left, sidebarBounds.right);
+        expect(playerBounds.right, width);
+        expect(sidebarBounds.bottom, 820);
+        expect(tester.getRect(find.byKey(const ValueKey('sidebar-version'))),
+            versionBounds);
+        expect(versionBounds!.bottom, sidebarBounds.bottom);
+      } else {
+        expect(playerBounds.left, 0);
+        expect(playerBounds.right, width);
+        expect(playerBounds.bottom, lessThanOrEqualTo(tester.getRect(nav).top));
+      }
       await player.toggle();
       await tester.pumpAndSettle();
       final open =
@@ -95,7 +113,7 @@ void main() {
           findsOneWidget);
       expect(player.playing, isTrue);
       expect(engine.opens.length, 1);
-      if (width < 780) {
+      if (Navigator.of(tester.element(inspector)).canPop()) {
         Navigator.of(tester.element(inspector)).pop();
         await tester.pumpAndSettle();
       }
