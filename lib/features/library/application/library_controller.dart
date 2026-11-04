@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
 import '../../../core/platform/desktop_files.dart';
 import '../../downloads/download_service.dart';
-import '../../downloads/playlist_exporter.dart';
 import '../../importing/csv_importer.dart';
 import '../../importing/music_link_catalog.dart';
 import '../../importing/music_link_service.dart';
@@ -18,11 +15,13 @@ import '../data/library_repository.dart';
 import '../data/playlist_editor.dart';
 import '../data/redownload_repository.dart';
 import 'download_selection_check.dart';
+import 'download_queue_run.dart';
+import 'library_music_sources.dart';
+import '../../../core/application/operation_message.dart';
 import '../../importing/music_link.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
 import '../domain/matching.dart';
-import '../../workspace/data/workspace_repository.dart';
 
 class LibraryController extends ChangeNotifier {
   LibraryController(
@@ -44,6 +43,10 @@ class LibraryController extends ChangeNotifier {
   bool _checkingDownloads = false;
   int inspectorRequest = 0, inspectorRevision = 0;
   Completer<void>? _additionDone;
+  final _transferUpdates = ChangeNotifier();
+  Listenable get transferUpdates => _transferUpdates;
+  int dataRevision = 0;
+  bool _disposed = false;
 
   Future<List<Collection>> collectionChoices(int offset) =>
       repository.collections(offset: offset);
@@ -76,7 +79,7 @@ class LibraryController extends ChangeNotifier {
       await refresh();
       return true;
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       return false;
     } finally {
       addingLinks = false;
@@ -118,7 +121,7 @@ class LibraryController extends ChangeNotifier {
       await refresh();
       return null;
     } catch (error) {
-      return _message(error);
+      return operationMessage(error);
     } finally {
       editing = false;
       notifyListeners();
@@ -160,7 +163,7 @@ class LibraryController extends ChangeNotifier {
       await refresh();
       return true;
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       return false;
     } finally {
       editing = false;
@@ -287,6 +290,7 @@ class LibraryController extends ChangeNotifier {
     page = nextPage;
     offset = nextOffset;
     focused = page.items.where((t) => t.id == focused?.id).firstOrNull;
+    dataRevision++;
     notifyListeners();
   }
 
@@ -381,40 +385,17 @@ class LibraryController extends ChangeNotifier {
     await refresh();
   }
 
+  LibraryMusicSources get _sources => LibraryMusicSources(repository,
+      linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify), music);
   Future<void> setManualSource(String value, ManualSourceMode mode) async {
     final track = focused;
     if (track == null || busy) return;
     _searchGeneration++;
     try {
-      MusicLink? link;
-      try {
-        link = MusicLink.parse(value);
-      } on FormatException {/* Generic pages may remain pending below. */}
-      if (link != null) {
-        final resolved = (await MusicLinkService(
-                    linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify),
-                    music)
-                .resolve(link.url))
-            .single;
-        await MusicLinkRepository(repository.database)
-            .setSource(track.id, resolved);
-        message = resolved.ready
-            ? 'Fonte manual salva.'
-            : 'Fonte salva; aguardando conexão ou revisão.';
-        await refresh();
-        return;
-      }
-      if (mode == ManualSourceMode.originalAudio) {
-        throw const FormatException(
-            'Use um link de faixa, YouTube ou MP3 direto.');
-      }
-      await repository.setManualSource(track.id, value, mode);
-      message = mode == ManualSourceMode.extractAudio
-          ? 'Fonte manual salva. A extração de páginas e vídeos ainda não está disponível.'
-          : 'Fonte manual salva. O endereço deve fornecer MP3; o arquivo será validado no download.';
+      message = await _sources.setManual(track, value, mode);
       await refresh();
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       notifyListeners();
     }
   }
@@ -446,7 +427,7 @@ class LibraryController extends ChangeNotifier {
       }
       await refresh();
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       notifyListeners();
     }
   }
@@ -472,76 +453,24 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _prepareMusic({required bool onlyPending}) async {
     final collection = current;
-    final resolver = music;
-    if (collection == null ||
-        busy ||
-        resolver == null ||
-        !resolver.available ||
-        isExample) {
+    if (collection == null || busy || music?.available != true || isExample) {
       return;
     }
     preparing = true;
     message = 'Conferindo correspondências…';
-    final cancellation = DownloadCancellation();
-    _cancellation = cancellation;
-    var after = 0;
-    var prepared = 0;
-    var review = 0;
+    final token = DownloadCancellation();
+    _cancellation = token;
     notifyListeners();
     try {
-      while (!cancellation.cancelled) {
-        final batch = await repository.page(collection.id, offset: after);
-        if (batch.items.isEmpty) break;
-        for (final track in batch.items) {
-          cancellation.check();
-          if (track.redownloadState.isNotEmpty) continue;
-          if (onlyPending && !track.needsAutomaticMatching) continue;
-          if (track.hasManualSource &&
-              track.status == TrackStatus.pending &&
-              resolver.available &&
-              (track.sourceKind == SourceKind.youtubeMusic ||
-                  track.sourceKind == SourceKind.youtube ||
-                  (track.sourceKind == SourceKind.deezerFull &&
-                      resolver.connection.connected))) {
-            await repository.setStatus(track.id, TrackStatus.ready);
-            prepared++;
-          }
-          if (track.status == TrackStatus.completed ||
-              track.hasManualSource ||
-              track.sourceKind == SourceKind.localExample) {
-            continue;
-          }
-          activeTitle = track.displayTitle;
-          message =
-              'Procurando faixas de áudio: ${track.position}/${collection.trackCount}';
-          notifyListeners();
-          try {
-            final found = await resolver.search(
-                track, '${track.artist} ${track.title}',
-                cancellation: cancellation);
-            await repository.saveCandidates(track.id, found);
-            final choice = resolver.automaticChoice(track, found);
-            if (choice != null) {
-              await repository.chooseMusicSource(track, choice);
-              prepared++;
-            } else {
-              await repository.markForReview(track.id);
-              review++;
-            }
-          } on DownloadCancelled {
-            rethrow;
-          } catch (error) {
-            review++;
-            await repository.setStatus(track.id, TrackStatus.pending,
-                error: _message(error));
-            await repository.markForReview(track.id);
-          }
-          await refresh();
-        }
-        after += batch.items.length;
-      }
+      final result = await _sources.prepare(collection, token,
+          onlyPending: onlyPending, recordsChanged: refresh, onTrack: (track) {
+        activeTitle = track.displayTitle;
+        message =
+            'Procurando faixas de áudio: ${track.position}/${collection.trackCount}';
+        notifyListeners();
+      });
       message =
-          '$prepared faixa(s) preparada(s). $review para revisão; videoclipes exigem aprovação.';
+          '${result.prepared} faixa(s) preparada(s). ${result.review} para revisão; videoclipes exigem aprovação.';
       if (collection.isPartial) {
         message += '\nLeitura parcial: confira o total de faixas importadas.';
       }
@@ -549,7 +478,7 @@ class LibraryController extends ChangeNotifier {
       message =
           'Busca interrompida. As correspondências já conferidas foram mantidas.';
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
     } finally {
       preparing = false;
       activeTitle = '';
@@ -574,7 +503,7 @@ class LibraryController extends ChangeNotifier {
           'Fonte vinculada: ${candidate.kind.musicProviderName ?? 'Fonte'}.';
       await refresh();
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       notifyListeners();
     }
   }
@@ -629,7 +558,7 @@ class LibraryController extends ChangeNotifier {
       await refresh();
       importedSuccessfully = true;
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
     } finally {
       importing = false;
       if (importedSuccessfully && !isExample && music?.available == true) {
@@ -661,7 +590,7 @@ class LibraryController extends ChangeNotifier {
         }
       }
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
     } finally {
       searching = false;
       notifyListeners();
@@ -678,22 +607,7 @@ class LibraryController extends ChangeNotifier {
         busy) {
       return;
     }
-    if (track.redownloadReview && track.hasManualSource) {
-      await repository.removeManualSource(track.id);
-    }
-    await repository.linkSource(track,
-        url: candidate.previewUrl,
-        kind: SourceKind.preview,
-        title: candidate.title,
-        artist: candidate.artist,
-        album: candidate.album,
-        coverUrl: candidate.coverUrl);
-    if (track.redownloadReview) {
-      await RedownloadRepository(repository.database).approvePrevious(track.id,
-          url: candidate.previewUrl, kind: SourceKind.preview);
-    }
-    message =
-        'Prévia vinculada. O arquivo será identificado como prévia, com a fonte real.';
+    message = await _sources.usePreview(track, candidate);
     await refresh();
   }
 
@@ -715,7 +629,7 @@ class LibraryController extends ChangeNotifier {
     try {
       await files.openFolder(outputDirectory);
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       notifyListeners();
     }
   }
@@ -770,7 +684,7 @@ class LibraryController extends ChangeNotifier {
       }
       return true;
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
       return false;
     } finally {
       _checkingDownloads = false;
@@ -798,173 +712,25 @@ class LibraryController extends ChangeNotifier {
     if ((collection == null && queueIds == null) || busy) return;
     downloading = true;
     progress = null;
+    _startingRun = true;
     final token = DownloadCancellation();
     _cancellation = token;
-    final destinations = <int, String>{};
-    var saved = 0;
-    var failed = 0;
-    var reviewVideos = 0;
-    final queue = WorkspaceRepository(repository.database);
-    final run = '${DateTime.now().microsecondsSinceEpoch}';
-    _startingRun = true;
     notifyListeners();
     try {
-      await queue.beginRun(
-          run: run,
-          ids: queueIds,
+      message = await DownloadQueueRun(repository, downloader, music).execute(
+          outputDirectory: outputDirectory,
           collectionId: collection?.id,
-          failedOnly: failedOnly);
-      _activeRun = run;
-      _startingRun = false;
-      notifyListeners();
-      while (!token.cancelled) {
-        try {
-          await token.waitForQueue();
-        } on DownloadCancelled {
-          break;
-        }
-        final track = await queue.claimNext(
-            run: run,
-            snapshot: true,
-            ids: queueIds,
-            collectionId: collection?.id,
-            failedOnly: failedOnly);
-        if (track == null) {
-          final addition = _additionDone;
-          if (addition != null) {
-            while (!token.cancelled && identical(_additionDone, addition)) {
-              await Future.any<void>([
-                addition.future,
-                Future<void>.delayed(const Duration(milliseconds: 100))
-              ]);
-            }
-            continue;
-          }
-          break;
-        }
-        final owner = await repository.collectionById(track.collectionId);
-        if (owner == null) continue;
-        final directory = p.join(outputDirectory,
-            '${safeSegment(owner.outputFolderName)} [${owner.id}]');
-        destinations[owner.id] = directory;
-        activeTrackId = track.id;
-        activeTitle = track.downloadName;
-        progress = null;
-        transfer = null;
-        await refresh();
-        try {
-          Future<String> receive(Track item) async {
-            transfer = null;
-            try {
-              final path =
-                  await downloader.save(item, directory, token, (value) {
-                progress = value;
-                notifyListeners();
-              }, onTransfer: (value) {
-                transfer = value;
-                notifyListeners();
-              });
-              await repository.recordMusicAttempt(item.id, item.sourceKind,
-                  succeeded: true);
-              return path;
-            } on DownloadCancelled {
-              rethrow;
-            } catch (error) {
-              token.check();
-              await repository.recordMusicAttempt(item.id, item.sourceKind,
-                  succeeded: false, message: _message(error));
-              rethrow;
-            }
-          }
-
-          String path;
-          try {
-            path = await receive(track);
-          } on DownloadCancelled {
-            rethrow;
-          } catch (error) {
-            token.check();
-            if (track.redownloadState.isNotEmpty ||
-                track.hasManualSource ||
-                track.sourceKind != SourceKind.deezerFull ||
-                music == null) {
-              rethrow;
-            }
-            final alternatives = await repository.musicCandidates(track.id);
-            final fallback = music!.automaticChoice(track, alternatives,
-                only: SourceKind.youtubeMusic);
-            if (fallback == null) {
-              final videos = await music!.searchVideos(
-                  track, '${track.artist} ${track.title}',
-                  cancellation: token);
-              if (videos.isEmpty) rethrow;
-              await repository.saveCandidates(
-                  track.id,
-                  [
-                    ...alternatives.where((c) => c.kind != SourceKind.youtube),
-                    ...videos
-                  ].take(24).toList());
-              await repository.markForReview(track.id);
-              await repository.setStatus(track.id, TrackStatus.pending,
-                  error:
-                      'Áudio indisponível. Videoclipe encontrado: aprove a versão na coleção.');
-              reviewVideos++;
-              await refresh();
-              continue;
-            }
-            message =
-                'Deezer indisponível para esta faixa; tentando a correspondência de áudio no YouTube Music.';
-            notifyListeners();
-            await repository.chooseMusicSource(track, fallback,
-                forFallback: true);
-            final updated = await repository.trackById(track.id);
-            await repository.setStatus(track.id, TrackStatus.downloading);
-            path = await receive(updated!);
-          }
-          await repository.setStatus(track.id, TrackStatus.completed,
-              localPath: path);
-          saved++;
-        } on DownloadCancelled {
-          await repository.setStatus(track.id, TrackStatus.ready,
-              error: 'Interrompido. Uma nova tentativa reinicia este arquivo.');
-          break;
-        } catch (error) {
-          failed++;
-          await repository.setStatus(track.id, TrackStatus.failed,
-              error: _message(error));
-        }
-        await refresh();
-        // Finish the current transfer in pause mode without starting another.
-        if (token.pauseMode) break;
-      }
-      _activeRun = null;
-      if (saved > 0) {
-        for (final entry in destinations.entries) {
-          await PlaylistExporter(repository).export(entry.key, entry.value);
-        }
-      }
-      message = token.cancelled
-          ? 'Transferência interrompida. Os arquivos concluídos foram preservados.'
-          : saved == 0 && failed == 0
-              ? 'Selecione faixas com uma fonte vinculada. Itens já salvos não são baixados novamente.'
-              : failed > 0
-                  ? '$failed download(s) com falha. Confira os itens marcados com erro.'
-                  : '';
-      if (reviewVideos > 0) {
-        message +=
-            ' $reviewVideos videoclipe(s) aguardando aprovação na coleção.';
-      }
+          queueIds: queueIds,
+          failedOnly: failedOnly,
+          token: token,
+          recordsChanged: refresh,
+          pendingAddition: () => _additionDone?.future,
+          onEvent: _downloadEvent);
     } catch (error) {
-      message = _message(error);
+      message = operationMessage(error);
     } finally {
       _activeRun = null;
       _startingRun = false;
-      try {
-        await queue.finishRun(run);
-      } catch (_) {
-        // Membership is also cleared on startup. Do not mask cancellation or
-        // leave the UI locked if this auxiliary cleanup fails.
-      }
       downloading = false;
       activeTitle = '';
       activeTrackId = null;
@@ -975,25 +741,46 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
+  void _downloadEvent(DownloadRunEvent event) {
+    switch (event) {
+      case DownloadRunMembership():
+        _activeRun = event.run;
+        _startingRun = false;
+      case DownloadRunTrack():
+        activeTrackId = event.track.id;
+        activeTitle = event.track.downloadName;
+        progress = null;
+        transfer = null;
+      case DownloadRunProgress():
+        progress = event.fraction;
+        transfer = event.transfer;
+        if (!_disposed) _transferUpdates.notifyListeners();
+        return;
+      case DownloadRunNotice():
+        message = event.message;
+    }
+    notifyListeners();
+  }
+
   void cancel() {
     _cancellation?.cancelled = true;
     message = 'Interrompendo após liberar a operação atual…';
     notifyListeners();
   }
 
-  String _message(Object error) {
-    if (error is HandshakeException) {
-      return 'Não foi possível validar o certificado da conexão. Verifique a rede e os certificados do sistema; você também pode importar um CSV.';
-    }
-    if (error is TimeoutException) {
-      return 'O serviço demorou para responder. Tente novamente mais tarde.';
-    }
-    if (error is SocketException) {
-      return 'Não foi possível conectar ao serviço. Verifique sua conexão e tente novamente.';
-    }
-    if (error is FormatException) return error.message;
-    if (error is HttpException) return error.message;
-    if (error is FileSystemException) return error.message;
-    return 'Não foi possível concluir a operação. ${error.toString().replaceFirst('Exception: ', '')}';
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _refreshGeneration++;
+    _searchGeneration++;
+    _cancellation?.cancelled = true;
+    _transferUpdates.dispose();
+    super.dispose();
   }
 }

@@ -7,52 +7,11 @@ import '../library/domain/models.dart';
 import 'mp3_tags.dart';
 import 'music_download_service.dart';
 import 'transfer_progress.dart';
+import 'download_cancellation.dart';
+import 'download_file_name.dart';
+export 'download_cancellation.dart';
+export 'download_file_name.dart';
 export 'transfer_progress.dart';
-
-class DownloadCancelled implements Exception {
-  const DownloadCancelled();
-}
-
-class DownloadCancellation {
-  bool cancelled = false;
-  bool _pauseMode = false;
-  bool get pauseMode => _pauseMode;
-  set pauseMode(bool value) {
-    if (_pauseMode == value) return;
-    _pauseMode = value;
-    _pacedBytes = 0;
-    _paceClock.reset();
-    if (value) _paceClock.start();
-  }
-
-  final Stopwatch _paceClock = Stopwatch();
-  int _pacedBytes = 0;
-  // Pause mode keeps the current connection alive at 10 KiB/s. The queue
-  // controller prevents another transfer from starting until it is resumed.
-  Future<void> throttle(int bytes) async {
-    check();
-    if (!pauseMode) return;
-    _pacedBytes += bytes;
-    final target = _pacedBytes * 1000 ~/ 10240;
-    while (pauseMode && _paceClock.elapsedMilliseconds < target) {
-      check();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    check();
-  }
-
-  Future<void> waitForQueue() async {
-    while (pauseMode) {
-      check();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    check();
-  }
-
-  void check() {
-    if (cancelled) throw const DownloadCancelled();
-  }
-}
 
 class DownloadService {
   const DownloadService(this.http, this.bundle, {this.music});
@@ -207,18 +166,4 @@ class DownloadService {
       client.close(force: true);
     }
   }
-}
-
-String safeSegment(String value) {
-  var text = value
-      .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-  text = text.replaceAll(RegExp(r'[. ]+$'), '');
-  if (text.isEmpty) text = 'Sem nome';
-  if (RegExp(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$', caseSensitive: false)
-      .hasMatch(text)) {
-    text = '_$text';
-  }
-  return text.length > 65 ? text.substring(0, 65).trim() : text;
 }

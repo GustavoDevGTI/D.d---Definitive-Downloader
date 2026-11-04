@@ -6,8 +6,10 @@ import '../domain/workspace_models.dart';
 import '../domain/download_columns.dart';
 
 class WorkspaceController extends ChangeNotifier {
-  WorkspaceController(this.library)
-      : repository = WorkspaceRepository(library.repository.database) {
+  WorkspaceController(this.library, {WorkspaceRepository? repository})
+      : repository =
+            repository ?? WorkspaceRepository(library.repository.database) {
+    _lastLibraryData = _libraryData;
     library.addListener(_changed);
   }
   final LibraryController library;
@@ -34,8 +36,14 @@ class WorkspaceController extends ChangeNotifier {
   bool _disposed = false;
   bool loaded = false;
   int _generation = 0;
+  late (int, bool, String) _lastLibraryData;
+  (int, bool, String) get _libraryData =>
+      (library.dataRevision, library.pauseMode, library.outputDirectory);
 
   void _changed() {
+    final revision = _libraryData;
+    if (revision == _lastLibraryData) return;
+    _lastLibraryData = revision;
     _refreshTimer ??= Timer(const Duration(milliseconds: 400), () {
       _refreshTimer = null;
       unawaited(refresh());

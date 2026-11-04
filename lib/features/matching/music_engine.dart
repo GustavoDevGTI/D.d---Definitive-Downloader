@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import '../downloads/download_service.dart';
+import '../downloads/transfer_progress.dart';
+import '../downloads/download_cancellation.dart';
 
 abstract interface class MusicEngine {
   bool get available;
@@ -13,12 +14,16 @@ abstract interface class MusicEngine {
 }
 
 class WindowsMusicEngine implements MusicEngine {
-  WindowsMusicEngine(this.executable);
+  WindowsMusicEngine._(this.executable, this.available);
   final String executable;
   @override
-  bool get available => Platform.isWindows && File(executable).existsSync();
+  final bool available;
 
-  static WindowsMusicEngine installed() => WindowsMusicEngine(p.join(
+  static Future<WindowsMusicEngine> load(String executable) async =>
+      WindowsMusicEngine._(
+          executable, Platform.isWindows && await File(executable).exists());
+
+  static Future<WindowsMusicEngine> installed() => load(p.join(
       p.dirname(Platform.resolvedExecutable),
       'music_engine',
       'dd_music_worker.exe'));
@@ -28,7 +33,7 @@ class WindowsMusicEngine implements MusicEngine {
       {DownloadCancellation? cancellation,
       void Function(String)? onStage,
       void Function(TransferProgress)? onProgress}) async {
-    if (!available) {
+    if (!available || !await File(executable).exists()) {
       throw const FormatException(
           'O motor musical não está instalado nesta plataforma.');
     }

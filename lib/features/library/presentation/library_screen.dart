@@ -17,6 +17,7 @@ import '../../workspace/presentation/settings_workspace.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'collection_workspace.dart';
 import 'sidebar.dart';
+import 'library_operation_status.dart';
 import '../../player/application/music_player_controller.dart';
 import '../../player/presentation/player_scope.dart';
 import '../../player/presentation/player_bar.dart';
@@ -174,7 +175,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                                   _heading(mobile),
                                                   const SizedBox(height: 20),
                                                   Expanded(child: _sections()),
-                                                  _status(),
+                                                  LibraryOperationStatus(
+                                                      controller:
+                                                          widget.controller),
                                                 ]))),
                                   ])),
                               if (widget.player != null)
@@ -248,34 +251,4 @@ class _LibraryScreenState extends State<LibraryScreen> {
             onConnections:
                 widget.connections == null ? null : _showConnections),
       ]);
-
-  Widget _status() {
-    final c = widget.controller;
-    if (!c.downloading && !c.preparing && !c.importing) {
-      return const SizedBox(height: 8);
-    }
-    return Container(
-        margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border.all(color: AppColors.line),
-            borderRadius: BorderRadius.circular(4)),
-        child: Row(children: [
-          Expanded(
-              child: Text(
-                  c.downloading
-                      ? '${c.activeTitle} · ${c.progress == null ? 'recebendo / processando' : '${(c.progress! * 100).round()}% recebidos'}'
-                      : c.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      const TextStyle(fontSize: 11, color: AppColors.muted))),
-          if (c.downloading || c.preparing)
-            IconButton(
-                tooltip: 'Interromper operação atual',
-                onPressed: c.cancel,
-                icon: const Icon(Icons.stop_circle_outlined, size: 20)),
-        ]));
-  }
 }

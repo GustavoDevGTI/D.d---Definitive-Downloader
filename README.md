@@ -2,7 +2,7 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.25](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.25). Cada nova versão deve ter commit, tag, notas e artefatos próprios, preservando as releases anteriores.
+Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.25](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.25). Releases publicadas conservam commit, tag, notas e artefatos próprios. No ciclo atual de feedback, releases estão suspensas por pedido do usuário; as entregas têm versão e commit locais. A revisão estrutural **0.1.35** está documentada em [Revisão da estrutura](docs/REVISAO_ESTRUTURA_0_1_35.md); o player local foi introduzido na [0.1.34](docs/VERSAO_LOCAL_0_1_34.md).
 
 ![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0124-desktop.png)
 
@@ -121,6 +121,19 @@ Também aceita separador `;`, colunas `duration_ms`, `isrc`, `cover_url` e `spot
 ## Estrutura
 
 `lib/main.dart` compõe as dependências. `lib/core` contém armazenamento, rede e integrações do sistema. `lib/features` separa importação, domínio/biblioteca, matching, downloads e apresentação. `runtime/music_worker` contém adaptadores isolados por operação, chamados pelo app Windows. O banco guarda registros relacionais, nunca uma coleção inteira serializada em um campo JSON.
+
+Responsabilidades no fluxo musical:
+
+| Módulo | Responsabilidade |
+| --- | --- |
+| `library/application/library_controller.dart` | Estado da tela, seleção e coordenação dos comandos; preserva a interface usada pelas telas. |
+| `library/application/library_music_sources.dart` | Conferência paginada, vínculos manuais e prévias. |
+| `library/application/download_queue_run.dart` | Execução da fila, extras, alternativas autorizadas, publicação e exportação. |
+| `downloads/download_cancellation.dart` e `download_file_name.dart` | Regras compartilhadas sem depender dos adaptadores de obtenção. |
+| `library/data` e `workspace/data` | Consultas, transações e paginação; widgets não fazem SQL ou acesso direto ao disco. |
+| `player/application`, `player/data`, `player/presentation` | Fila/estado, motor/arquivos e interface. O relógio possui notificações separadas dos controles. |
+
+As tabelas mantêm navegação/gestos e delegam a apresentação das linhas. Progresso de transferência usa `transferUpdates`; recarga de dados usa a revisão da biblioteca. `test/architecture_test.dart` impede ciclos de importação e dependências de plataforma/SQL na apresentação e no domínio. Os testes de custo verificam notificações e consultas evitadas, sem equivaler a um benchmark de FPS.
 
 Validação: `dart format`, `flutter analyze` e `flutter test`. Regras de continuidade em [AGENTS.md](AGENTS.md); análise original, decisões e resultados em [docs/](docs/).
 

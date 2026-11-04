@@ -34,12 +34,12 @@ Future<void> main(List<String> arguments) async {
     exit(await diagnosePlayer(arguments));
   }
   if (arguments.contains('--check-music-engine')) {
-    exit(await diagnoseMusicEngine(WindowsMusicEngine.installed()));
+    exit(await diagnoseMusicEngine(await WindowsMusicEngine.installed()));
   }
   final files = DesktopFiles();
   final database = AppDatabase(await files.databasePath());
   const http = BoundedHttp();
-  final engine = WindowsMusicEngine.installed();
+  final engine = await WindowsMusicEngine.installed();
   final deezer = DeezerConnectionController(
       const SecureDeezerSessionStore(FlutterSecureStorage()), engine);
   final connections = SpotifyConnectionController(

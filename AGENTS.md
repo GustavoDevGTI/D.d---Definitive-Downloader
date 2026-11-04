@@ -49,6 +49,8 @@
 
 ## Arquitetura
 
+- Revisão local 0.1.35 em `docs/REVISAO_ESTRUTURA_0_1_35.md`: execução da fila em `DownloadQueueRun`, conferência/vínculos em `LibraryMusicSources`, linhas visuais em `TrackRow`/`downloadRowCells`. Cancelamento e nomes de arquivos ficam em módulos puros próprios; não reintroduzir dependência desses tipos no adaptador `DownloadService`, criando ciclos. Métricas transitórias notificam `LibraryController.transferUpdates`; `dataRevision` sinaliza recarga dos registros para o workspace. Relógio do player usa `timeline`, preservando notificações gerais imediatas de pausa, fim, erro e troca. `MusicEngine.available` é capacidade lida assincronamente no carregamento; conferir executável novamente de forma assíncrona antes da operação. Manter as verificações de arquitetura e custo de atualização.
+
 - Não concentrar o aplicativo em um único arquivo. `main.dart` apenas inicializa e compõe dependências.
 - Separar domínio, casos de uso/controle, infraestrutura e apresentação. Widgets não fazem SQL, HTTP, leitura de arquivos ou execução de processos.
 - Usar módulos com interfaces pequenas e responsabilidades claras; evitar abstrações sem uso real.

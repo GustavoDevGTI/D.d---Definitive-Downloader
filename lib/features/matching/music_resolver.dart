@@ -1,5 +1,5 @@
 import '../connections/application/deezer_connection_controller.dart';
-import '../downloads/download_service.dart';
+import '../downloads/download_cancellation.dart';
 import '../library/domain/models.dart';
 import '../library/domain/matching.dart';
 import 'music_candidates.dart';

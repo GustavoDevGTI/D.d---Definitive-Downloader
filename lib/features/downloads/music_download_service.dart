@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'transfer_progress.dart';
 import '../connections/application/deezer_connection_controller.dart';
 import '../library/domain/models.dart';
 import '../matching/music_candidates.dart';
 import '../matching/music_engine.dart';
-import 'download_service.dart';
+import 'download_cancellation.dart';
+import 'download_file_name.dart';
 
 class MusicDownloadService {
   MusicDownloadService(this.engine, this.connection);

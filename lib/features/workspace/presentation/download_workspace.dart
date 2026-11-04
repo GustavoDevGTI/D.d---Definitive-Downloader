@@ -39,7 +39,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-      listenable: Listenable.merge([controller, controller.library]),
+      listenable: Listenable.merge(
+          [controller, controller.library, controller.library.transferUpdates]),
       builder: (context, child) =>
           LayoutBuilder(builder: (context, constraints) {
             final wide = constraints.maxWidth >= 1040;

@@ -14,8 +14,9 @@ class LibraryRepository {
           .select('''
     SELECT c.*, COUNT(t.id) AS total,
       COALESCE(SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END),0) AS completed
-    FROM collections c LEFT JOIN tracks t ON t.collection_id=c.id
-    GROUP BY c.id ORDER BY c.id DESC LIMIT 30 OFFSET ?''', [offset])
+    FROM (SELECT * FROM collections ORDER BY id DESC LIMIT 30 OFFSET ?) c
+      LEFT JOIN tracks t ON t.collection_id=c.id
+    GROUP BY c.id ORDER BY c.id DESC''', [offset])
           .map(readCollection)
           .toList());
 

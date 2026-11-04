@@ -35,6 +35,8 @@ class MusicPlayerController extends ChangeNotifier {
   AudioRepeat repeat = AudioRepeat.off;
   double volume = .65, _lastVolume = .65;
   Duration position = Duration.zero, duration = Duration.zero;
+  final _timeline = ChangeNotifier();
+  Listenable get timeline => _timeline;
   Uint8List? cover;
   String title = '', artist = '', message = '';
   Future<void> _operations = Future<void>.value();
@@ -256,6 +258,13 @@ class MusicPlayerController extends ChangeNotifier {
 
   void _event(AudioEvent event) {
     if (_disposed) return;
+    final stateChanged = (event.playing != null && playing != event.playing) ||
+        (event.buffering != null && buffering != event.buffering);
+    final clockChanged =
+        (event.position != null && position != event.position) ||
+            (event.duration != null &&
+                event.duration! > Duration.zero &&
+                duration != event.duration);
     if (event.playing != null) playing = event.playing!;
     if (event.position != null) position = event.position!;
     if (event.duration != null && event.duration! > Duration.zero) {
@@ -272,7 +281,8 @@ class MusicPlayerController extends ChangeNotifier {
       playing = false;
       unawaited(_complete());
     }
-    _notify();
+    if (clockChanged) _timeline.notifyListeners();
+    if (stateChanged || event.failed || event.completed) _notify();
   }
 
   Future<void> _complete() async {
@@ -418,6 +428,7 @@ class MusicPlayerController extends ChangeNotifier {
     _disposed = true;
     _request++;
     _volumeTimer?.cancel();
+    _timeline.dispose();
     unawaited(_subscription.cancel());
     unawaited(engine.dispose());
     super.dispose();

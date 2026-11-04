@@ -43,19 +43,23 @@ class PlayerBar extends StatelessWidget {
                                 if (player.current != null)
                                   Padding(
                                       padding: const EdgeInsets.only(top: 5),
-                                      child: LinearProgressIndicator(
-                                          value:
-                                              player.duration.inMilliseconds <=
-                                                      0
-                                                  ? 0
-                                                  : (player.position
-                                                              .inMilliseconds /
-                                                          player.duration
-                                                              .inMilliseconds)
-                                                      .clamp(0, 1),
-                                          minHeight: 2,
-                                          backgroundColor: Colors.white24,
-                                          color: AppColors.accent)),
+                                      child: ListenableBuilder(
+                                          listenable: player.timeline,
+                                          builder: (context, _) =>
+                                              LinearProgressIndicator(
+                                                  value: player.duration
+                                                              .inMilliseconds <=
+                                                          0
+                                                      ? 0
+                                                      : (player.position
+                                                                  .inMilliseconds /
+                                                              player.duration
+                                                                  .inMilliseconds)
+                                                          .clamp(0, 1),
+                                                  minHeight: 2,
+                                                  backgroundColor:
+                                                      Colors.white24,
+                                                  color: AppColors.accent))),
                               ])
                             : Row(children: [
                                 Expanded(flex: 3, child: _metadata(52)),
@@ -304,7 +308,11 @@ class PlayerSeek extends StatefulWidget {
 class _PlayerSeekState extends State<PlayerSeek> {
   double? _drag;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+      listenable: widget.player.timeline,
+      builder: (context, _) => _content(context));
+
+  Widget _content(BuildContext context) {
     final p = widget.player;
     final max = p.duration.inMilliseconds.toDouble();
     final value = (_drag ?? p.position.inMilliseconds.toDouble())
