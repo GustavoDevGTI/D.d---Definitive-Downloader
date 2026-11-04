@@ -414,10 +414,9 @@ void main() {
         await tester.tap(find.byTooltip('Fechar conferência'));
         await tester.pumpAndSettle();
       }
-      await tester.ensureVisible(find.byTooltip('Abrir downloads musicais'));
+      await tester.ensureVisible(find.text('Downloads'));
       await tester.pumpAndSettle();
-      await tester.runAsync(
-          () => tester.tap(find.byTooltip('Abrir downloads musicais')));
+      await tester.runAsync(() => tester.tap(find.text('Downloads')));
       await tester.pump();
       final downloadsWidget =
           tester.widget<DownloadWorkspace>(find.byType(DownloadWorkspace));

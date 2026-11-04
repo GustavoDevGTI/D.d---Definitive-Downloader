@@ -170,9 +170,12 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                           : () => unawaited(showAddMusicLinks(context, c))),
               const SizedBox(width: 6),
               DownloadActionButton(
-                  label: 'Abrir downloads musicais',
-                  icon: Icons.downloading_outlined,
-                  onPressed: widget.onDownloads),
+                  label: 'Rever correspondências',
+                  icon: Icons.fact_check_outlined,
+                  color: AppColors.accentActive,
+                  onPressed: c.busy || c.isExample || c.music?.available != true
+                      ? null
+                      : () => unawaited(c.prepareMusic())),
               if (c.preparing || c.downloading) ...[
                 const SizedBox(width: 6),
                 DownloadActionButton(
@@ -181,19 +184,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                     color: DownloadActionColors.stop,
                     onPressed: c.cancel)
               ],
-              PopupMenuButton<String>(
-                  tooltip: 'Mais ações da playlist',
-                  icon: const Icon(Icons.more_horiz,
-                      color: AppColors.accentActive),
-                  onSelected: (_) => unawaited(c.prepareMusic()),
-                  itemBuilder: (_) => [
-                        PopupMenuItem(
-                            value: 'recheck',
-                            enabled: !c.busy &&
-                                !c.isExample &&
-                                c.music?.available == true,
-                            child: const Text('Rever correspondências'))
-                      ]),
             ])),
         Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
