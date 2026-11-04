@@ -18,6 +18,7 @@ import '../data/library_repository.dart';
 import '../data/playlist_editor.dart';
 import '../../importing/music_link.dart';
 import '../domain/models.dart';
+import '../domain/track_listing.dart';
 import '../domain/matching.dart';
 import '../../workspace/data/workspace_repository.dart';
 
@@ -100,7 +101,12 @@ class LibraryController extends ChangeNotifier {
           : name;
       await PlaylistEditor(repository.database).edit(track.id,
           name: requestedName, position: position, replacement: replacement);
-      offset = collectionQuery.isEmpty ? ((position - 1) ~/ 40) * 40 : 0;
+      offset = collectionQuery.isEmpty &&
+              view == 'collections' &&
+              trackSort == TrackSort.position &&
+              !trackDescending
+          ? ((position - 1) ~/ 40) * 40
+          : 0;
       message = 'Faixa atualizada.';
       await refresh();
       return true;
@@ -125,6 +131,9 @@ class LibraryController extends ChangeNotifier {
   TrackPage page = const TrackPage([], 0, 0);
   Track? focused;
   List<Candidate> candidates = [];
+  Candidate? selectedCandidate;
+  TrackSort trackSort = TrackSort.position;
+  bool trackDescending = false;
   String outputDirectory = '';
   String message = '';
   String view = 'collections';
@@ -189,7 +198,9 @@ class LibraryController extends ChangeNotifier {
     final generation = ++_refreshGeneration;
     final id = current?.id,
         query = collectionQuery,
-        filter = view == 'collections' ? '' : view;
+        filter = view == 'collections' ? '' : view,
+        sort = trackSort,
+        descending = trackDescending;
     var nextOffset = offset;
     final nextCollections =
         await repository.collections(offset: collectionOffset);
@@ -197,10 +208,15 @@ class LibraryController extends ChangeNotifier {
     var nextPage = owner == null
         ? const TrackPage([], 0, 0)
         : await repository.page(owner.id,
-            offset: nextOffset, filter: filter, query: query);
+            offset: nextOffset,
+            filter: filter,
+            query: query,
+            sort: sort,
+            descending: descending);
     if (owner != null && nextOffset > 0 && nextPage.items.isEmpty) {
       nextOffset = 0;
-      nextPage = await repository.page(owner.id, filter: filter, query: query);
+      nextPage = await repository.page(owner.id,
+          filter: filter, query: query, sort: sort, descending: descending);
     }
     if (generation != _refreshGeneration || current?.id != id) return;
     collections = nextCollections;
@@ -217,8 +233,31 @@ class LibraryController extends ChangeNotifier {
     offset = 0;
     focused = null;
     candidates = [];
+    selectedCandidate = null;
     collectionQuery = '';
+    view = 'collections';
+    trackSort = TrackSort.position;
+    trackDescending = false;
     message = '';
+    await refresh();
+    if (!busy &&
+        music?.available == true &&
+        !isExample &&
+        await repository.needsAutomaticMatching(collection.id) &&
+        current?.id == collection.id) {
+      unawaited(prepareMusic(onlyPending: true));
+    }
+  }
+
+  void selectCandidate(Candidate? candidate) {
+    selectedCandidate = candidate;
+    notifyListeners();
+  }
+
+  Future<void> sortTracks(TrackSort sort) async {
+    trackDescending = sort == trackSort ? !trackDescending : false;
+    trackSort = sort;
+    offset = 0;
     await refresh();
   }
 
@@ -228,6 +267,7 @@ class LibraryController extends ChangeNotifier {
     offset = 0;
     focused = null;
     candidates = [];
+    selectedCandidate = null;
     await refresh();
   }
 
@@ -237,12 +277,14 @@ class LibraryController extends ChangeNotifier {
         (offset + direction * 40).clamp(0, page.total > 0 ? page.total - 1 : 0);
     focused = null;
     candidates = [];
+    selectedCandidate = null;
     await refresh();
   }
 
   void focus(Track track) {
     focused = track;
     candidates = [];
+    selectedCandidate = null;
     _searchGeneration++;
     notifyListeners();
     if (music != null && !isExample) unawaited(_loadMusicCandidates(track));
@@ -254,6 +296,7 @@ class LibraryController extends ChangeNotifier {
     _searchGeneration++;
     focused = null;
     candidates = [];
+    selectedCandidate = null;
     await refresh();
   }
 
@@ -270,7 +313,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> selectCollection(bool value) async {
     if (current == null || busy) return;
     await repository.selectCollection(current!.id, value,
-        query: collectionQuery);
+        query: collectionQuery, filter: view == 'collections' ? '' : view);
     await refresh();
   }
 
@@ -341,11 +384,28 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
-  Future<void> prepareMusic() async {
+  Future<void>? _preparation;
+  Future<void> get preparationDone => _preparation ?? Future<void>.value();
+
+  Future<void> prepareMusic({bool onlyPending = false}) {
+    if (busy || current == null || music?.available != true || isExample) {
+      return preparationDone;
+    }
+    return _preparation = _prepareMusic(onlyPending: onlyPending);
+  }
+
+  Future<void> _prepareMusic({required bool onlyPending}) async {
     final collection = current;
     final resolver = music;
-    if (collection == null || busy || resolver == null) return;
+    if (collection == null ||
+        busy ||
+        resolver == null ||
+        !resolver.available ||
+        isExample) {
+      return;
+    }
     preparing = true;
+    message = 'Conferindo correspondências…';
     final cancellation = DownloadCancellation();
     _cancellation = cancellation;
     var after = 0;
@@ -358,6 +418,7 @@ class LibraryController extends ChangeNotifier {
         if (batch.items.isEmpty) break;
         for (final track in batch.items) {
           cancellation.check();
+          if (onlyPending && !track.needsAutomaticMatching) continue;
           if (track.hasManualSource &&
               track.status == TrackStatus.pending &&
               resolver.available &&
@@ -387,7 +448,7 @@ class LibraryController extends ChangeNotifier {
               await repository.chooseMusicSource(track, choice);
               prepared++;
             } else {
-              if (found.isNotEmpty) await repository.markForReview(track.id);
+              await repository.markForReview(track.id);
               review++;
             }
           } on DownloadCancelled {
@@ -396,6 +457,7 @@ class LibraryController extends ChangeNotifier {
             review++;
             await repository.setStatus(track.id, TrackStatus.pending,
                 error: _message(error));
+            await repository.markForReview(track.id);
           }
           await refresh();
         }
@@ -403,9 +465,14 @@ class LibraryController extends ChangeNotifier {
       }
       message =
           '$prepared faixa(s) preparada(s). $review para revisão; videoclipes exigem aprovação.';
+      if (collection.isPartial) {
+        message += '\nLeitura parcial: confira o total de faixas importadas.';
+      }
     } on DownloadCancelled {
       message =
           'Busca interrompida. As correspondências já conferidas foram mantidas.';
+    } catch (error) {
+      message = _message(error);
     } finally {
       preparing = false;
       activeTitle = '';
@@ -461,6 +528,7 @@ class LibraryController extends ChangeNotifier {
     _searchGeneration++;
     importing = true;
     message = 'Lendo a coleção…';
+    var importedSuccessfully = false;
     notifyListeners();
     try {
       final imported = await source();
@@ -472,17 +540,24 @@ class LibraryController extends ChangeNotifier {
       offset = 0;
       focused = null;
       candidates = [];
+      selectedCandidate = null;
       view = 'collections';
+      trackSort = TrackSort.position;
+      trackDescending = false;
       message = imported.isPartial
           ? 'Leitura pública parcial. O Spotify pode limitar a lista; confira o total ou importe um CSV completo.'
           : imported.source == 'Exemplo local'
               ? 'Exemplo local: trechos sintéticos de 4 segundos. Nenhuma música comercial foi baixada.'
               : 'Coleção importada. A ordem e as repetições foram preservadas.';
       await refresh();
+      importedSuccessfully = true;
     } catch (error) {
       message = _message(error);
     } finally {
       importing = false;
+      if (importedSuccessfully && !isExample && music?.available == true) {
+        unawaited(prepareMusic(onlyPending: true));
+      }
       notifyListeners();
     }
   }
@@ -498,6 +573,7 @@ class LibraryController extends ChangeNotifier {
           : await music!.search(focused!, query);
       if (generation == _searchGeneration) {
         candidates = found;
+        selectedCandidate = null;
         message = found.isEmpty
             ? 'Nenhum resultado. Tente ajustar título ou artista.'
             : music == null

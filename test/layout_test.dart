@@ -1,3 +1,4 @@
+import 'package:definitive_downloader/features/library/domain/track_listing.dart';
 import 'widget_io.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -195,9 +196,74 @@ void main() {
           () => tester.tap(find.textContaining('Exemplo local').first));
       await tester.runAsync(() => controller.refresh());
       await tester.pumpAndSettle();
-      expect(find.text('Baixar selecionadas'), findsOneWidget);
+      expect(find.byTooltip('Baixar selecionadas'), findsOneWidget);
       expect(find.text('Faixa / artista'), findsOneWidget);
       expect(find.text('Selecionar todas'), findsNothing);
+      if (width == 1360 || width == 390) {
+        final trackId = controller.page.items.first.id;
+        await tester.runAsync(() async {
+          await controller.repository.markForReview(trackId);
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+        expect(
+            tester
+                .widget<Material>(find.byKey(ValueKey('track-row-$trackId')))
+                .color,
+            const Color(0xFFFDE7ED));
+        await capture(tester, captureKey, 'review-highlight-${width.toInt()}');
+        final filter = find.byKey(ValueKey('track-filter-${controller.view}'));
+        await tester.ensureVisible(filter);
+        await tester.tap(filter);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Conferir').last);
+        await tester.pumpAndSettle();
+        await ioUntil(tester,
+            () => controller.view == 'review' && controller.page.total == 1);
+        await capture(tester, captureKey, 'review-filter-${width.toInt()}');
+        await tester.enterText(
+            find.byKey(const ValueKey('track-search')), 'não existe');
+        await tester.pump(const Duration(milliseconds: 350));
+        await ioUntil(tester, () => controller.page.total == 0);
+        expect(find.text('Nenhuma faixa neste filtro.'), findsOneWidget);
+        await tester.tap(find.byTooltip('Limpar pesquisa de faixas'));
+        await ioUntil(tester, () => controller.page.total == 1);
+        await tester.tap(find.byKey(const ValueKey('track-filter-review')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Todas').last);
+        await tester.pumpAndSettle();
+        await ioUntil(
+            tester,
+            () =>
+                controller.view == 'collections' && controller.page.total == 6);
+        if (width == 1360) {
+          await tester.tap(find.byKey(const ValueKey('track-sort-name')));
+          await ioUntil(tester, () => controller.trackSort == TrackSort.name);
+          await tester.tap(find.byKey(const ValueKey('track-sort-name')));
+          await ioUntil(
+              tester,
+              () =>
+                  controller.trackDescending &&
+                  controller.page.items.first.displayTitle ==
+                      'Ponto de encontro');
+          expect(controller.page.items.first.displayTitle, 'Ponto de encontro');
+          await tester.tap(find.byKey(const ValueKey('track-sort-duration')));
+          await ioUntil(
+              tester,
+              () =>
+                  controller.trackSort == TrackSort.duration &&
+                  controller.page.items.first.position == 1);
+          expect(controller.page.items.first.position, 1);
+        }
+        await tester.runAsync(() async {
+          await controller.repository.confirmSource(trackId);
+          controller.trackSort = TrackSort.position;
+          controller.trackDescending = false;
+          await controller.refresh();
+        });
+        await tester.pumpAndSettle();
+      }
+
       final selectAll = find.byKey(const ValueKey('select-all-collection'));
       await tester
           .runAsync(() => controller.select(controller.page.items.first, true));
@@ -225,6 +291,9 @@ void main() {
               controller.repository.database, controller.current!.id, true);
           await controller.refresh();
         });
+        await tester.pumpAndSettle();
+        await tester
+            .ensureVisible(find.byTooltip('Por que a edição está bloqueada?'));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Por que a edição está bloqueada?'));
         await tester.pumpAndSettle();
@@ -284,8 +353,8 @@ void main() {
       await tester.ensureVisible(find.text('Versão de vídeo para revisão'));
       await tester.tap(find.text('Versão de vídeo para revisão'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Aprovar videoclipe'));
-      await tester.tap(find.text('Aprovar videoclipe'));
+      await tester.ensureVisible(find.byTooltip('Aprovar videoclipe'));
+      await tester.tap(find.byTooltip('Aprovar videoclipe'));
       await tester.pumpAndSettle();
       expect(find.text('Aprovar esta versão'), findsOneWidget);
       expect(find.textContaining('Duração desta versão:'), findsOneWidget);
@@ -294,9 +363,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(
           controller.focused!.sourceAuthorization, SourceAuthorization.catalog);
-      await tester.ensureVisible(find.text('Informar link manualmente'));
-      await tester
-          .runAsync(() => tester.tap(find.text('Informar link manualmente')));
+      await tester.ensureVisible(find.byTooltip('Informar link manualmente'));
+      await tester.runAsync(
+          () => tester.tap(find.byTooltip('Informar link manualmente')));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byType(TextFormField), 'https://example.org/manual.mp3');
@@ -323,11 +392,11 @@ void main() {
           await controller.refresh();
         });
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Ver fonte vinculada'));
-        await tester.tap(find.text('Ver fonte vinculada'));
+        await tester.ensureVisible(find.byTooltip('Ver fonte vinculada'));
+        await tester.tap(find.byTooltip('Ver fonte vinculada'));
         await tester.pumpAndSettle();
         expect(find.text('Fonte da faixa concluída'), findsOneWidget);
-        expect(find.text('Informar link manualmente'), findsNothing);
+        expect(find.byTooltip('Informar link manualmente'), findsNothing);
         await capture(
             tester, captureKey, 'notice-completed-source-${width.toInt()}');
         await tester.tap(find.text('OK'));

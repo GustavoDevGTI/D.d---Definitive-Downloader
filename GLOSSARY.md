@@ -2,6 +2,8 @@
 
 Vocabulário do fluxo de importação, conferência, transferência e download de músicas.
 
+Inclui a direção de biblioteca e reprodução definida em 04/11/2026; um termo definido aqui não indica que a capacidade já esteja implementada.
+
 ## Linguagem
 
 **Playlist**:
@@ -12,6 +14,28 @@ Uma entrada específica em uma posição da playlist. Duas entradas da mesma gra
 
 **Gravação**:
 Uma versão específica de uma música, com intérprete e características próprias. Uma apresentação ao vivo, um remix e uma gravação de estúdio não são automaticamente equivalentes.
+
+**Biblioteca musical**:
+O acervo pessoal de músicas e suas referências, arquivos, playlists e pastas organizados pelo usuário.
+
+**Arquivo musical local**:
+Um arquivo de áudio armazenado no dispositivo, importado pelo usuário ou obtido por um download concluído.
+
+**Pasta de mídia**:
+A pasta que guarda arquivos de mídia e é administrada pelo usuário no app. É o sentido de “álbum” no pedido de personalização de Coleções de 04/11/2026.
+
+**Personalização de playlist/pasta**:
+A definição de nome, capa, conteúdo, ordem e organização de uma playlist ou pasta no app.
+
+**Álbum de catálogo**:
+O lançamento ao qual uma gravação pertence na plataforma ou nos metadados de origem.
+
+**Tags do arquivo**:
+Os metadados incorporados ao arquivo de áudio, como título, artista, álbum, capa e número da faixa.
+
+**Fila de reprodução**:
+A sequência de músicas escolhida para tocar no player.
+_Evitar_: fila de downloads.
 
 **Correspondência**:
 A associação entre uma ocorrência de origem e uma gravação encontrada em outra plataforma, acompanhada dos motivos e da decisão de aceitar ou revisar.

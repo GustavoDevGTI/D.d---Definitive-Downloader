@@ -2,6 +2,8 @@ import '../../../core/storage/database.dart';
 import '../../../core/network/bounded_http.dart';
 import 'package:path/path.dart' as p;
 import '../domain/models.dart';
+import '../domain/track_listing.dart';
+import 'track_listing_query.dart';
 
 class LibraryRepository {
   const LibraryRepository(this.database);
@@ -116,41 +118,36 @@ class LibraryRepository {
         }
       });
 
+  Future<bool> needsAutomaticMatching(int id) => database.run((db) => db.select(
+      "SELECT 1 FROM tracks WHERE collection_id=? AND status='pending' AND match_status='pending' AND source_kind='none' AND manual_url='' LIMIT 1",
+      [id]).isNotEmpty);
+
   Future<TrackPage> page(int id,
           {int offset = 0,
           int limit = 40,
           String filter = '',
-          String query = ''}) =>
+          String query = '',
+          TrackSort sort = TrackSort.position,
+          bool descending = false}) =>
       database.run((db) {
-        if (limit < 1 || limit > 100 || offset < 0) {
+        if (limit < 1 || limit > 100 || offset < 0 || query.length > 400) {
           throw ArgumentError('Página inválida.');
         }
-        var clause = switch (filter) {
-          'downloads' => " AND status IN ('ready','downloading','failed')",
-          'files' => " AND status='completed'",
-          _ => ''
-        };
-        final args = <Object?>[id];
-        if (query.trim().isNotEmpty) {
-          clause +=
-              ' AND (instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0 OR instr(lower(custom_title),lower(?))>0)';
-          args.addAll([query.trim(), query.trim(), query.trim()]);
-        }
+        final listing = TrackListingQuery(db, id, filter, query);
         final total = db
-            .select(
-                'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?$clause',
-                args)
+            .select('SELECT COUNT(*) AS n FROM tracks WHERE ${listing.where}',
+                listing.args)
             .first['n'] as int;
         final selected = db.select(
             'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=? AND selected=1',
             [id]).first['n'] as int;
         final rows = db.select(
-            'SELECT * FROM tracks WHERE collection_id=?$clause ORDER BY position LIMIT ? OFFSET ?',
-            [...args, limit, offset]);
+            'SELECT * FROM tracks WHERE ${listing.where} ORDER BY ${TrackListingQuery.order(sort, descending)} LIMIT ? OFFSET ?',
+            [...listing.args, limit, offset]);
         final filteredSelected = db
             .select(
-                'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?$clause AND selected=1',
-                args)
+                'SELECT COUNT(*) AS n FROM tracks WHERE ${listing.where} AND selected=1',
+                listing.args)
             .first['n'] as int;
         return TrackPage(
             rows.map(readTrack).toList(), total, selected, filteredSelected);
@@ -459,11 +456,12 @@ class LibraryRepository {
         return readCollection(rows.first);
       });
 
-  Future<void> selectCollection(int id, bool value, {String query = ''}) =>
+  Future<void> selectCollection(int id, bool value,
+          {String query = '', String filter = ''}) =>
       database.run((db) {
-        db.execute('''UPDATE tracks SET selected=? WHERE collection_id=?
-      AND (?='' OR instr(lower(title),lower(?))>0 OR instr(lower(artist),lower(?))>0 OR instr(lower(custom_title),lower(?))>0)''',
-            [value ? 1 : 0, id, query, query, query, query]);
+        final listing = TrackListingQuery(db, id, filter, query);
+        db.execute('UPDATE tracks SET selected=? WHERE ${listing.where}',
+            [value ? 1 : 0, ...listing.args]);
       });
 
   Future<void> recordMusicAttempt(int id, SourceKind provider,

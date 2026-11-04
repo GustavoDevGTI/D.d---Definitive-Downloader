@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
-import '../../../app/app_notice.dart';
-import '../../workspace/presentation/download_action_button.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
-import 'manual_source_input.dart';
+import 'track_review_actions.dart';
 
 class TrackInspector extends StatefulWidget {
   const TrackInspector({super.key, required this.controller});
@@ -18,7 +16,6 @@ class TrackInspector extends StatefulWidget {
 class _TrackInspectorState extends State<TrackInspector> {
   final _query = TextEditingController();
   int? _trackId;
-  Candidate? _candidate;
   int _tab = 0;
   @override
   void dispose() {
@@ -31,7 +28,6 @@ class _TrackInspectorState extends State<TrackInspector> {
     final c = widget.controller, t = c.focused;
     if (_trackId != t?.id) {
       _trackId = t?.id;
-      _candidate = null;
       _tab = 0;
       _query.text = t == null ? '' : '${t.artist} ${t.title}';
     }
@@ -134,100 +130,52 @@ class _TrackInspectorState extends State<TrackInspector> {
                             if (t.hasManualSource)
                               _line('Link manual', t.manualUrl),
                           ] else ...[
-                            if (t.status == TrackStatus.completed) ...[
-                              OutlinedButton.icon(
-                                  style: downloadActionStyle(
-                                      AppColors.accentActive),
-                                  onPressed: () => unawaited(showAppNotice(
-                                      context,
-                                      title: 'Fonte da faixa concluída',
-                                      message:
-                                          '${t.sourceKind.musicProviderName ?? t.sourceLabel}${t.hasManualSource ? '\n${t.manualUrl}' : ''}\nEste arquivo já foi concluído. Para baixar outra versão, adicione um novo link à coleção.')),
-                                  icon: const Icon(Icons.link, size: 16),
-                                  label: const Text('Ver fonte vinculada')),
-                            ] else if (t.hasManualSource) ...[
+                            if (t.hasManualSource) ...[
                               const Text('Fonte manual prioritária',
                                   style:
                                       TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
                               SelectableText(t.manualUrl,
                                   style: const TextStyle(fontSize: 12)),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                  style: downloadActionStyle(
-                                      AppColors.accentActive),
-                                  onPressed: c.busy ? null : _manual,
-                                  icon:
-                                      const Icon(Icons.edit_outlined, size: 16),
-                                  label: const Text('Editar link manual')),
-                              OutlinedButton(
-                                  style:
-                                      downloadActionStyle(AppColors.secondary),
-                                  onPressed: c.busy ||
-                                          t.status == TrackStatus.completed
-                                      ? null
-                                      : () => unawaited(c.removeManualSource()),
-                                  child: const Text('Remover vínculo manual')),
-                            ] else ...[
+                            ] else if (t.status != TrackStatus.completed) ...[
                               TextField(
                                   controller: _query,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Buscar outras versões'),
+                                  decoration: InputDecoration(
+                                      labelText: 'Buscar outras versões',
+                                      suffixIcon: IconButton(
+                                          tooltip: c.searching
+                                              ? 'Pesquisando…'
+                                              : 'Pesquisar faixas',
+                                          onPressed: c.searching ||
+                                                  c.busy ||
+                                                  c.isExample ||
+                                                  (c.music != null &&
+                                                      !c.music!.available)
+                                              ? null
+                                              : () => unawaited(
+                                                  c.search(_query.text)),
+                                          icon: const Icon(Icons.search,
+                                              color: AppColors.accentActive))),
                                   onSubmitted: c.searching || c.busy
                                       ? null
                                       : (v) => unawaited(c.search(v))),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                  onPressed: c.searching ||
-                                          c.busy ||
-                                          c.isExample ||
-                                          (c.music != null &&
-                                              !c.music!.available)
-                                      ? null
-                                      : () => unawaited(c.search(_query.text)),
-                                  icon: const Icon(Icons.search, size: 16),
-                                  label: Text(c.searching
-                                      ? 'Pesquisando…'
-                                      : 'Pesquisar faixas')),
+                            ],
+                            const SizedBox(height: 8),
+                            SingleChildScrollView(
+                                key: const ValueKey('conference-actions'),
+                                scrollDirection: Axis.horizontal,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: TrackReviewActions(controller: c)),
+                            if (!t.hasManualSource &&
+                                t.status != TrackStatus.completed)
                               RadioGroup<Candidate>(
-                                  groupValue: _candidate,
-                                  onChanged: (value) =>
-                                      setState(() => _candidate = value),
+                                  groupValue: c.selectedCandidate,
+                                  onChanged: c.selectCandidate,
                                   child: Column(children: [
                                     for (final candidate in c.candidates)
                                       _option(candidate)
                                   ])),
-                              const SizedBox(height: 12),
-                              OutlinedButton(
-                                  onPressed: c.busy ||
-                                          (_candidate == null &&
-                                              t.sourceKind ==
-                                                  SourceKind.none) ||
-                                          (_candidate != null &&
-                                              c.music != null &&
-                                              !c.music!.canUse(_candidate!))
-                                      ? null
-                                      : () => unawaited(_confirm()),
-                                  child: Text(
-                                      _candidate?.isVideoRecording == true
-                                          ? 'Aprovar videoclipe'
-                                          : 'Confirmar correspondência')),
-                              OutlinedButton(
-                                  style:
-                                      downloadActionStyle(AppColors.secondary),
-                                  onPressed:
-                                      c.busy || t.sourceKind == SourceKind.none
-                                          ? null
-                                          : () => unawaited(c.reviewSource()),
-                                  child: const Text('Marcar para revisão')),
-                              OutlinedButton.icon(
-                                  style: downloadActionStyle(
-                                      AppColors.accentActive),
-                                  onPressed: c.busy ? null : _manual,
-                                  icon: const Icon(Icons.link, size: 16),
-                                  label:
-                                      const Text('Informar link manualmente')),
-                            ],
                             if (c.isExample)
                               const Text('Exemplo local com áudio sintético.',
                                   style: TextStyle(
@@ -260,67 +208,5 @@ class _TrackInspectorState extends State<TrackInspector> {
         subtitle: Text(
             '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
             style: const TextStyle(fontSize: 11)));
-  }
-
-  Future<void> _confirm() async {
-    if (_candidate case final candidate?) {
-      if (widget.controller.music == null) {
-        await widget.controller.usePreview(candidate);
-      } else {
-        var approved = false;
-        if (candidate.isVideoRecording) {
-          final id = widget.controller.focused?.id;
-          approved = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                          title: const Text('Usar áudio deste videoclipe?'),
-                          content: SingleChildScrollView(
-                              child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text(candidate.title),
-                                const SizedBox(height: 8),
-                                Text(candidate.artist),
-                                const SizedBox(height: 8),
-                                Text(
-                                    'Duração desta versão: ${formatDuration(candidate.durationMs)}'),
-                                Text(
-                                    'Duração solicitada: ${formatDuration(widget.controller.focused?.durationMs)}'),
-                                const SizedBox(height: 12),
-                                SelectableText(candidate.pageUrl,
-                                    style: const TextStyle(fontSize: 12)),
-                              ])),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar')),
-                            FilledButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Aprovar esta versão'))
-                          ])) ==
-              true;
-          if (!approved || !mounted || widget.controller.focused?.id != id) {
-            return;
-          }
-        }
-        await widget.controller
-            .useMusicCandidate(candidate, approveVideo: approved);
-      }
-    } else {
-      await widget.controller.confirmSource();
-    }
-  }
-
-  Future<void> _manual() async {
-    final track = widget.controller.focused;
-    if (track == null) return;
-    final choice = await showDialog<ManualSourceChoice>(
-        context: context, builder: (_) => ManualSourceInput(track: track));
-    if (choice != null &&
-        mounted &&
-        widget.controller.focused?.id == track.id) {
-      await widget.controller.setManualSource(choice.url, choice.mode);
-    }
   }
 }

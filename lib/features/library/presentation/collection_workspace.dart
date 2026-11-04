@@ -8,6 +8,7 @@ import '../../workspace/presentation/workspace_components.dart';
 import '../../workspace/presentation/link_entry_panel.dart';
 import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
+import '../domain/track_listing.dart';
 import 'track_table.dart';
 import 'add_music_links_dialog.dart';
 import '../../workspace/presentation/download_action_button.dart';
@@ -123,7 +124,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   Widget _tracks(LibraryController c, bool wide) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 8, 0),
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 0),
             child: Row(children: [
               Expanded(
                   child: Text(c.current!.name,
@@ -131,6 +132,8 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600))),
+              Text('${c.page.selectedCount} selecionadas',
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted)),
               if (c.current!.editingLocked)
                 IconButton(
                     tooltip: 'Por que a edição está bloqueada?',
@@ -140,33 +143,145 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                             'Nomes, ordem e IDs ficam bloqueados após o início dos downloads. Você ainda pode adicionar novos links à coleção.')),
                     icon: const Icon(Icons.lock_outline,
                         size: 18, color: AppColors.accentActive)),
+            ])),
+        SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Row(children: [
+              DownloadActionButton(
+                  label: 'Baixar selecionadas',
+                  icon: Icons.download_rounded,
+                  color: DownloadActionColors.start,
+                  primary: true,
+                  onPressed: c.busy || c.page.selectedCount == 0
+                      ? null
+                      : () {
+                          unawaited(c.downloadSelected());
+                          widget.onDownloads();
+                        }),
+              const SizedBox(width: 6),
               DownloadActionButton(
                   label: 'Adicionar links',
                   color: DownloadActionColors.add,
+                  icon: Icons.add_link_rounded,
                   onPressed:
                       c.addingLinks || c.importing || c.preparing || c.editing
                           ? null
-                          : () => unawaited(showAddMusicLinks(context, c)),
-                  icon: Icons.add_link_rounded),
-              IconButton(
-                  tooltip: 'Buscar músicas',
-                  onPressed: c.busy || c.isExample || c.music?.available != true
-                      ? null
-                      : () => unawaited(c.prepareMusic()),
-                  icon: const Icon(Icons.manage_search, size: 20)),
+                          : () => unawaited(showAddMusicLinks(context, c))),
+              const SizedBox(width: 6),
+              DownloadActionButton(
+                  label: 'Abrir downloads musicais',
+                  icon: Icons.downloading_outlined,
+                  onPressed: widget.onDownloads),
+              if (c.preparing || c.downloading) ...[
+                const SizedBox(width: 6),
+                DownloadActionButton(
+                    label: 'Interromper',
+                    icon: Icons.stop,
+                    color: DownloadActionColors.stop,
+                    onPressed: c.cancel)
+              ],
+              PopupMenuButton<String>(
+                  tooltip: 'Mais ações da playlist',
+                  icon: const Icon(Icons.more_horiz,
+                      color: AppColors.accentActive),
+                  onSelected: (_) => unawaited(c.prepareMusic()),
+                  itemBuilder: (_) => [
+                        PopupMenuItem(
+                            value: 'recheck',
+                            enabled: !c.busy &&
+                                !c.isExample &&
+                                c.music?.available == true,
+                            child: const Text('Rever correspondências'))
+                      ]),
             ])),
         Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: TextField(
-                controller: _query,
-                decoration: const InputDecoration(
-                    hintText: 'Pesquisar faixas…',
-                    prefixIcon: Icon(Icons.search, size: 18)),
-                onChanged: (value) {
-                  _timer?.cancel();
-                  _timer = Timer(const Duration(milliseconds: 300),
-                      () => unawaited(c.searchCollection(value)));
-                })),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            child: LayoutBuilder(builder: (context, box) {
+              final search = TextField(
+                  key: const ValueKey('track-search'),
+                  controller: _query,
+                  maxLength: 400,
+                  decoration: InputDecoration(
+                      hintText: 'Pesquisar faixas…',
+                      counterText: '',
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      suffixIcon: _query.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Limpar pesquisa de faixas',
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                _timer?.cancel();
+                                _query.clear();
+                                unawaited(c.searchCollection(''));
+                              })),
+                  onChanged: (value) {
+                    setState(() {});
+                    _timer?.cancel();
+                    _timer = Timer(const Duration(milliseconds: 300),
+                        () => unawaited(c.searchCollection(value)));
+                  });
+              final filter = DropdownButtonFormField<String>(
+                  key: ValueKey('track-filter-${c.view}'),
+                  initialValue: c.view,
+                  isExpanded: true,
+                  menuMaxHeight: 280,
+                  decoration: const InputDecoration(
+                      labelText: 'Mostrar',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'collections',
+                        child: Text('Todas', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'review',
+                        child:
+                            Text('Conferir', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'ready',
+                        child:
+                            Text('Prontas', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'files',
+                        child:
+                            Text('Concluídas', overflow: TextOverflow.ellipsis))
+                  ],
+                  onChanged: (v) {
+                    if (v != null) unawaited(c.setView(v));
+                  });
+              final sort = PopupMenuButton<TrackSort>(
+                  tooltip: 'Ordenar faixas',
+                  icon: const Icon(Icons.sort, color: AppColors.accentActive),
+                  onSelected: (v) => unawaited(c.sortTracks(v)),
+                  itemBuilder: (_) => [
+                        for (final item in const [
+                          (TrackSort.position, 'Ordem da playlist'),
+                          (TrackSort.name, 'Nome'),
+                          (TrackSort.duration, 'Duração'),
+                          (TrackSort.correspondence, 'Correspondência')
+                        ])
+                          CheckedPopupMenuItem(
+                              value: item.$1,
+                              checked: c.trackSort == item.$1,
+                              child: Text(
+                                  '${item.$2}${c.trackSort == item.$1 ? c.trackDescending ? ' ↓' : ' ↑' : ''}'))
+                      ]);
+              if (box.maxWidth >= 520) {
+                return Row(children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 136, child: filter),
+                  sort
+                ]);
+              }
+              return Column(children: [
+                search,
+                const SizedBox(height: 10),
+                Row(children: [Expanded(child: filter), sort])
+              ]);
+            })),
         if (c.importing || c.preparing)
           const LinearProgressIndicator(minHeight: 2),
         Expanded(
@@ -178,34 +293,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
             total: c.page.total,
             onPage: (v) => unawaited(c.turnPage(v)),
             label: 'faixas'),
-        Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('${c.page.selectedCount} selecionadas',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.muted)),
-                  OutlinedButton(
-                      onPressed: c.busy || c.page.selectedCount == 0
-                          ? null
-                          : () {
-                              unawaited(c.downloadSelected());
-                              widget.onDownloads();
-                            },
-                      child: const Text('Baixar selecionadas')),
-                  IconButton(
-                      tooltip: 'Abrir downloads musicais',
-                      onPressed: widget.onDownloads,
-                      icon: const Icon(Icons.downloading_outlined, size: 20)),
-                  if (c.downloading || c.preparing)
-                    IconButton(
-                        tooltip: 'Interromper',
-                        onPressed: c.cancel,
-                        icon: const Icon(Icons.stop, size: 20)),
-                ])),
       ]);
   void _focus(Track track, bool wide) {
     widget.controller.focus(track);

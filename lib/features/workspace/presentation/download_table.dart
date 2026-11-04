@@ -6,7 +6,6 @@ import '../../library/domain/models.dart';
 import '../domain/workspace_models.dart';
 import '../domain/download_columns.dart';
 import 'column_resize_handle.dart';
-import 'horizontal_table_viewport.dart';
 
 class DownloadTable extends StatefulWidget {
   const DownloadTable(
@@ -47,6 +46,36 @@ class _DownloadTableState extends State<DownloadTable> {
   static const _headerHeight = 56.0;
   static const _rail = 12.0;
   final _vertical = ScrollController();
+  final _horizontal = ScrollController();
+  final _headerHorizontal = ScrollController();
+  bool _syncing = false;
+  @override
+  void initState() {
+    super.initState();
+    _horizontal
+        .addListener(() => _syncHorizontal(_horizontal, _headerHorizontal));
+    _headerHorizontal
+        .addListener(() => _syncHorizontal(_headerHorizontal, _horizontal));
+  }
+
+  void _syncHorizontal(ScrollController from, ScrollController to) {
+    if (_syncing ||
+        !from.hasClients ||
+        !to.hasClients ||
+        !to.position.hasContentDimensions) {
+      return;
+    }
+    final offset = from.offset
+        .clamp(to.position.minScrollExtent, to.position.maxScrollExtent);
+    if ((to.offset - offset).abs() < .01) return;
+    _syncing = true;
+    try {
+      to.jumpTo(offset);
+    } finally {
+      _syncing = false;
+    }
+  }
+
   int? _hovered;
   @override
   void didUpdateWidget(covariant DownloadTable oldWidget) {
@@ -62,6 +91,8 @@ class _DownloadTableState extends State<DownloadTable> {
   @override
   void dispose() {
     _vertical.dispose();
+    _horizontal.dispose();
+    _headerHorizontal.dispose();
     super.dispose();
   }
 
@@ -90,173 +121,246 @@ class _DownloadTableState extends State<DownloadTable> {
                         : AppColors.accent.withAlpha(210)),
                 trackColor: const WidgetStatePropertyAll(AppColors.surface),
                 trackBorderColor: const WidgetStatePropertyAll(AppColors.line)),
-            child: Stack(fit: StackFit.expand, children: [
-              const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: _headerHeight,
-                  child: ColoredBox(color: AppColors.navigation)),
-              RawScrollbar(
-                  thumbColor: AppColors.accent.withAlpha(210),
-                  trackColor: AppColors.surface,
-                  trackBorderColor: AppColors.line,
-                  thickness: 10,
-                  radius: const Radius.circular(6),
-                  controller: _vertical,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  interactive: true,
-                  padding: const EdgeInsets.only(
-                      top: _headerHeight, bottom: _rail, right: 1),
-                  notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
-                  child: Padding(
-                      padding: const EdgeInsets.only(right: _rail),
-                      child: HorizontalTableViewport(
-                          width: widths.fold<double>(
-                              0, (sum, value) => sum + value),
-                          child: Column(children: [
-                            _row([
-                              Checkbox(
-                                  shape: const CircleBorder(),
-                                  checkColor: AppColors.navigation,
-                                  fillColor: WidgetStateProperty.resolveWith(
-                                      (states) =>
-                                          states.contains(WidgetState.selected)
-                                              ? Colors.white
-                                              : Colors.transparent),
-                                  semanticLabel:
-                                      'Selecionar downloads da página',
-                                  value: entries.isNotEmpty &&
-                                      entries.every((e) =>
-                                          selection.contains(e.track.id)),
-                                  side: const BorderSide(
-                                      color: Colors.white70, width: 1.2),
-                                  onChanged: entries.isEmpty
-                                      ? null
-                                      : (v) => onSelectPage(v ?? false)),
-                              for (var i = 1; i < downloadColumns.length; i++)
-                                _headerCell(i),
-                            ], widths: widths, header: true),
-                            Expanded(
-                                child: ListView.builder(
-                                    key: const ValueKey('download-rows'),
-                                    controller: _vertical,
-                                    primary: false,
-                                    itemCount: entries.length,
-                                    itemBuilder: (context, index) {
-                                      final e = entries[index], t = e.track;
-                                      return MouseRegion(
-                                          key: ValueKey('download-row-${t.id}'),
-                                          onEnter: (_) =>
-                                              setState(() => _hovered = t.id),
-                                          onExit: (_) {
-                                            if (_hovered == t.id) {
-                                              setState(() => _hovered = null);
-                                            }
-                                          },
-                                          child: _row([
-                                            Checkbox(
-                                                shape: const CircleBorder(),
-                                                semanticLabel:
-                                                    'Selecionar download ${t.title}',
-                                                value: selection.contains(t.id),
-                                                onChanged: (v) =>
-                                                    onSelect(t.id, v ?? false)),
-                                            Tooltip(
-                                                message:
-                                                    '${t.localPath.isEmpty ? t.displayTitle : p.basename(t.localPath)} · ${e.collectionName} · Prioridade ${t.queuePriority}',
-                                                child: Text(
-                                                    t.localPath.isEmpty
-                                                        ? t.displayTitle
-                                                        : p.basename(
-                                                            t.localPath),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 12))),
-                                            const Text('—'),
-                                            Tooltip(
-                                                message: t.sourceKind
-                                                        .musicProviderName ??
-                                                    t.sourceLabel,
-                                                child: Text(
-                                                    t.sourceKind
-                                                            .musicProviderName ??
-                                                        t.sourceLabel,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 12))),
-                                            Tooltip(
-                                                message: t.error.isEmpty
-                                                    ? e.statusLabel
-                                                    : t.error,
-                                                child: Text(
-                                                    t.id == activeId && paused
-                                                        ? 'Pausado · 10 KiB/s'
-                                                        : e.statusLabel,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 12))),
-                                            const Text('—'),
-                                            const Text('—'),
-                                            const Text('—'),
-                                            t.status == TrackStatus.completed
-                                                ? const Text('Concluído',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style:
-                                                        TextStyle(fontSize: 12))
-                                                : t.id == activeId
-                                                    ? LinearProgressIndicator(
-                                                        value: progress,
-                                                        minHeight: 6)
-                                                    : const Text('—'),
-                                            Tooltip(
-                                                message: e.downloadedAt == null
-                                                    ? 'Sem registro de conclusão.'
-                                                    : 'Concluído em ${_completionLabel(e.downloadedAt!)} (horário local)',
-                                                child: Text(
-                                                    e.downloadedAt == null
-                                                        ? '—'
-                                                        : _completionLabel(
-                                                            e.downloadedAt!),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 12))),
-                                            Tooltip(
-                                                message: t.localPath.isEmpty
-                                                    ? output
-                                                    : p.dirname(t.localPath),
-                                                child: Text(
-                                                    t.localPath.isEmpty
-                                                        ? output
-                                                        : p.dirname(
-                                                            t.localPath),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        fontSize: 12))),
-                                          ],
-                                              widths: widths,
-                                              index: index,
-                                              hovered: _hovered == t.id,
-                                              selected:
-                                                  selection.contains(t.id) ||
-                                                      t.id == activeId));
-                                    })),
-                            const SizedBox(height: _rail),
-                          ]))))
-            ]));
+            child: ScrollConfiguration(
+                behavior:
+                    ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: Stack(fit: StackFit.expand, children: [
+                  const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: _headerHeight,
+                      child: ColoredBox(color: AppColors.navigation)),
+                  Scrollbar(
+                      controller: _horizontal,
+                      thumbVisibility: true,
+                      notificationPredicate: (n) =>
+                          n.metrics.axis == Axis.horizontal,
+                      child: Column(children: [
+                        Padding(
+                            padding: const EdgeInsets.only(right: _rail),
+                            child: SizedBox(
+                                height: _headerHeight,
+                                child: SingleChildScrollView(
+                                    key: const ValueKey(
+                                        'download-horizontal-header'),
+                                    controller: _headerHorizontal,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                        width: widths.fold<double>(
+                                            0, (sum, w) => sum + w),
+                                        child: _row([
+                                          Checkbox(
+                                              shape: const CircleBorder(),
+                                              checkColor: AppColors.navigation,
+                                              fillColor: WidgetStateProperty.resolveWith(
+                                                  (states) => states.contains(
+                                                          WidgetState.selected)
+                                                      ? Colors.white
+                                                      : Colors.transparent),
+                                              semanticLabel:
+                                                  'Selecionar downloads da página',
+                                              value: entries.isNotEmpty &&
+                                                  entries.every((e) => selection
+                                                      .contains(e.track.id)),
+                                              side: const BorderSide(
+                                                  color: Colors.white70,
+                                                  width: 1.2),
+                                              onChanged: entries.isEmpty
+                                                  ? null
+                                                  : (v) =>
+                                                      onSelectPage(v ?? false)),
+                                          for (var i = 1;
+                                              i < downloadColumns.length;
+                                              i++)
+                                            _headerCell(i),
+                                        ], widths: widths, header: true))))),
+                        Expanded(
+                            child: RawScrollbar(
+                                controller: _vertical,
+                                thumbVisibility: true,
+                                trackVisibility: true,
+                                interactive: true,
+                                thumbColor: AppColors.accent.withAlpha(210),
+                                trackColor: AppColors.surface,
+                                trackBorderColor: AppColors.line,
+                                thickness: 10,
+                                radius: const Radius.circular(6),
+                                padding: const EdgeInsets.only(right: 1),
+                                notificationPredicate: (n) =>
+                                    n.metrics.axis == Axis.vertical,
+                                child: Padding(
+                                    padding:
+                                        const EdgeInsets.only(right: _rail),
+                                    child: SingleChildScrollView(
+                                        key: const ValueKey(
+                                            'download-horizontal-rows'),
+                                        controller: _horizontal,
+                                        scrollDirection: Axis.horizontal,
+                                        child: SizedBox(
+                                            width: widths.fold<double>(
+                                                0, (sum, w) => sum + w),
+                                            child: ListView.builder(
+                                                key: const ValueKey(
+                                                    'download-rows'),
+                                                controller: _vertical,
+                                                primary: false,
+                                                itemCount: entries.length,
+                                                itemBuilder: (context, index) {
+                                                  final e = entries[index],
+                                                      t = e.track;
+                                                  return MouseRegion(
+                                                      key: ValueKey(
+                                                          'download-row-${t.id}'),
+                                                      onEnter: (_) => setState(
+                                                          () =>
+                                                              _hovered = t.id),
+                                                      onExit: (_) {
+                                                        if (_hovered == t.id) {
+                                                          setState(() =>
+                                                              _hovered = null);
+                                                        }
+                                                      },
+                                                      child: _row([
+                                                        Checkbox(
+                                                            shape:
+                                                                const CircleBorder(),
+                                                            semanticLabel:
+                                                                'Selecionar download ${t.title}',
+                                                            value: selection
+                                                                .contains(t.id),
+                                                            onChanged: (v) =>
+                                                                onSelect(
+                                                                    t.id,
+                                                                    v ??
+                                                                        false)),
+                                                        Tooltip(
+                                                            message:
+                                                                '${t.localPath.isEmpty ? t.displayTitle : p.basename(t.localPath)} · ${e.collectionName} · Prioridade ${t.queuePriority}',
+                                                            child: Text(
+                                                                t.localPath
+                                                                        .isEmpty
+                                                                    ? t
+                                                                        .displayTitle
+                                                                    : p.basename(t
+                                                                        .localPath),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                    fontSize:
+                                                                        12))),
+                                                        const Text('—'),
+                                                        Tooltip(
+                                                            message: t
+                                                                    .sourceKind
+                                                                    .musicProviderName ??
+                                                                t.sourceLabel,
+                                                            child: Text(
+                                                                t.sourceKind
+                                                                        .musicProviderName ??
+                                                                    t
+                                                                        .sourceLabel,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                    fontSize:
+                                                                        12))),
+                                                        Tooltip(
+                                                            message: t.error
+                                                                    .isEmpty
+                                                                ? e.statusLabel
+                                                                : t.error,
+                                                            child: Text(
+                                                                t.id == activeId &&
+                                                                        paused
+                                                                    ? 'Pausado · 10 KiB/s'
+                                                                    : e
+                                                                        .statusLabel,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                    fontSize:
+                                                                        12))),
+                                                        const Text('—'),
+                                                        const Text('—'),
+                                                        const Text('—'),
+                                                        t.status ==
+                                                                TrackStatus
+                                                                    .completed
+                                                            ? const Text(
+                                                                'Concluído',
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: TextStyle(
+                                                                    fontSize:
+                                                                        12))
+                                                            : t.id == activeId
+                                                                ? LinearProgressIndicator(
+                                                                    value:
+                                                                        progress,
+                                                                    minHeight:
+                                                                        6)
+                                                                : const Text(
+                                                                    '—'),
+                                                        Tooltip(
+                                                            message: e.downloadedAt ==
+                                                                    null
+                                                                ? 'Sem registro de conclusão.'
+                                                                : 'Concluído em ${_completionLabel(e.downloadedAt!)} (horário local)',
+                                                            child: Text(
+                                                                e.downloadedAt ==
+                                                                        null
+                                                                    ? '—'
+                                                                    : _completionLabel(e
+                                                                        .downloadedAt!),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                    fontSize:
+                                                                        12))),
+                                                        Tooltip(
+                                                            message: t.localPath
+                                                                    .isEmpty
+                                                                ? output
+                                                                : p.dirname(t
+                                                                    .localPath),
+                                                            child: Text(
+                                                                t.localPath
+                                                                        .isEmpty
+                                                                    ? output
+                                                                    : p.dirname(t
+                                                                        .localPath),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                    fontSize:
+                                                                        12))),
+                                                      ],
+                                                          widths: widths,
+                                                          index: index,
+                                                          hovered:
+                                                              _hovered == t.id,
+                                                          selected: selection
+                                                                  .contains(
+                                                                      t.id) ||
+                                                              t.id ==
+                                                                  activeId));
+                                                })))))),
+                        const SizedBox(height: _rail),
+                      ])),
+                ])));
       });
   Widget _row(List<Widget> cells,
       {required List<double> widths,

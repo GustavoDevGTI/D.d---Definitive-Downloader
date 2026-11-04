@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'edit_track_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
-import '../../workspace/presentation/workspace_components.dart';
+import '../domain/track_listing.dart';
+import 'edit_track_dialog.dart';
 
 class TrackTable extends StatelessWidget {
   const TrackTable(
@@ -12,9 +12,8 @@ class TrackTable extends StatelessWidget {
   final LibraryController controller;
   final ValueChanged<Track> onFocus;
   @override
-  Widget build(BuildContext context) =>
-      LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 500;
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final compact = box.maxWidth < 500;
         final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
         return Column(children: [
           Container(
@@ -36,38 +35,50 @@ class TrackTable extends StatelessWidget {
                             ? null
                             : (_) => unawaited(controller.selectCollection(
                                 !controller.allFilteredSelected)))),
-                const Expanded(child: Text('Faixa / artista', style: _header)),
+                Expanded(child: _header('Faixa / artista', TrackSort.name)),
                 if (!compact) ...[
-                  const SizedBox(
-                      width: 58, child: Text('Duração', style: _header)),
-                  const SizedBox(
-                      width: 116,
-                      child: Text('Correspondência', style: _header)),
+                  SizedBox(
+                      width: 84, child: _header('Duração', TrackSort.duration)),
+                  SizedBox(
+                      width: 142,
+                      child:
+                          _header('Correspondência', TrackSort.correspondence))
                 ],
               ])),
           Expanded(
               child: controller.page.items.isEmpty
-                  ? const WorkspaceNotice(
-                      title: 'Nenhuma faixa nesta visualização.',
-                      message: 'Ajuste a pesquisa para conferir outras faixas.')
+                  ? const Center(
+                      child: Text('Nenhuma faixa neste filtro.',
+                          style:
+                              TextStyle(fontSize: 12, color: AppColors.muted)))
                   : ListView.builder(
                       primary: false,
                       itemExtent: (compact ? 102.0 : 80.0) * scale.clamp(1, 2),
                       itemCount: controller.page.items.length,
                       itemBuilder: (context, index) {
                         final t = controller.page.items[index];
+                        final focused = controller.focused?.id == t.id;
                         return Material(
-                            color: controller.focused?.id == t.id
-                                ? AppColors.accentSoft
-                                : Colors.white,
+                            key: ValueKey('track-row-${t.id}'),
+                            color: focused
+                                ? Color.lerp(
+                                    AppColors.accentSoft, AppColors.accent, .12)
+                                : t.needsReview
+                                    ? AppColors.accentSoft
+                                    : Colors.white,
                             child: InkWell(
                                 onTap: () => onFocus(t),
                                 child: Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6),
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                         border: Border(
-                                            bottom: BorderSide(
+                                            left: BorderSide(
+                                                width: 3,
+                                                color: t.needsReview
+                                                    ? AppColors.accentActive
+                                                    : Colors.transparent),
+                                            bottom: const BorderSide(
                                                 color: AppColors.line))),
                                     child: Row(children: [
                                       SizedBox(
@@ -83,7 +94,7 @@ class TrackTable extends StatelessWidget {
                                       Expanded(
                                           child: Padding(
                                               padding: const EdgeInsets.only(
-                                                  right: 10),
+                                                  right: 8),
                                               child: Column(
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.center,
@@ -91,6 +102,16 @@ class TrackTable extends StatelessWidget {
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Row(children: [
+                                                      if (t.needsReview)
+                                                        const Tooltip(
+                                                            message:
+                                                                'Conferir correspondência',
+                                                            child: Icon(
+                                                                Icons
+                                                                    .priority_high,
+                                                                size: 16,
+                                                                color: AppColors
+                                                                    .accentActive)),
                                                       if (t.hasManualSource)
                                                         const Padding(
                                                             padding:
@@ -111,11 +132,16 @@ class TrackTable extends StatelessWidget {
                                                               overflow:
                                                                   TextOverflow
                                                                       .ellipsis,
-                                                              style: const TextStyle(
+                                                              style: TextStyle(
                                                                   fontSize: 13,
                                                                   fontWeight:
                                                                       FontWeight
-                                                                          .w600))),
+                                                                          .w600,
+                                                                  color: t.needsReview
+                                                                      ? AppColors
+                                                                          .accentActive
+                                                                      : AppColors
+                                                                          .ink))),
                                                     ]),
                                                     Text(t.artist,
                                                         maxLines: 1,
@@ -138,80 +164,92 @@ class TrackTable extends StatelessWidget {
                                                                 .muted)),
                                                     if (compact)
                                                       Text(
-                                                          '${formatDuration(t.durationMs)} · ${t.matchStatus.label}',
+                                                          '${formatDuration(t.durationMs)} · ${t.needsReview ? 'Conferir' : t.matchStatus.label}',
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                           style: const TextStyle(
                                                               fontSize: 11,
                                                               color: AppColors
-                                                                  .accent)),
+                                                                  .accentActive)),
                                                   ]))),
-                                      PopupMenuButton<String>(
-                                          tooltip: controller
-                                                      .current?.editingLocked ==
-                                                  true
-                                              ? 'Nomes e ordem bloqueados após o início'
-                                              : 'Editar faixa',
-                                          enabled: !controller.busy &&
-                                              controller
-                                                      .current?.editingLocked !=
-                                                  true,
-                                          icon: const Icon(Icons.more_vert,
-                                              size: 19,
-                                              color: AppColors.accent),
-                                          onSelected: (action) {
-                                            if (action == 'edit') {
-                                              unawaited(showEditTrack(
-                                                  context, controller, t));
-                                            } else {
-                                              unawaited(controller.editTrack(t,
-                                                  name: t.displayTitle,
-                                                  position: t.position +
-                                                      (action == 'up'
-                                                          ? -1
-                                                          : 1)));
-                                            }
-                                          },
-                                          itemBuilder: (_) => [
-                                                const PopupMenuItem(
-                                                    value: 'edit',
-                                                    child: Text(
-                                                        'Editar nome, link / ID e posição')),
-                                                PopupMenuItem(
-                                                    value: 'up',
-                                                    enabled: t.position > 1,
-                                                    child: const Text(
-                                                        'Mover para cima')),
-                                                PopupMenuItem(
-                                                    value: 'down',
-                                                    enabled: t.position <
-                                                        (controller.current
-                                                                ?.trackCount ??
-                                                            0),
-                                                    child: const Text(
-                                                        'Mover para baixo')),
-                                              ]),
+                                      _edit(context, t),
                                       if (!compact) ...[
                                         SizedBox(
-                                            width: 58,
+                                            width: 84,
                                             child: Text(
                                                 formatDuration(t.durationMs),
                                                 style: const TextStyle(
                                                     fontSize: 11,
                                                     color: AppColors.muted))),
                                         SizedBox(
-                                            width: 116,
-                                            child: Text(t.matchStatus.label,
-                                                style: const TextStyle(
+                                            width: 142,
+                                            child: Text(
+                                                t.needsReview
+                                                    ? 'Conferir'
+                                                    : t.matchStatus.label,
+                                                style: TextStyle(
                                                     fontSize: 11,
-                                                    color: AppColors.accent))),
+                                                    color: t.needsReview
+                                                        ? AppColors.accentActive
+                                                        : AppColors.muted,
+                                                    fontWeight: t.needsReview
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w400))),
                                       ],
                                     ]))));
                       })),
         ]);
       });
-}
 
-const _header = TextStyle(
-    fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.muted);
+  Widget _header(String label, TrackSort sort) => Tooltip(
+      message: 'Ordenar por $label',
+      child: InkWell(
+          key: ValueKey('track-sort-${sort.name}'),
+          onTap: () => unawaited(controller.sortTracks(sort)),
+          child: SizedBox(
+              height: 44,
+              child: Row(children: [
+                Flexible(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w600))),
+                if (controller.trackSort == sort)
+                  Icon(
+                      controller.trackDescending
+                          ? Icons.arrow_downward
+                          : Icons.arrow_upward,
+                      size: 14,
+                      color: AppColors.accentActive),
+              ]))));
+
+  Widget _edit(BuildContext context, Track t) => PopupMenuButton<String>(
+      tooltip: controller.current?.editingLocked == true
+          ? 'Nomes e ordem bloqueados após o início'
+          : 'Editar faixa',
+      enabled: !controller.busy && controller.current?.editingLocked != true,
+      icon: const Icon(Icons.more_vert, size: 19, color: AppColors.accent),
+      onSelected: (action) {
+        if (action == 'edit') {
+          unawaited(showEditTrack(context, controller, t));
+        } else {
+          unawaited(controller.editTrack(t,
+              name: t.displayTitle,
+              position: t.position + (action == 'up' ? -1 : 1)));
+        }
+      },
+      itemBuilder: (_) => [
+            const PopupMenuItem(
+                value: 'edit', child: Text('Editar nome, link / ID e posição')),
+            PopupMenuItem(
+                value: 'up',
+                enabled: t.position > 1,
+                child: const Text('Mover para cima')),
+            PopupMenuItem(
+                value: 'down',
+                enabled: t.position < (controller.current?.trackCount ?? 0),
+                child: const Text('Mover para baixo'))
+          ]);
+}

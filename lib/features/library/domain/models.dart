@@ -139,6 +139,16 @@ class Track {
   final String mediaUrl;
   final SourceKind sourceKind;
   final TrackStatus status;
+  bool get needsReview =>
+      status != TrackStatus.completed &&
+      (matchStatus == MatchStatus.pending ||
+          matchStatus == MatchStatus.review ||
+          sourceKind == SourceKind.none);
+  bool get needsAutomaticMatching =>
+      status == TrackStatus.pending &&
+      matchStatus == MatchStatus.pending &&
+      sourceKind == SourceKind.none &&
+      !hasManualSource;
   final bool selected;
   final String localPath;
   final String error;
