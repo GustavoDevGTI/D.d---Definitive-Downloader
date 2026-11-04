@@ -26,7 +26,8 @@ class HeldDownload extends DownloadService {
   final release = Completer<void>();
   @override
   Future<String> save(Track track, String directory, DownloadCancellation token,
-      void Function(double?) progress) async {
+      void Function(double?) progress,
+      {void Function(TransferProgress)? onTransfer}) async {
     started.complete();
     await release.future;
     if (cleanupFails) throw const FileSystemException('Deletion failed');
@@ -42,13 +43,15 @@ class GatedDownload extends DownloadService {
   final ids = <int>[];
   @override
   Future<String> save(Track track, String directory, DownloadCancellation token,
-      void Function(double?) progress) async {
+      void Function(double?) progress,
+      {void Function(TransferProgress)? onTransfer}) async {
     ids.add(track.id);
     if (ids.length == 1) {
       started.complete();
       await release.future;
     }
-    return super.save(track, directory, token, progress);
+    return super
+        .save(track, directory, token, progress, onTransfer: onTransfer);
   }
 }
 
@@ -110,6 +113,8 @@ void main() {
     expect(controller.current!.id, currentId);
     expect(controller.downloading, isFalse);
     expect(controller.activeTrackId, isNull);
+    expect(controller.message, isEmpty,
+        reason: 'Sucesso na fila não abre aviso modal.');
     expect((await WorkspaceRepository(repository.database).summary()).completed,
         3);
     for (final id in [first[0].id, first[2].id, second[1].id]) {
@@ -129,6 +134,8 @@ void main() {
     expect(playlists.length, 2);
     final list = await File(playlists.first.path).readAsString();
     expect(list, contains('#EXTM3U'));
+    expect(
+        list, contains('${first[0].outputTitle} - ${first[0].outputArtist}'));
   });
   test(
       'cancelamento da fila preserva registros e deixa item pronto para nova tentativa',

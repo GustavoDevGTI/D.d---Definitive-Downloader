@@ -180,6 +180,7 @@ class LibraryController extends ChangeNotifier {
   bool downloading = false;
   bool preparing = false;
   double? progress;
+  TransferProgress? transfer;
   String activeTitle = '';
   DownloadCancellation? _cancellation;
   bool get pauseMode => downloading && _cancellation?.pauseMode == true;
@@ -723,15 +724,20 @@ class LibraryController extends ChangeNotifier {
             '${safeSegment(owner.outputFolderName)} [${owner.id}]');
         destinations[owner.id] = directory;
         activeTrackId = track.id;
-        activeTitle = track.displayTitle;
+        activeTitle = track.downloadName;
         progress = null;
+        transfer = null;
         await refresh();
         try {
           Future<String> receive(Track item) async {
+            transfer = null;
             try {
               final path =
                   await downloader.save(item, directory, token, (value) {
                 progress = value;
+                notifyListeners();
+              }, onTransfer: (value) {
+                transfer = value;
                 notifyListeners();
               });
               await repository.recordMusicAttempt(item.id, item.sourceKind,
@@ -816,7 +822,9 @@ class LibraryController extends ChangeNotifier {
           ? 'Transferência interrompida. Os arquivos concluídos foram preservados.'
           : saved == 0 && failed == 0
               ? 'Selecione faixas com uma fonte vinculada. Itens já salvos não são baixados novamente.'
-              : '$saved arquivo(s) salvo(s) com metadados. $failed falha(s). Playlist M3U8 na pasta da coleção.';
+              : failed > 0
+                  ? '$failed download(s) com falha. Confira os itens marcados com erro.'
+                  : '';
       if (reviewVideos > 0) {
         message +=
             ' $reviewVideos videoclipe(s) aguardando aprovação na coleção.';
@@ -835,6 +843,7 @@ class LibraryController extends ChangeNotifier {
       activeTitle = '';
       activeTrackId = null;
       progress = null;
+      transfer = null;
       _cancellation = null;
       await refresh();
     }

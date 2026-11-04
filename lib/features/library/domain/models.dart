@@ -119,6 +119,12 @@ class Track {
   final String customTitle, recordingType;
   final SourceAuthorization sourceAuthorization;
   String get displayTitle => customTitle.isEmpty ? title : customTitle;
+  String get downloadArtist => artist.isEmpty ? outputArtist : artist;
+  String get downloadName {
+    final author = downloadArtist;
+    return author.isEmpty ? displayTitle : '$displayTitle — $author';
+  }
+
   final int queuePriority;
   final MatchStatus matchStatus;
   final String manualUrl;

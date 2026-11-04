@@ -7,7 +7,9 @@ import '../downloads/download_service.dart';
 abstract interface class MusicEngine {
   bool get available;
   Future<Map<String, dynamic>> call(Map<String, dynamic> request,
-      {DownloadCancellation? cancellation, void Function(String)? onStage});
+      {DownloadCancellation? cancellation,
+      void Function(String)? onStage,
+      void Function(TransferProgress)? onProgress});
 }
 
 class WindowsMusicEngine implements MusicEngine {
@@ -24,7 +26,8 @@ class WindowsMusicEngine implements MusicEngine {
   @override
   Future<Map<String, dynamic>> call(Map<String, dynamic> request,
       {DownloadCancellation? cancellation,
-      void Function(String)? onStage}) async {
+      void Function(String)? onStage,
+      void Function(TransferProgress)? onProgress}) async {
     if (!available) {
       throw const FormatException(
           'O motor musical não está instalado nesta plataforma.');
@@ -104,6 +107,8 @@ class WindowsMusicEngine implements MusicEngine {
               if (message is String && message.length <= 200) {
                 onStage?.call(message);
               }
+            } else if (event['event'] == 'progress') {
+              onProgress?.call(TransferProgress.fromEvent(event));
             } else if (event['event'] == 'result' && !result.isCompleted) {
               result
                   .complete(Map<String, dynamic>.from(event['result'] as Map));

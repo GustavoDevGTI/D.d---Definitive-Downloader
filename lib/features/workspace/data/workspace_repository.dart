@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 import '../../../core/storage/database.dart';
@@ -56,12 +57,6 @@ class WorkspaceRepository {
               function: (a, b) =>
                   (a ?? '').toLowerCase().compareTo((b ?? '').toLowerCase()));
           db.createFunction(
-              functionName: 'download_basename',
-              argumentCount: const AllowedArgumentCount(1),
-              deterministic: true,
-              function: (args) => p.posix
-                  .basename((args.first as String).replaceAll(r'\', '/')));
-          db.createFunction(
               functionName: 'download_folder',
               argumentCount: const AllowedArgumentCount(1),
               deterministic: true,
@@ -71,7 +66,7 @@ class WorkspaceRepository {
                       .dirname((args.first as String).replaceAll(r'\', '/')));
           final expression = switch (sort) {
             DownloadSort.name =>
-              "CASE WHEN t.local_path!='' THEN download_basename(t.local_path) ELSE COALESCE(NULLIF(t.custom_title,''),t.title) END COLLATE download_text",
+              "(COALESCE(NULLIF(t.custom_title,''),t.title) || ' — ' || COALESCE(NULLIF(t.artist,''),t.resolved_artist)) COLLATE download_text",
             DownloadSort.provider =>
               "CASE t.source_kind WHEN 'none' THEN 'A conferir' WHEN 'localExample' THEN 'Exemplo local' WHEN 'directMp3' THEN 'MP3 vinculado' WHEN 'preview' THEN 'Prévia Deezer' WHEN 'deezerFull' THEN 'Deezer' WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'youtube' THEN 'YouTube' ELSE t.source_kind END COLLATE download_text",
             DownloadSort.status =>
@@ -97,6 +92,20 @@ class WorkspaceRepository {
                         _readCompletionDate(r['downloaded_at'] as String?)))
                 .toList(),
             count);
+      }).then((page) async {
+        // Bounded to the current page; asynchronous disk checks never run in widgets.
+        final entries = await Future.wait(page.items.map((entry) async {
+          final track = entry.track;
+          int? size;
+          if (track.status == TrackStatus.completed &&
+              track.localPath.isNotEmpty) {
+            final stat = await FileStat.stat(track.localPath);
+            if (stat.type == FileSystemEntityType.file) size = stat.size;
+          }
+          return DownloadEntry(track, entry.collectionName,
+              downloadedAt: entry.downloadedAt, fileBytes: size);
+        }));
+        return DownloadPage(entries, page.total);
       });
 
   static DateTime? _readCompletionDate(String? value) {

@@ -92,7 +92,7 @@ void main() {
           "UPDATE tracks SET source_kind='directMp3',media_url='https://example.org/a.mp3',title='Zulu',custom_title='Alpha',status='ready' WHERE id=?",
           [rows[0].id]);
       db.execute(
-          "UPDATE tracks SET source_kind='deezerFull',media_url='https://example.org/b.mp3',title='Alpha',status='completed',local_path=? WHERE id=?",
+          "UPDATE tracks SET source_kind='deezerFull',media_url='https://example.org/b.mp3',title='Beta',status='completed',local_path=? WHERE id=?",
           [r'C:\Zulu\beta.mp3', rows[1].id]);
       db.execute(
           "UPDATE tracks SET source_kind='youtubeMusic',media_url='https://example.org/c.mp3',title='Charlie',status='failed',local_path='/Alpha/zeta.mp3' WHERE id=?",
@@ -116,6 +116,30 @@ void main() {
     final filtered = await workspace.downloads(ContentCategory.music,
         filter: DownloadFilter.completed, sort: DownloadSort.name);
     expect(filtered.items.single.track.id, rows[1].id);
+  });
+
+  test('tamanho vem do arquivo real e nome fica título antes do artista',
+      () async {
+    final rows = await seed(2);
+    final file = File('${directory.path}/001 - Artista - Nome antigo.mp3');
+    await file.writeAsBytes(List.filled(8192, 0));
+    await library.setStatus(rows[0].id, TrackStatus.completed,
+        localPath: file.path);
+    await library.database.run((db) {
+      db.execute(
+          "UPDATE tracks SET source_kind='directMp3' WHERE collection_id=?",
+          [rows[0].collectionId]);
+    });
+    var page = await workspace.downloads(ContentCategory.music);
+    expect(page.items.first.fileBytes, 8192);
+    expect(page.items.first.track.downloadName, 'Repetida — Pessoa');
+    expect(page.items.last.track.downloadName, 'Repetida — Pessoa');
+    expect(page.items.last.fileBytes, isNull);
+    await file.delete();
+    page = await workspace.downloads(ContentCategory.music);
+    expect(page.total, 2);
+    expect(page.items.first.fileBytes, isNull);
+    expect(page.items.first.track.localPath, file.path);
   });
 
   test(

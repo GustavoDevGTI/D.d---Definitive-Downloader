@@ -13,7 +13,8 @@ class EmptyEngine implements MusicEngine {
   @override
   Future<Map<String, dynamic>> call(Map<String, dynamic> request,
           {DownloadCancellation? cancellation,
-          void Function(String)? onStage}) async =>
+          void Function(String)? onStage,
+          void Function(TransferProgress)? onProgress}) async =>
       {};
 }
 
@@ -46,7 +47,8 @@ class SearchPolicyEngine extends EmptyEngine {
   @override
   Future<Map<String, dynamic>> call(Map<String, dynamic> request,
       {DownloadCancellation? cancellation,
-      void Function(String)? onStage}) async {
+      void Function(String)? onStage,
+      void Function(TransferProgress)? onProgress}) async {
     final provider = request['provider'] as String;
     providers.add(provider);
     return {

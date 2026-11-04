@@ -12,7 +12,8 @@ class MusicDownloadService {
   final DeezerConnectionController connection;
 
   Future<String> save(Track track, String directory, DownloadCancellation token,
-      void Function(String) onStage) async {
+      void Function(String) onStage,
+      {void Function(TransferProgress)? onTransfer}) async {
     final candidate = Candidate(
         title: track.resolvedTitle.isEmpty ? track.title : track.resolvedTitle,
         artist: track.outputArtist,
@@ -50,8 +51,15 @@ class MusicDownloadService {
       if (track.sourceKind == SourceKind.deezerFull) {
         request['arl'] = await connection.sessionForDownload();
       }
+      TransferProgress? latest;
       final result =
-          await engine.call(request, cancellation: token, onStage: onStage);
+          await engine.call(request, cancellation: token, onProgress: (value) {
+        latest = value;
+        onTransfer?.call(value);
+      }, onStage: (stage) {
+        if (latest != null) onTransfer?.call(latest!.asProcessing());
+        onStage(stage);
+      });
       token.check();
       final actual = parseMusicCandidate(
           Map<String, dynamic>.from(result['actual'] as Map));
@@ -81,7 +89,7 @@ class MusicDownloadService {
             'O motor não entregou um arquivo validado.');
       }
       final name =
-          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(actual.artist)} - ${safeSegment(track.customTitle.isEmpty ? actual.title : track.customTitle)}${actual.kind.musicProviderSuffix}';
+          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(track.customTitle.isEmpty ? actual.title : track.customTitle)} - ${safeSegment(actual.artist)}${actual.kind.musicProviderSuffix}';
       var output = File(p.join(folder.path, '$name.mp3'));
       if (await output.exists()) {
         output = File(p.join(folder.path, '$name [${track.id}].mp3'));

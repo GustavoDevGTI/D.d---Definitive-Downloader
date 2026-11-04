@@ -254,7 +254,9 @@ void main() {
                           onSelectPage: (_) {},
                           output: 'C:/Fixture'))))));
       await tester.pumpAndSettle();
-      expect(find.textContaining('03/11/2026'), findsOneWidget);
+      final label =
+          tester.widget<Text>(find.textContaining('03/11/2026')).data!;
+      expect(label, matches(RegExp(r'^03/11/2026 \d{2}:\d{2}$')));
       expect(find.byTooltip('Sem registro de conclusão.'), findsOneWidget);
       final header = find.byKey(const ValueKey('sort-download-downloadedAt'));
       await tester.ensureVisible(header);

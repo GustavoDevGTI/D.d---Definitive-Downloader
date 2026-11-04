@@ -96,6 +96,9 @@ def search_videos(query):
     return result
 
 
+from transfer_progress import TransferProgress
+
+
 class QuietLogger:
     def debug(self, *_): pass
     def warning(self, *_): pass
@@ -112,6 +115,7 @@ def download(candidate, directory, ffmpeg, control=None, authorization='catalog'
     check_duration(int(details.get('lengthSeconds') or 0) * 1000, candidate['durationMs'])
     emit('stage', message='Recebendo áudio do YouTube')
     received = 0
+    meter = TransferProgress()
     def progress(info):
         nonlocal received
         current = int(info.get('downloaded_bytes') or 0)
@@ -119,6 +123,10 @@ def download(candidate, directory, ffmpeg, control=None, authorization='catalog'
         if control is not None:
             control.consume(max(0, current - received))
         received = current
+        exact = info.get('total_bytes')
+        total = exact or info.get('total_bytes_estimate')
+        meter.update(current, int(total) if total else None,
+                     estimated=not bool(exact), force=info.get('status') == 'finished')
         if info.get('status') == 'finished':
             emit('stage', message='Validando áudio e capa')
     options = {

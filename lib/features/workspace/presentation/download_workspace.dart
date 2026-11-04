@@ -222,6 +222,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                   onSelectPage: c.selectPage,
                                   activeId: library.activeTrackId,
                                   progress: library.progress,
+                                  transfer: library.transfer,
                                   paused: library.pauseMode,
                                   output: library.outputDirectory))),
                   if (wide)

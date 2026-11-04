@@ -27,8 +27,17 @@ void main() {
           mediaUrl: '$base/tone.mp3',
           coverUrl: '$base/cover.png',
           kind: SourceKind.directMp3);
-      final path = await DownloadService(const BoundedHttp(), rootBundle)
-          .save(track, directory.path, DownloadCancellation(), (_) {});
+      final measurements = <TransferProgress>[];
+      final path = await DownloadService(const BoundedHttp(), rootBundle).save(
+          track, directory.path, DownloadCancellation(), (_) {},
+          onTransfer: measurements.add);
+      expect(measurements.first.received, 0);
+      expect(measurements.last.received,
+          await File('assets/demo/tone.mp3').length());
+      expect(measurements.last.total, measurements.last.received);
+      expect(measurements.last.processing, isTrue);
+      expect(measurements.last.remaining, isNull);
+      expect(path, contains('${track.outputTitle} - ${track.outputArtist}'));
       final bytes = await File(path).readAsBytes();
       expect(String.fromCharCodes(bytes.take(3)), 'ID3');
       expect(String.fromCharCodes(bytes).contains('APIC'), true);
@@ -40,6 +49,34 @@ void main() {
       await server.close(force: true);
       await directory.delete(recursive: true);
     }
+  });
+  test('progresso sem tamanho não inventa porcentagem nem tempo', () {
+    final measured =
+        TransferProgress.fromEvent({'received': 1024, 'bytesPerSecond': 2048});
+    expect(measured.fraction, isNull);
+    expect(measured.remaining, isNull);
+    final known = TransferProgress.fromEvent({
+      'received': 1024,
+      'total': 5120,
+      'bytesPerSecond': 2048,
+      'estimatedTotal': true
+    });
+    expect(known.fraction, .2);
+    expect(known.remaining, const Duration(seconds: 2));
+    expect(known.estimatedTotal, isTrue);
+    expect(known.asProcessing().fraction, isNull);
+    expect(known.asProcessing().remaining, isNull);
+    for (final invalid in [-1, '1024', 600 * 1024 * 1024]) {
+      expect(() => TransferProgress.fromEvent({'received': invalid}),
+          throwsFormatException);
+    }
+    expect(
+        TransferProgress.fromEvent({
+          'received': 12,
+          'total': 10,
+          'bytesPerSecond': double.infinity
+        }).total,
+        isNull);
   });
   test('não publica HTML disfarçado de MP3', () async {
     final directory = await Directory.systemTemp.createTemp('dd-download-');

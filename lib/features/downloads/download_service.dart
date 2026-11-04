@@ -6,6 +6,8 @@ import '../../core/network/bounded_http.dart';
 import '../library/domain/models.dart';
 import 'mp3_tags.dart';
 import 'music_download_service.dart';
+import 'transfer_progress.dart';
+export 'transfer_progress.dart';
 
 class DownloadCancelled implements Exception {
   const DownloadCancelled();
@@ -59,7 +61,8 @@ class DownloadService {
   final MusicDownloadService? music;
 
   Future<String> save(Track track, String directory, DownloadCancellation token,
-      void Function(double? fraction) progress) async {
+      void Function(double? fraction) progress,
+      {void Function(TransferProgress)? onTransfer}) async {
     if (!track.canDownload) {
       throw const FormatException(
           'A fonte precisa de revisão ou ainda não tem suporte para download.');
@@ -70,13 +73,17 @@ class DownloadService {
       if (music == null) {
         throw const FormatException('O motor musical não está disponível.');
       }
-      return music!.save(track, directory, token, (_) => progress(null));
+      return music!.save(track, directory, token, (_) => progress(null),
+          onTransfer: (value) {
+        onTransfer?.call(value);
+        progress(value.fraction);
+      });
     }
     final folder = Directory(directory);
     await folder.create(recursive: true);
     final suffix = track.sourceKind == SourceKind.preview ? ' (prévia)' : '';
     final name =
-        '${track.position.toString().padLeft(3, '0')} - ${safeSegment(track.outputArtist)} - ${safeSegment(track.outputTitle)}$suffix.mp3';
+        '${track.position.toString().padLeft(3, '0')} - ${safeSegment(track.outputTitle)} - ${safeSegment(track.outputArtist)}$suffix.mp3';
     var destination = File(p.join(folder.path, name));
     if (await destination.exists()) {
       destination = File(p.join(folder.path,
@@ -89,6 +96,13 @@ class DownloadService {
     final partial = File('${destination.path}.part');
     final tagged = File('${destination.path}.tagging');
     token.check();
+    TransferProgress? latest;
+    void report(TransferProgress value) {
+      latest = value;
+      onTransfer?.call(value);
+      progress(value.fraction);
+    }
+
     if (track.mediaUrl.startsWith('asset:')) {
       if (track.sourceKind != SourceKind.localExample ||
           track.mediaUrl != 'asset:assets/demo/tone.mp3') {
@@ -97,11 +111,13 @@ class DownloadService {
       final data = await bundle.load(track.mediaUrl.substring(6));
       await partial.writeAsBytes(
           data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
-      progress(1);
+      report(TransferProgress(
+          received: data.lengthInBytes, total: data.lengthInBytes));
     } else {
-      await _receive(Uri.parse(track.mediaUrl), partial, token, progress);
+      await _receive(Uri.parse(track.mediaUrl), partial, token, report);
     }
     token.check();
+    if (latest != null) report(latest!.asProcessing());
     Uint8List? cover;
     final coverUrl = track.resolvedCoverUrl.isEmpty
         ? track.coverUrl
@@ -126,7 +142,7 @@ class DownloadService {
   }
 
   Future<void> _receive(Uri uri, File destination, DownloadCancellation token,
-      void Function(double?) progress) async {
+      void Function(TransferProgress) progress) async {
     validateHttpUrl(uri);
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
@@ -157,6 +173,10 @@ class DownloadService {
         }
         output = destination.openWrite();
         var received = 0;
+        final meter = TransferMeter();
+        final total =
+            response.contentLength > 0 ? response.contentLength : null;
+        progress(meter.sample(0, total: total));
         var lastUpdate = DateTime.now();
         await for (final chunk
             in response.timeout(const Duration(seconds: 20))) {
@@ -168,9 +188,7 @@ class DownloadService {
           }
           output.add(chunk);
           if (DateTime.now().difference(lastUpdate).inMilliseconds > 200) {
-            progress(response.contentLength > 0
-                ? received / response.contentLength
-                : null);
+            progress(meter.sample(received, total: total));
             lastUpdate = DateTime.now();
           }
           // Flush applies backpressure rather than accumulating a large file in memory.
@@ -180,7 +198,7 @@ class DownloadService {
         if (response.contentLength > 0 && received != response.contentLength) {
           throw const HttpException('O arquivo recebido está incompleto.');
         }
-        progress(1);
+        progress(meter.sample(received, total: total));
         return;
       }
       throw const HttpException('Muitos redirecionamentos.');

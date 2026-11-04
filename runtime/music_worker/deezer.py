@@ -6,6 +6,7 @@ from urllib.parse import urlparse, urljoin
 import requests
 from common import MusicError, allowed_url, bounded_response, clean_text, emit, identifier, json_response
 from deezer_audio import decoded_blocks
+from transfer_progress import TransferProgress
 
 
 def catalog_track(row):
@@ -106,6 +107,10 @@ class DeezerSession:
                 if r.status_code != 200:
                     raise MusicError('A Deezer recusou o fluxo de áudio.')
                 received = 0
+                expected = r.headers.get('Content-Length', '')
+                total = int(expected) if expected.isdigit() else None
+                meter = TransferProgress()
+                meter.update(0, total, force=True)
                 def bounded_chunks():
                     nonlocal received
                     for chunk in r.iter_content(65536):
@@ -114,13 +119,14 @@ class DeezerSession:
                         received += len(chunk)
                         if received > 80_000_000:
                             raise MusicError('O áudio ultrapassou o limite de tamanho.')
+                        meter.update(received, total)
                         yield chunk
                 with path.open('xb') as target:
                     for block in decoded_blocks(bounded_chunks(), track_id):
                         target.write(block)
-                expected = r.headers.get('Content-Length', '')
                 if expected.isdigit() and received != int(expected):
                     raise MusicError('O arquivo recebido está incompleto.')
+                meter.update(received, total, force=True)
                 actual = dict(candidate)
                 actual.update(title=clean_text(row.get('SNG_TITLE')), artist=clean_text(row.get('ART_NAME')),
                               album=clean_text(row.get('ALB_TITLE')))

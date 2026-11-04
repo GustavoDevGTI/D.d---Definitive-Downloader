@@ -35,7 +35,8 @@ class LinkSearchEngine implements MusicEngine {
   @override
   Future<Map<String, dynamic>> call(Map<String, dynamic> request,
       {DownloadCancellation? cancellation,
-      void Function(String)? onStage}) async {
+      void Function(String)? onStage,
+      void Function(TransferProgress)? onProgress}) async {
     providers.add(request['provider'] as String);
     return {
       'candidates': request['provider'] != 'youtubeMusic'

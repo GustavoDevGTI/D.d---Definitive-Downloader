@@ -7,7 +7,9 @@ enum ContentCategory { music, media }
 enum DownloadFilter { all, downloading, queued, paused, completed, failed }
 
 class DownloadEntry {
-  const DownloadEntry(this.track, this.collectionName, {this.downloadedAt});
+  const DownloadEntry(this.track, this.collectionName,
+      {this.downloadedAt, this.fileBytes});
+  final int? fileBytes;
   final DateTime? downloadedAt;
   final Track track;
   final String collectionName;
