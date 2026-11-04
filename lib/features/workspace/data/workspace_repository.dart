@@ -4,6 +4,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../../core/storage/database.dart';
 import '../../library/data/library_repository.dart';
 import '../../library/domain/models.dart';
+import '../../downloads/run_order.dart';
 import '../domain/workspace_models.dart';
 import '../domain/download_columns.dart';
 
@@ -169,6 +170,34 @@ class WorkspaceRepository {
                 "UPDATE tracks SET queue_priority=MIN(4,MAX(-4,queue_priority+?)) WHERE id=? AND queue_hidden=0 AND status IN ('ready','failed')",
                 [delta, id]);
           }
+          final runs = ids.isEmpty
+              ? <Map<String, Object?>>[]
+              : db.select(
+                  'SELECT DISTINCT run FROM download_run_additions WHERE track_id IN (${List.filled(ids.length, '?').join(',')})',
+                  ids);
+          for (final run in runs) {
+            final members = db.select(
+                '''SELECT a.*,t.queue_priority,t.collection_id,t.position
+                FROM download_run_additions a JOIN tracks t ON t.id=a.track_id
+                WHERE a.run=? AND t.queue_run!=? AND t.status IN ('ready','failed')
+                ORDER BY a.ordinal LIMIT 10001''', [run['run'], run['run']]);
+            if (members.length > 10000) {
+              throw const FormatException(
+                  'Limite de 10.000 faixas por execução.');
+            }
+            final order = [...members]..sort((a, b) {
+                final priority = (b['queue_priority'] as int)
+                    .compareTo(a['queue_priority'] as int);
+                if (priority != 0) return priority;
+                final owner = (a['collection_id'] as int)
+                    .compareTo(b['collection_id'] as int);
+                return owner != 0
+                    ? owner
+                    : (a['position'] as int).compareTo(b['position'] as int);
+              });
+            reassignRunSlots(
+                db, members, order.map((r) => r['track_id'] as int).toList());
+          }
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');
@@ -194,7 +223,7 @@ class WorkspaceRepository {
         }
       });
 
-  Future<Track?> claimNext(
+  Future<void> beginRun(
           {required String run,
           List<int>? ids,
           int? collectionId,
@@ -203,26 +232,81 @@ class WorkspaceRepository {
         if (run.isEmpty ||
             (ids == null && collectionId == null) ||
             (ids != null && (ids.isEmpty || ids.length > 100))) {
+          throw const FormatException('Seleção de execução inválida.');
+        }
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          if (db.select(
+              'SELECT 1 FROM download_run_additions WHERE run=? LIMIT 1',
+              [run]).isNotEmpty) {
+            throw const FormatException('Esta execução já foi iniciada.');
+          }
+          final scope = ids == null
+              ? 'collection_id=? AND selected=1'
+              : 'id IN (${List.filled(ids.length, '?').join(',')})';
+          final rows = db.select('''SELECT id FROM tracks WHERE ($scope)
+        AND queue_hidden=0 AND source_kind!='none' AND match_status!='review'
+        AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo'))
+        AND NOT(manual_url!='' AND manual_mode='extractAudio')
+        AND status IN ('ready','failed') ${failedOnly ? "AND status='failed'" : ''}
+        ORDER BY queue_priority DESC,collection_id,position,id LIMIT 10001''',
+              [if (ids == null) collectionId else ...ids]);
+          if (rows.length > 10000) {
+            throw const FormatException(
+                'Limite de 10.000 faixas por execução.');
+          }
+          final insert = db.prepare(
+              'INSERT INTO download_run_additions(run,track_id) VALUES(?,?)');
+          try {
+            for (final row in rows) {
+              insert.execute([run, row['id']]);
+            }
+          } finally {
+            insert.dispose();
+          }
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
+
+  Future<Track?> claimNext(
+          {required String run,
+          List<int>? ids,
+          int? collectionId,
+          bool failedOnly = false,
+          bool snapshot = false}) =>
+      database.run((db) {
+        if (run.isEmpty ||
+            (!snapshot && ids == null && collectionId == null) ||
+            (ids != null && (ids.isEmpty || ids.length > 100))) {
           return null;
         }
         final selection = ids == null
             ? 't.collection_id=? AND t.selected=1'
             : 't.id IN (${List.filled(ids.length, '?').join(',')})';
+        final scope = snapshot
+            ? 'a.track_id IS NOT NULL'
+            : '(($selection) OR a.track_id IS NOT NULL)';
         db.execute('BEGIN IMMEDIATE');
         try {
           final rows = db.select('''SELECT t.* FROM tracks t
         LEFT JOIN download_run_additions a ON a.track_id=t.id AND a.run=?
         WHERE t.queue_run!=? AND t.queue_hidden=0
-        AND (($selection) OR a.track_id IS NOT NULL)
+        AND $scope
         AND t.source_kind!='none' AND t.match_status!='review'
         AND (t.source_kind!='youtube' OR t.source_authorization IN ('manualLink','approvedVideo'))
         AND NOT(t.manual_url!='' AND t.manual_mode='extractAudio')
         AND t.status IN ('ready','failed')
         ${failedOnly ? "AND (t.status='failed' OR a.track_id IS NOT NULL)" : ''}
-        ORDER BY (a.track_id IS NOT NULL),
+        ORDER BY ${snapshot ? 'a.ordinal,' : ''} (a.track_id IS NOT NULL),
           CASE WHEN a.track_id IS NULL THEN t.queue_priority END DESC,
-          a.ordinal,t.collection_id,t.position LIMIT 1''',
-              [run, run, if (ids == null) collectionId else ...ids]);
+          a.ordinal,t.collection_id,t.position LIMIT 1''', [
+            run,
+            run,
+            if (!snapshot) ...[if (ids == null) collectionId else ...ids]
+          ]);
           Track? track;
           if (rows.isNotEmpty) {
             track = LibraryRepository.readTrack(rows.first);

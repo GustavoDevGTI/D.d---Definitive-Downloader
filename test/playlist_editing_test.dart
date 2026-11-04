@@ -157,18 +157,20 @@ void main() {
         throwsFormatException);
     await library.setStatus(rows[2].id, TrackStatus.ready);
     await library.database.initialize();
-    expect((await library.trackById(rows[2].id))!.orderLocked, isTrue);
-    await expectLater(
-        editor.move(owner, rows[2].id, targetId: rows[1].id, after: true),
-        throwsFormatException);
+    expect((await library.trackById(rows[2].id))!.orderLocked, isFalse);
+    await editor.move(owner, rows[2].id, targetId: rows[1].id, after: true);
+    expect((await library.trackById(rows[2].id))!.position, 3);
   });
-  test('não cruza posições já iniciadas nem move seleção que as inclua',
+  test('cruza uma concluída sem deslocá-la; seleção com concluída é recusada',
       () async {
     final rows = (await library.page(owner, limit: 100)).items;
-    await queue.claimNext(run: 'fixed', ids: [rows[2].id]);
-    await expectLater(
-        editor.move(owner, rows[1].id, targetId: rows[3].id, after: true),
-        throwsFormatException);
+    await library.setStatus(rows[2].id, TrackStatus.completed,
+        localPath: '${temp.path}/fixed.mp3');
+    await editor.move(owner, rows[1].id, targetId: rows[3].id, after: true);
+    final changed = (await library.page(owner, limit: 100)).items;
+    expect(changed.take(4).map((t) => t.id),
+        [rows[0].id, rows[3].id, rows[2].id, rows[1].id]);
+    expect(changed[2].position, 3);
     await library.select(rows[2].id, true);
     await library.select(rows[3].id, true);
     await expectLater(
@@ -176,7 +178,7 @@ void main() {
             targetId: rows[4].id, after: true, selectedGroup: true),
         throwsFormatException);
     expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
-        rows.map((t) => t.id));
+        changed.map((t) => t.id));
   });
   test(
       'reordena extras nos seus slots globais sem mudar a posição de outra coleção',
@@ -192,7 +194,8 @@ void main() {
             mediaUrl: 'https://example.org/a.mp3',
             sourceKind: SourceKind.directMp3))));
     final otherId = (await library.page(other)).items.single.id;
-    await queue.claimNext(run: 'extras', ids: [rows[0].id]);
+    await queue.beginRun(run: 'extras', ids: [rows[0].id, rows[1].id]);
+    await queue.claimNext(run: 'extras', snapshot: true);
     await library.database.run((db) {
       for (final id in [rows[83].id, otherId, rows[84].id]) {
         db.execute(
@@ -201,15 +204,32 @@ void main() {
       }
     });
     await editor.move(owner, rows[84].id, targetId: rows[83].id, after: false);
-    await expectLater(
-        editor.move(owner, rows[84].id, targetId: rows[1].id, after: false),
-        throwsFormatException);
+    await editor.move(owner, rows[84].id, targetId: rows[1].id, after: false);
     final claimed = <int>[];
-    for (var i = 0; i < 3; i++) {
-      claimed
-          .add((await queue.claimNext(run: 'extras', ids: [rows[0].id]))!.id);
+    for (var i = 0; i < 4; i++) {
+      claimed.add((await queue.claimNext(run: 'extras', snapshot: true))!.id);
     }
-    expect(claimed, [rows[84].id, otherId, rows[83].id]);
+    expect(claimed, [rows[84].id, rows[1].id, otherId, rows[83].id]);
+  });
+  test('troca posições 1 e 3 mantendo a concluída 2 e seu arquivo intactos',
+      () async {
+    final rows = (await library.page(owner, limit: 100)).items;
+    final file = File('${temp.path}/002 - fixa.mp3');
+    await file.writeAsBytes([1, 2, 3, 4]);
+    await library.setStatus(rows[1].id, TrackStatus.completed,
+        localPath: file.path);
+    await library.setStatus(rows[2].id, TrackStatus.failed);
+    await editor.move(owner, rows[2].id, targetId: rows[0].id, after: false);
+    final after = (await library.page(owner, limit: 100)).items;
+    expect(
+        after.take(3).map((t) => t.id), [rows[2].id, rows[1].id, rows[0].id]);
+    expect(after[1].position, 2);
+    expect(after[1].localPath, file.path);
+    expect(await file.readAsBytes(), [1, 2, 3, 4]);
+    await library.database.initialize();
+    expect(
+        (await library.page(owner, limit: 100)).items.take(3).map((t) => t.id),
+        after.take(3).map((t) => t.id));
   });
   test(
       'move através de páginas em ambos os sentidos preservando repetições e identidade',

@@ -272,7 +272,6 @@ class LibraryRepository {
       sourceAuthorization: SourceAuthorization.values
           .byName(r['source_authorization'] as String? ?? 'catalog'),
       queuePriority: r['queue_priority'] as int? ?? 0,
-      transferRun: r['queue_run'] as String? ?? '',
       id: r['id'] as int,
       collectionId: r['collection_id'] as int,
       position: r['position'] as int,

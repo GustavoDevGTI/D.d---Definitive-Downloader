@@ -115,7 +115,6 @@ class Track {
       this.manualMode = ManualSourceMode.originalAudio,
       this.resolvedCoverUrl = '',
       this.queuePriority = 0,
-      this.transferRun = '',
       this.customTitle = '',
       this.recordingType = '',
       this.sourceAuthorization = SourceAuthorization.catalog});
@@ -129,12 +128,8 @@ class Track {
   }
 
   final int queuePriority;
-  final String transferRun;
-  bool get orderLocked => trackOrderLocked(
-      status: status.name,
-      run: transferRun,
-      localPath: localPath,
-      error: error);
+  bool get orderLocked =>
+      trackOrderLocked(status: status.name, localPath: localPath);
   final MatchStatus matchStatus;
   final String manualUrl;
   final ManualSourceMode manualMode;

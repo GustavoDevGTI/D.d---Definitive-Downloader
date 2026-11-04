@@ -52,7 +52,7 @@ Viabilidade pesquisada nas fontes dos provedores: o [YouTube IFrame Player](http
 
 ## Separação necessária da fila de downloads
 
-Hoje `tracks` reúne a ocorrência da coleção, a fonte, o caminho e o estado da transferência; `editing_locked` bloqueia nomes e IDs depois do início. O pedido posterior aplicado na versão local 0.1.31 libera o arraste de ocorrências ainda não iniciadas, mantendo a posição das já iniciadas. Essa exceção não implementa uma organização da biblioteca independente da execução ou dos arquivos.
+Hoje `tracks` reúne a ocorrência da coleção, a fonte, o caminho e o estado da transferência; `editing_locked` bloqueia nomes e IDs depois do início. O esclarecimento aplicado na versão local 0.1.32 permite trocar livremente as posições ainda não baixadas, inclusive através das concluídas, que mantêm suas posições. A faixa em andamento fica temporariamente fixa; falha/parada sem arquivo publicado libera sua posição. Essa exceção não implementa uma organização da biblioteca independente dos arquivos.
 
 Na evolução proposta, separar referências da biblioteca, arquivos e pastas locais, ocorrências em playlists, execução de downloads e fila de reprodução. Uma ocorrência pode referenciar uma música com fontes de catálogo e arquivos locais associados, sem exigir download repetido. Remover da playlist não exclui o arquivo. Exclusão física é uma ação distinta e informa as referências afetadas.
 

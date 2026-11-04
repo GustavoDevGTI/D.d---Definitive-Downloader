@@ -140,7 +140,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                     onPressed: () => unawaited(showAppNotice(context,
                         title: 'Edição bloqueada',
                         message:
-                            'Nomes e IDs ficam bloqueados após o primeiro download. Você pode reordenar as faixas ainda não iniciadas e adicionar novos links. Faixas já iniciadas mantêm sua posição.')),
+                            'Nomes e IDs ficam bloqueados após o primeiro download. Faixas ainda não baixadas podem trocar as posições livres entre si. Concluídas ficam fixas; a faixa em andamento fica fixa até terminar ou parar.')),
                     icon: const Icon(Icons.lock_outline,
                         size: 18, color: AppColors.accentActive)),
             ])),

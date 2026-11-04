@@ -38,13 +38,16 @@ class LibraryController extends ChangeNotifier {
   bool addingLinks = false;
   String linkProgress = '';
   String? _activeRun;
+  bool _startingRun = false;
   Completer<void>? _additionDone;
 
   Future<List<Collection>> collectionChoices(int offset) =>
       repository.collections(offset: offset);
 
   Future<bool> addLinks(int collectionId, String input) async {
-    if (addingLinks || importing || preparing || editing) return false;
+    if (addingLinks || importing || preparing || editing || _startingRun) {
+      return false;
+    }
     addingLinks = true;
     _additionDone = Completer<void>();
     notifyListeners();
@@ -201,8 +204,14 @@ class LibraryController extends ChangeNotifier {
   int _searchGeneration = 0;
   int _refreshGeneration = 0;
   bool get busy =>
-      importing || downloading || preparing || addingLinks || editing;
-  bool get reorderingBusy => importing || preparing || addingLinks || editing;
+      importing ||
+      downloading ||
+      preparing ||
+      addingLinks ||
+      editing ||
+      _startingRun;
+  bool get reorderingBusy =>
+      importing || preparing || addingLinks || editing || _startingRun;
   bool get isExample => current?.source == 'Exemplo local';
   bool get allFilteredSelected =>
       page.total > 0 && page.filteredSelectedCount == page.total;
@@ -695,9 +704,17 @@ class LibraryController extends ChangeNotifier {
     var reviewVideos = 0;
     final queue = WorkspaceRepository(repository.database);
     final run = '${DateTime.now().microsecondsSinceEpoch}';
-    _activeRun = run;
+    _startingRun = true;
     notifyListeners();
     try {
+      await queue.beginRun(
+          run: run,
+          ids: queueIds,
+          collectionId: collection?.id,
+          failedOnly: failedOnly);
+      _activeRun = run;
+      _startingRun = false;
+      notifyListeners();
       while (!token.cancelled) {
         try {
           await token.waitForQueue();
@@ -706,6 +723,7 @@ class LibraryController extends ChangeNotifier {
         }
         final track = await queue.claimNext(
             run: run,
+            snapshot: true,
             ids: queueIds,
             collectionId: collection?.id,
             failedOnly: failedOnly);
@@ -837,6 +855,7 @@ class LibraryController extends ChangeNotifier {
       message = _message(error);
     } finally {
       _activeRun = null;
+      _startingRun = false;
       try {
         await queue.finishRun(run);
       } catch (_) {

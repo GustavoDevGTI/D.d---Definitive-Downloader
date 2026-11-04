@@ -2,6 +2,7 @@ import '../../../core/storage/database.dart';
 import '../../importing/music_link.dart';
 import '../../importing/music_link_repository.dart';
 import '../domain/track_order.dart';
+import '../../downloads/run_order.dart';
 
 class PlaylistEditor {
   const PlaylistEditor(this.database);
@@ -25,7 +26,7 @@ class PlaylistEditor {
           // Only order, selection and transfer guards of this bounded collection
           // are loaded, never the library or full track metadata.
           final rows = db.select(
-              'SELECT id,position,selected,queue_run,status,local_path,error FROM tracks WHERE collection_id=? ORDER BY position LIMIT 10001',
+              'SELECT id,position,selected,status,local_path FROM tracks WHERE collection_id=? ORDER BY position LIMIT 10001',
               [collectionId]);
           if (rows.length > 10000) {
             throw const FormatException('Limite de 10.000 faixas por coleção.');
@@ -40,13 +41,11 @@ class PlaylistEditor {
           }
           bool locked(Map<String, Object?> row) => trackOrderLocked(
               status: row['status'] as String,
-              run: row['queue_run'] as String,
-              localPath: row['local_path'] as String,
-              error: row['error'] as String);
+              localPath: row['local_path'] as String);
           if (locked(dragged) ||
               locked(rows.firstWhere((r) => r['id'] == targetId))) {
             throw const FormatException(
-                'Só é possível reordenar faixas que ainda não iniciaram o download.');
+                'Faixas concluídas ou em andamento mantêm sua posição.');
           }
           final moving = rows
               .where((r) =>
@@ -56,21 +55,27 @@ class PlaylistEditor {
           final movingSet = moving.toSet();
           if (rows.any((r) => movingSet.contains(r['id']) && locked(r))) {
             throw const FormatException(
-                'A seleção inclui uma faixa que já iniciou o download.');
+                'A seleção inclui uma faixa concluída ou em andamento.');
           }
           if (movingSet.contains(targetId)) {
             db.execute('COMMIT');
             return dragged['position'] as int;
           }
           final remaining = rows
+              .where((r) => !locked(r))
               .map((r) => r['id'] as int)
               .where((id) => !movingSet.contains(id))
               .toList();
           final insertion = remaining.indexOf(targetId) + (after ? 1 : 0);
-          final order = [
+          final freeOrder = [
             ...remaining.take(insertion),
             ...moving,
             ...remaining.skip(insertion)
+          ];
+          var freeIndex = 0;
+          final order = [
+            for (final row in rows)
+              if (locked(row)) row['id'] as int else freeOrder[freeIndex++]
           ];
           final positions = {
             for (final r in rows) r['id'] as int: r['position'] as int
@@ -84,8 +89,8 @@ class PlaylistEditor {
                   'O movimento alteraria a posição de uma faixa já iniciada.');
             }
           }
-          // Extras keep their global append slots; reorder only this collection's
-          // occurrences within those slots. Other collections keep their places.
+          // The execution snapshot includes originals and extras. Reorder only
+          // this collection's slots, preserving every other collection's place.
           final additions = db.select('''SELECT a.run,a.ordinal,a.track_id
             FROM download_run_additions a JOIN tracks t ON t.id=a.track_id
             WHERE t.collection_id=? ORDER BY a.ordinal LIMIT 10001''',
@@ -99,27 +104,9 @@ class PlaylistEditor {
           }
           for (final entries in runs.values) {
             final addedIds = entries.map((a) => a['track_id'] as int).toSet();
-            final firstExtra = addedIds
-                .map((id) => newPositions[id]!)
-                .reduce((a, b) => a < b ? a : b);
-            if (rows.any((r) =>
-                !addedIds.contains(r['id']) &&
-                newPositions[r['id']]! > firstExtra)) {
-              throw const FormatException(
-                  'Durante a execução, as faixas extras permanecem após as originais.');
-            }
             final reordered = [...addedIds]
               ..sort((a, b) => newPositions[a]!.compareTo(newPositions[b]!));
-            for (final a in entries) {
-              db.execute(
-                  'UPDATE download_run_additions SET ordinal=-ordinal WHERE ordinal=?',
-                  [a['ordinal']]);
-            }
-            for (var i = 0; i < entries.length; i++) {
-              db.execute(
-                  'UPDATE download_run_additions SET ordinal=? WHERE run=? AND track_id=?',
-                  [entries[i]['ordinal'], entries[i]['run'], reordered[i]]);
-            }
+            reassignRunSlots(db, entries, reordered);
           }
           final changed = [
             for (var i = 0; i < order.length; i++)
