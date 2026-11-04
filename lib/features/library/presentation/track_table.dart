@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../app/app_notice.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
@@ -34,6 +35,7 @@ class _TrackTableState extends State<TrackTable> {
   _TrackDrag? _drag;
   bool get _editable =>
       !controller.busy && controller.current?.editingLocked != true;
+  bool get _reorderable => !controller.reorderingBusy;
 
   @override
   void dispose() {
@@ -395,8 +397,12 @@ class _TrackTableState extends State<TrackTable> {
     final payload = _TrackDrag(
         track.collectionId,
         track.id,
-        track.selected && controller.page.selectedCount > 1,
-        track.selected ? controller.page.selectedCount : 1);
+        !controller.downloading &&
+            track.selected &&
+            controller.page.selectedCount > 1,
+        !controller.downloading && track.selected
+            ? controller.page.selectedCount
+            : 1);
     final row = Semantics(
         selected: track.selected,
         customSemanticsActions: _editable
@@ -407,14 +413,14 @@ class _TrackTableState extends State<TrackTable> {
             : const {},
         child: Stack(fit: StackFit.expand, children: [
           child,
-          if (_drag != null && _editable)
+          if (_drag != null && _reorderable && !track.orderLocked)
             Positioned.fill(
                 child: Column(children: [
               Expanded(child: _dropZone(track, false)),
               Expanded(child: _dropZone(track, true)),
             ])),
         ]));
-    if (!_editable) return row;
+    if (!_reorderable || track.orderLocked) return row;
     final feedback = Material(
         color: AppColors.accentSoft,
         shape: const RoundedRectangleBorder(
@@ -476,16 +482,17 @@ class _TrackTableState extends State<TrackTable> {
   Widget _dropZone(Track track, bool after) => DragTarget<_TrackDrag>(
       key: ValueKey('drop-${after ? 'after' : 'before'}-${track.id}'),
       onWillAcceptWithDetails: (d) =>
-          _editable &&
+          _reorderable &&
+          !track.orderLocked &&
           d.data.collectionId == track.collectionId &&
           d.data.trackId != track.id &&
           !(d.data.group && track.selected),
       onAcceptWithDetails: (d) {
-        unawaited(controller.moveTracks(d.data.trackId,
+        unawaited(_reportMove(controller.moveTracks(d.data.trackId,
             collectionId: d.data.collectionId,
             targetId: track.id,
             after: after,
-            selectedGroup: d.data.group));
+            selectedGroup: d.data.group)));
         _finishDrag();
       },
       builder: (context, candidates, rejected) => Container(
@@ -497,6 +504,13 @@ class _TrackTableState extends State<TrackTable> {
                   height: 3,
                   width: double.infinity,
                   child: ColoredBox(color: AppColors.accentActive))));
+
+  Future<void> _reportMove(Future<String?> movement) async {
+    final error = await movement;
+    if (error != null && mounted) {
+      await showAppNotice(context, message: error);
+    }
+  }
 
   Widget _pageControls() => Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -521,13 +535,20 @@ class _TrackTableState extends State<TrackTable> {
     return DragTarget<_TrackDrag>(
       key: ValueKey('track-page-$direction'),
       onWillAcceptWithDetails: (d) =>
-          enabled && _editable && d.data.collectionId == controller.current?.id,
+          enabled &&
+          _reorderable &&
+          d.data.collectionId == controller.current?.id,
       onMove: (_) {
         if (_hoverPage == direction) return;
         _pageTimer?.cancel();
         _hoverPage = direction;
         _pageTimer = Timer(const Duration(milliseconds: 650), () async {
-          if (!mounted || _drag == null || !enabled || controller.busy) return;
+          if (!mounted ||
+              _drag == null ||
+              !enabled ||
+              controller.reorderingBusy) {
+            return;
+          }
           await controller.turnPage(direction);
           if (mounted && _scroll.hasClients) {
             _scroll

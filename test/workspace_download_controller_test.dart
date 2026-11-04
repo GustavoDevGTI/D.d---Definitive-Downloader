@@ -283,6 +283,44 @@ void main() {
     expect(entries.map((s) => s.substring(0, 3)), ['001', '002', '003']);
   });
   test(
+      'arraste enquanto 1 recebe faz baixar 3 antes de 2 e exporta a nova ordem',
+      () async {
+    controller.dispose();
+    final downloader = GatedDownload();
+    controller = create(downloader);
+    controller.outputDirectory = directory.path;
+    await controller.loadExample();
+    final rows = controller.page.items.take(3).toList();
+    final running =
+        controller.downloadSelected(queueIds: rows.map((t) => t.id).toList());
+    await downloader.started.future;
+    await controller.moveTracks(rows[2].id,
+        collectionId: rows[2].collectionId,
+        targetId: rows[1].id,
+        after: false,
+        selectedGroup: false);
+    expect(controller.downloading, isTrue);
+    expect(controller.activeTrackId, rows[0].id);
+    expect(controller.page.items.take(3).map((t) => t.id),
+        [rows[0].id, rows[2].id, rows[1].id]);
+    downloader.release.complete();
+    await running;
+    expect(downloader.ids, [rows[0].id, rows[2].id, rows[1].id]);
+    final first = (await repository.trackById(rows[0].id))!;
+    final second = (await repository.trackById(rows[2].id))!;
+    final third = (await repository.trackById(rows[1].id))!;
+    expect(first.localPath, contains('001 - '));
+    expect(second.localPath, contains('002 - '));
+    expect(third.localPath, contains('003 - '));
+    final lists = await directory
+        .list(recursive: true)
+        .where((f) => f.path.endsWith('.m3u8'))
+        .toList();
+    final contents = await File(lists.single.path).readAsString();
+    expect(contents.indexOf(second.outputTitle),
+        lessThan(contents.indexOf(third.outputTitle)));
+  });
+  test(
       'inclusão iniciada em execução aguarda catálogo e baixa extras ao final na mesma rodada',
       () async {
     controller.dispose();

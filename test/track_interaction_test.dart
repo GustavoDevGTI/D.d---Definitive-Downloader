@@ -16,6 +16,7 @@ import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/library/presentation/track_table.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'widget_io.dart';
+import 'package:definitive_downloader/features/workspace/data/workspace_repository.dart';
 
 void main() {
   for (final width in [900.0, 390.0]) {
@@ -131,6 +132,34 @@ void main() {
               c.page.items.last.id == original[2]);
       expect(c.page.items.last.position, 40);
       expect(c.page.selectedCount, 2);
+      expect(tester.takeException(), isNull);
+      final future = c.page.items.take(3).toList();
+      await tester.runAsync(() async {
+        await WorkspaceRepository(c.repository.database)
+            .claimNext(run: 'gesture-active', ids: [future[0].id]);
+        c.downloading = true;
+        await c.refresh();
+      });
+      await tester.pump();
+      expect(find.byKey(ValueKey('drag-track-${future[0].id}')), findsNothing);
+      expect(
+          find.byKey(ValueKey('drag-track-${future[2].id}')), findsOneWidget);
+      final pending = await tester.startGesture(
+          tester.getCenter(row(future[2].id)),
+          kind:
+              width > 500 ? PointerDeviceKind.mouse : PointerDeviceKind.touch);
+      await tester.pump(const Duration(milliseconds: 350));
+      await pending.moveBy(const Offset(0, 12));
+      await tester.pump();
+      await pending.moveTo(tester
+          .getCenter(find.byKey(ValueKey('drop-before-${future[1].id}'))));
+      await tester.pump();
+      await pending.up();
+      await ioUntil(
+          tester, () => !c.editing && c.page.items[1].id == future[2].id);
+      expect(c.page.items.first.id, future[0].id);
+      expect(c.page.items.first.position, 1);
+      expect(c.downloading, isTrue);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       c.dispose();

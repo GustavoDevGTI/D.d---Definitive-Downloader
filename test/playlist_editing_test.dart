@@ -111,7 +111,7 @@ void main() {
     expect((await library.page(owner)).selectedCount, 1);
   });
   test(
-      'arraste rejeita coleção bloqueada e alvo de outra coleção, com rollback integral',
+      'arraste rejeita faixa iniciada e alvo de outra coleção, com rollback integral',
       () async {
     final before = (await library.page(owner, limit: 100)).items;
     final other = await library.importCollection(ImportedCollection(
@@ -129,7 +129,8 @@ void main() {
     await library.select(before.first.id, true);
     await queue.claimNext(run: 'locked', ids: [before.first.id]);
     await expectLater(
-        editor.move(owner, before[1].id, targetId: before.last.id, after: true),
+        editor.move(owner, before.first.id,
+            targetId: before.last.id, after: true),
         throwsFormatException);
     expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
         before.map((t) => t.id));
@@ -137,6 +138,78 @@ void main() {
         await library.database
             .run((db) => db.select('PRAGMA quick_check').first.values.first),
         'ok');
+  });
+  test(
+      'troca 2 e 3 durante a primeira transferência e preserva nomes e posição ativa',
+      () async {
+    final rows = (await library.page(owner, limit: 100)).items;
+    final ids = rows.take(3).map((t) => t.id).toList();
+    await queue.claimNext(run: 'active', ids: ids);
+    await editor.move(owner, rows[2].id, targetId: rows[1].id, after: false);
+    final after = (await library.page(owner, limit: 100)).items;
+    expect(
+        after.take(3).map((t) => t.id), [rows[0].id, rows[2].id, rows[1].id]);
+    expect(after.first.position, 1);
+    expect(after.first.orderLocked, isTrue);
+    expect(after[1].orderLocked, isFalse);
+    expect((await queue.claimNext(run: 'active', ids: ids))!.id, rows[2].id);
+    await expectLater(editor.edit(rows[1].id, name: 'Outro', position: 3),
+        throwsFormatException);
+    await library.setStatus(rows[2].id, TrackStatus.ready);
+    await library.database.initialize();
+    expect((await library.trackById(rows[2].id))!.orderLocked, isTrue);
+    await expectLater(
+        editor.move(owner, rows[2].id, targetId: rows[1].id, after: true),
+        throwsFormatException);
+  });
+  test('não cruza posições já iniciadas nem move seleção que as inclua',
+      () async {
+    final rows = (await library.page(owner, limit: 100)).items;
+    await queue.claimNext(run: 'fixed', ids: [rows[2].id]);
+    await expectLater(
+        editor.move(owner, rows[1].id, targetId: rows[3].id, after: true),
+        throwsFormatException);
+    await library.select(rows[2].id, true);
+    await library.select(rows[3].id, true);
+    await expectLater(
+        editor.move(owner, rows[3].id,
+            targetId: rows[4].id, after: true, selectedGroup: true),
+        throwsFormatException);
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.id),
+        rows.map((t) => t.id));
+  });
+  test(
+      'reordena extras nos seus slots globais sem mudar a posição de outra coleção',
+      () async {
+    final rows = (await library.page(owner, limit: 100)).items;
+    final other = await library.importCollection(ImportedCollection(
+        name: 'Outra',
+        source: 'Fixture',
+        sourceUrl: '',
+        tracks: Stream.value(const TrackDraft(
+            title: 'Outra',
+            artist: 'Pessoa',
+            mediaUrl: 'https://example.org/a.mp3',
+            sourceKind: SourceKind.directMp3))));
+    final otherId = (await library.page(other)).items.single.id;
+    await queue.claimNext(run: 'extras', ids: [rows[0].id]);
+    await library.database.run((db) {
+      for (final id in [rows[83].id, otherId, rows[84].id]) {
+        db.execute(
+            'INSERT INTO download_run_additions(run,track_id) VALUES(?,?)',
+            ['extras', id]);
+      }
+    });
+    await editor.move(owner, rows[84].id, targetId: rows[83].id, after: false);
+    await expectLater(
+        editor.move(owner, rows[84].id, targetId: rows[1].id, after: false),
+        throwsFormatException);
+    final claimed = <int>[];
+    for (var i = 0; i < 3; i++) {
+      claimed
+          .add((await queue.claimNext(run: 'extras', ids: [rows[0].id]))!.id);
+    }
+    expect(claimed, [rows[84].id, otherId, rows[83].id]);
   });
   test(
       'move através de páginas em ambos os sentidos preservando repetições e identidade',

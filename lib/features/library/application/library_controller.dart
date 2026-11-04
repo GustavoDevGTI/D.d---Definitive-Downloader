@@ -84,12 +84,14 @@ class LibraryController extends ChangeNotifier {
     return true;
   }
 
-  Future<void> moveTracks(int trackId,
+  Future<String?> moveTracks(int trackId,
       {required int collectionId,
       required int targetId,
       required bool after,
       required bool selectedGroup}) async {
-    if (busy || current?.id != collectionId) return;
+    if (reorderingBusy || current?.id != collectionId) {
+      return 'A lista mudou ou está sendo atualizada. Tente arrastar novamente.';
+    }
     editing = true;
     notifyListeners();
     try {
@@ -102,8 +104,9 @@ class LibraryController extends ChangeNotifier {
           ? ((position - 1) ~/ 40) * 40
           : 0;
       await refresh();
+      return null;
     } catch (error) {
-      message = _message(error);
+      return _message(error);
     } finally {
       editing = false;
       notifyListeners();
@@ -199,6 +202,7 @@ class LibraryController extends ChangeNotifier {
   int _refreshGeneration = 0;
   bool get busy =>
       importing || downloading || preparing || addingLinks || editing;
+  bool get reorderingBusy => importing || preparing || addingLinks || editing;
   bool get isExample => current?.source == 'Exemplo local';
   bool get allFilteredSelected =>
       page.total > 0 && page.filteredSelectedCount == page.total;
