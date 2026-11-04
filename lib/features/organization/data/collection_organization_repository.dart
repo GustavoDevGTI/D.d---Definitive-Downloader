@@ -81,6 +81,35 @@ class CollectionOrganizationRepository {
     });
   }
 
+  Future<void> setCover(int id, String path) => database.run((db) {
+        db.execute(
+            'UPDATE collections SET cover_path=? WHERE id=?', [path, id]);
+        if (db.updatedRows != 1) {
+          throw const FormatException('Playlist não encontrada.');
+        }
+      });
+
+  /// Removes library occurrences only. Download history/files survive via SET NULL.
+  Future<void> remove(int id) => database.run((db) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          if (db.select(
+              "SELECT 1 FROM tracks t WHERE t.collection_id=? AND (t.status='downloading' OR EXISTS(SELECT 1 FROM download_run_additions a WHERE a.track_id=t.id)) LIMIT 1",
+              [id]).isNotEmpty) {
+            throw const FormatException(
+                'A playlist está em uma execução. Aguarde ou pare a fila antes de excluir.');
+          }
+          db.execute('DELETE FROM collections WHERE id=?', [id]);
+          if (db.updatedRows != 1) {
+            throw const FormatException('Playlist não encontrada.');
+          }
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
+
   Future<void> move(int id, int? groupId) => database.run((db) {
         db.execute(
             'UPDATE collections SET group_id=? WHERE id=?', [groupId, id]);

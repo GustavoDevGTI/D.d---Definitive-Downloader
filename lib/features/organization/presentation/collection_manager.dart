@@ -8,6 +8,10 @@ import '../../workspace/presentation/workspace_components.dart';
 import '../application/collection_organization_controller.dart';
 import '../data/collection_organization_repository.dart';
 import '../domain/collection_organization.dart';
+import 'organization_name_dialog.dart';
+import 'collection_group_strip.dart';
+import '../../library/data/artwork_store.dart';
+import '../../library/presentation/artwork_thumbnail.dart';
 
 class CollectionManager extends StatefulWidget {
   const CollectionManager(
@@ -96,67 +100,20 @@ class _CollectionManagerState extends State<CollectionManager> {
                         () => unawaited(c.filter(value, c.groupId)));
                   }),
               const SizedBox(height: 10),
-              Row(children: [
-                Expanded(
-                    child: DropdownButtonFormField<int>(
-                        key: ValueKey('group-filter-${c.groupId}'),
-                        initialValue: c.groupId ?? -1,
-                        isExpanded: true,
-                        menuMaxHeight: 320,
-                        selectedItemBuilder: (_) => [
-                              const Text('Todas'),
-                              const Text('Sem grupo',
-                                  overflow: TextOverflow.ellipsis),
-                              for (final g in c.groups)
-                                Text('${g.name} (${g.count})',
-                                    overflow: TextOverflow.ellipsis),
-                            ],
-                        decoration: const InputDecoration(
-                            labelText: 'Grupo',
-                            prefixIcon: Icon(Icons.folder_outlined, size: 19)),
-                        items: [
-                          const DropdownMenuItem(
-                              value: -1, child: Text('Todas as playlists')),
-                          const DropdownMenuItem(
-                              value: 0, child: Text('Sem grupo')),
-                          for (final g in c.groups)
-                            DropdownMenuItem(
-                                value: g.id,
-                                child: Text('${g.name} (${g.count})',
-                                    overflow: TextOverflow.ellipsis))
-                        ],
-                        onChanged: (v) {
-                          _timer?.cancel();
-                          unawaited(c.filter(_search.text, v == -1 ? null : v));
-                        })),
-                const SizedBox(width: 6),
-                PopupMenuButton<String>(
-                    tooltip: 'Gerenciar grupos',
-                    enabled: enabled,
-                    icon: const Icon(Icons.create_new_folder_outlined,
-                        color: AppColors.accentActive),
-                    onSelected: (v) {
-                      if (v == 'new') {
-                        unawaited(_editGroup());
-                      }
-                      if (v == 'rename' && group != null) {
-                        unawaited(_editGroup(group));
-                      }
-                      if (v == 'remove' && group != null) {
-                        unawaited(_removeGroup(group));
-                      }
-                    },
-                    itemBuilder: (_) => [
-                          const PopupMenuItem(
-                              value: 'new', child: Text('Novo grupo')),
-                          if (group != null) ...[
-                            const PopupMenuItem(
-                                value: 'rename', child: Text('Renomear grupo')),
-                            const PopupMenuItem(
-                                value: 'remove', child: Text('Remover grupo'))
-                          ]
-                        ]),
-              ]),
+              CollectionGroupStrip(
+                  groups: c.groups,
+                  selected: c.groupId,
+                  onSelect: (id) {
+                    _timer?.cancel();
+                    unawaited(c.filter(_search.text, id));
+                  },
+                  onCreate: enabled ? () => unawaited(_editGroup()) : null,
+                  onRename: enabled && group != null
+                      ? () => unawaited(_editGroup(group))
+                      : null,
+                  onRemove: enabled && group != null
+                      ? () => unawaited(_removeGroup(group))
+                      : null),
               const SizedBox(height: 12),
               if (c.loading && c.listing.items.isEmpty)
                 const Text('Carregando playlists…',
@@ -182,37 +139,64 @@ class _CollectionManagerState extends State<CollectionManager> {
               for (final item in c.listing.items)
                 Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(children: [
-                      Expanded(
-                          child: WorkspaceNavigationButton(
-                              key: ValueKey('collection-open-${item.id}'),
-                              title: item.name,
-                              subtitle:
-                                  '${item.trackCount} faixas · ${item.source}${item.isPartial ? ' · parcial' : ''}${_groupLabel(item)}',
-                              icon: Icons.library_music_outlined,
-                              onPressed: () => widget.onOpen(item))),
-                      PopupMenuButton<String>(
-                          key: ValueKey('collection-actions-${item.id}'),
-                          tooltip: 'Organizar ${item.name}',
-                          enabled: enabled,
-                          icon: const Icon(Icons.more_horiz,
-                              color: AppColors.accentActive),
-                          onSelected: (v) {
-                            if (v == 'rename') {
-                              unawaited(_editPlaylist(item));
-                            } else {
-                              unawaited(_move(item));
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                    value: 'rename',
-                                    child: Text('Renomear playlist')),
-                                PopupMenuItem(
-                                    value: 'move',
-                                    child: Text('Mover para grupo'))
-                              ]),
-                    ])),
+                    child: LayoutBuilder(builder: (context, box) {
+                      final tile = WorkspaceNavigationButton(
+                          key: ValueKey('collection-open-${item.id}'),
+                          title: item.name,
+                          subtitle:
+                              '${item.trackCount} faixas · ${item.completedCount} baixadas · ${item.source}${_groupLabel(item)}',
+                          leading: ArtworkThumbnail(
+                              reference: item.coverPath,
+                              size: 44,
+                              icon: Icons.library_music_outlined),
+                          icon: Icons.library_music_outlined,
+                          onPressed: () => widget.onOpen(item));
+                      final actions =
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                        _action(
+                            'Renomear playlist',
+                            Icons.edit_outlined,
+                            enabled
+                                ? () => unawaited(_editPlaylist(item))
+                                : null,
+                            item.id,
+                            'rename'),
+                        _action(
+                            'Alterar capa',
+                            Icons.add_photo_alternate_outlined,
+                            enabled ? () => unawaited(_cover(item)) : null,
+                            item.id,
+                            'cover'),
+                        _action(
+                            'Mover para grupo',
+                            Icons.drive_file_move_outline,
+                            enabled ? () => unawaited(_move(item)) : null,
+                            item.id,
+                            'move'),
+                        _action(
+                            'Excluir playlist',
+                            Icons.delete_outline,
+                            enabled
+                                ? () => unawaited(_removePlaylist(item))
+                                : null,
+                            item.id,
+                            'delete'),
+                      ]);
+                      return box.maxWidth < 600
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                  tile,
+                                  Align(
+                                      alignment: Alignment.centerRight,
+                                      child: actions)
+                                ])
+                          : Row(children: [
+                              Expanded(child: tile),
+                              const SizedBox(width: 8),
+                              actions
+                            ]);
+                    })),
               if (c.listing.total > 0)
                 PageControls(
                     offset: c.offset,
@@ -224,6 +208,65 @@ class _CollectionManagerState extends State<CollectionManager> {
             ]);
       });
 
+  Widget _action(String label, IconData icon, VoidCallback? onPressed, int id,
+          String action) =>
+      IconButton(
+          key: ValueKey('collection-$action-$id'),
+          tooltip: label,
+          onPressed: onPressed,
+          color: AppColors.accentActive,
+          icon: Icon(icon, size: 19));
+  Future<void> _cover(Collection item) async {
+    try {
+      final path = await widget.library.files.chooseCover();
+      if (path == null || !mounted) return;
+      final error = await _controller.mutate(() async {
+        if (widget.library.busy) {
+          throw const FormatException('Aguarde a operação em andamento.');
+        }
+        final cover = await ArtworkStore.shared
+            .importCover(path, await widget.library.files.dataDirectory());
+        await _controller.repository.setCover(item.id, cover);
+        await widget.library.refresh();
+      });
+      if (error != null && mounted) {
+        await showAppNotice(context, message: error);
+      }
+    } catch (_) {
+      if (mounted) {
+        await showAppNotice(context,
+            message:
+                'Não foi possível usar a imagem. Escolha PNG, JPEG ou WebP de até 5 MB.');
+      }
+    }
+  }
+
+  Future<void> _removePlaylist(Collection item) async {
+    final approved = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Excluir playlist?'),
+                content: Text(
+                    'Excluir “${item.name}” da biblioteca? Os arquivos baixados e o histórico em Arquivos serão preservados.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancelar')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Excluir playlist'))
+                ]));
+    if (approved != true || !mounted) return;
+    final error = await _controller.mutate(() async {
+      if (widget.library.busy) {
+        throw const FormatException('Aguarde a operação em andamento.');
+      }
+      await _controller.repository.remove(item.id);
+      await widget.library.refresh();
+    });
+    if (error != null && mounted) await showAppNotice(context, message: error);
+  }
+
   String _groupLabel(Collection item) {
     final group =
         _controller.groups.where((g) => g.id == item.groupId).firstOrNull;
@@ -234,7 +277,7 @@ class _CollectionManagerState extends State<CollectionManager> {
     int? createdId;
     final saved = await showDialog<bool>(
         context: context,
-        builder: (_) => _NameDialog(
+        builder: (_) => OrganizationNameDialog(
             title: item == null ? 'Nova playlist' : 'Renomear playlist',
             name: item?.name ?? '',
             groups: item == null ? _controller.groups : null,
@@ -262,7 +305,7 @@ class _CollectionManagerState extends State<CollectionManager> {
   Future<void> _editGroup([CollectionGroup? group]) async {
     await showDialog<bool>(
         context: context,
-        builder: (_) => _NameDialog(
+        builder: (_) => OrganizationNameDialog(
             title: group == null ? 'Novo grupo' : 'Renomear grupo',
             name: group?.name ?? '',
             maxLength: 80,
@@ -303,7 +346,7 @@ class _CollectionManagerState extends State<CollectionManager> {
   Future<void> _move(Collection item) async {
     await showDialog<bool>(
         context: context,
-        builder: (_) => _NameDialog(
+        builder: (_) => OrganizationNameDialog(
             title: 'Mover para grupo',
             name: item.name,
             groups: _controller.groups,
@@ -318,114 +361,4 @@ class _CollectionManagerState extends State<CollectionManager> {
                   await widget.library.refresh();
                 })));
   }
-}
-
-class _NameDialog extends StatefulWidget {
-  const _NameDialog(
-      {required this.title,
-      required this.name,
-      required this.onSave,
-      this.groups,
-      this.groupId,
-      this.maxLength = 160,
-      this.nameEditable = true});
-  final String title, name;
-  final int maxLength;
-  final bool nameEditable;
-  final List<CollectionGroup>? groups;
-  final int? groupId;
-  final Future<String?> Function(String, int?) onSave;
-  @override
-  State<_NameDialog> createState() => _NameDialogState();
-}
-
-class _NameDialogState extends State<_NameDialog> {
-  late final _name = TextEditingController(text: widget.name);
-  late int? _groupId = widget.groupId;
-  String? _error;
-  bool _saving = false;
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_saving) return;
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    final error = await widget.onSave(_name.text, _groupId);
-    if (!mounted) return;
-    if (error == null) {
-      Navigator.pop(context, true);
-    } else {
-      setState(() {
-        _saving = false;
-        _error = error;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => PopScope(
-      canPop: !_saving,
-      child: AlertDialog(
-          title: Text(widget.title),
-          content: SizedBox(
-              width: 400,
-              child: SingleChildScrollView(
-                  child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                    if (widget.nameEditable)
-                      TextField(
-                          key: const ValueKey('organization-name'),
-                          controller: _name,
-                          autofocus: true,
-                          enabled: !_saving,
-                          maxLength: widget.maxLength,
-                          decoration: const InputDecoration(labelText: 'Nome'),
-                          onSubmitted: (_) => unawaited(_save()))
-                    else
-                      Text(widget.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                    if (widget.groups != null) ...[
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<int>(
-                          initialValue: _groupId ?? 0,
-                          isExpanded: true,
-                          menuMaxHeight: 300,
-                          decoration: const InputDecoration(labelText: 'Grupo'),
-                          items: [
-                            const DropdownMenuItem(
-                                value: 0, child: Text('Sem grupo')),
-                            for (final g in widget.groups!)
-                              DropdownMenuItem(
-                                  value: g.id,
-                                  child: Text(g.name,
-                                      overflow: TextOverflow.ellipsis))
-                          ],
-                          onChanged: _saving
-                              ? null
-                              : (v) =>
-                                  setState(() => _groupId = v == 0 ? null : v))
-                    ],
-                    if (_error != null)
-                      Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Text(_error!,
-                              style: const TextStyle(
-                                  color: AppColors.accentActive))),
-                  ]))),
-          actions: [
-            TextButton(
-                onPressed: _saving ? null : () => Navigator.pop(context, false),
-                child: const Text('Cancelar')),
-            FilledButton(
-                onPressed: _saving ? null : _save,
-                child: Text(_saving ? 'Salvando…' : 'Salvar'))
-          ]));
 }

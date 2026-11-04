@@ -48,6 +48,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(widget.player?.setModuleActive(_section == AppSection.music));
     _inspectorRequest = widget.controller.inspectorRequest;
     widget.controller.addListener(_requestInspector);
     unawaited(_workspace.refresh());
@@ -73,6 +74,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     _inspectorRequest = widget.controller.inspectorRequest;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        unawaited(widget.player?.setModuleActive(true));
         setState(() {
           _section = AppSection.music;
           _musicTab = 0;
@@ -92,6 +94,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   void _navigate(AppSection section, [int tab = 0]) {
+    unawaited(widget.player?.setModuleActive(section == AppSection.music));
     widget.controller.clearMessage();
     setState(() {
       _section = section;
@@ -127,7 +130,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               bindings: {
                 const SingleActivator(LogicalKeyboardKey.keyO, control: true):
                     () => unawaited(widget.controller.importCsv()),
-                if (widget.player != null) ...{
+                if (widget.player != null && _section == AppSection.music) ...{
                   const SingleActivator(LogicalKeyboardKey.mediaPlayPause):
                       () => unawaited(widget.player!.toggle()),
                   const SingleActivator(LogicalKeyboardKey.mediaTrackNext):
@@ -180,7 +183,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                                           widget.controller),
                                                 ]))),
                                   ])),
-                              if (widget.player != null)
+                              if (widget.player != null &&
+                                  _section == AppSection.music)
                                 PlayerBar(player: widget.player!)
                             ])));
                       })))));

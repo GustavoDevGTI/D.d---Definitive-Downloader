@@ -154,6 +154,7 @@ void main() {
     final bytes = await File(saved.localPath).readAsBytes();
     await repo.database.run((db) {
       db.execute('ALTER TABLE tracks DROP COLUMN redownload_state');
+      db.execute('ALTER TABLE collections DROP COLUMN cover_path');
       db.execute('PRAGMA user_version=10');
     });
     await repo.database.initialize();
@@ -164,7 +165,7 @@ void main() {
     expect(
         await repo.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        11);
+        12);
   });
   test('link manual aprova a reposição sem iniciar e persiste após reinício',
       () async {

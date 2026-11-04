@@ -92,6 +92,13 @@ class PlayerLibrary {
   }
 
   Future<AudioItem?> candidate(Track track, Candidate candidate) async {
+    if (track.redownloadState.isEmpty &&
+        track.sourceKind == candidate.kind &&
+        publicReference(candidate.pageUrl).isNotEmpty &&
+        publicReference(track.mediaUrl) == publicReference(candidate.pageUrl)) {
+      final own = await localFor(track);
+      if (own != null) return own;
+    }
     final matches = await database.run((db) => db
         .select(
             "SELECT * FROM tracks WHERE media_url=? AND source_kind=? AND status='completed' AND local_path!='' ORDER BY id LIMIT 20",

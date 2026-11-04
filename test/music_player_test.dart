@@ -26,6 +26,15 @@ class PreviewHttp extends BoundedHttp {
   }
 }
 
+class DeferredAudioEngine extends FakeAudioEngine {
+  final opening = Completer<void>();
+  @override
+  Future<void> open(String uri) async {
+    await opening.future;
+    await super.open(uri);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late MemoryPlayerLibrary library;
@@ -39,6 +48,59 @@ void main() {
     player = MusicPlayerController(library, engine, files, random: Random(7));
   });
   tearDown(() => player.dispose());
+  test('saída de Músicas pausa sem apagar fila nem retomar ao retornar',
+      () async {
+    await player.playCollection(1);
+    final current = player.current;
+    await player.setModuleActive(false);
+    expect(player.playing, isFalse);
+    await player.setModuleActive(true);
+    expect(player.playing, isFalse);
+    expect(player.current, current);
+    expect(player.queue.length, 4);
+  });
+  test('abertura pendente e fim tardio não tocam fora de Músicas', () async {
+    final delayed = DeferredAudioEngine();
+    final actual = MusicPlayerController(library, delayed, files);
+    final opening = actual.playCollection(1);
+    await playerUntil(() => actual.loading);
+    await actual.setModuleActive(false);
+    delayed.opening.complete();
+    await opening;
+    expect(actual.playing, isFalse);
+    delayed.emit(const AudioEvent(completed: true));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(delayed.opens.length, 1);
+    expect(actual.playing, isFalse);
+    actual.dispose();
+  });
+  test('YouTube Music abre versão exata sem prévia fictícia ou confirmação',
+      () async {
+    await player.playCollection(1);
+    final current = player.current;
+    library.preview = null;
+    const candidate = Candidate(
+        title: 'Outra versão',
+        artist: 'Pessoa',
+        album: '',
+        durationMs: 200000,
+        pageUrl: 'https://music.youtube.com/watch?v=abcdefghijk&list=other',
+        previewUrl: '',
+        coverUrl: '',
+        kind: SourceKind.youtubeMusic);
+    final track = audioTrack(path: '');
+    expect(player.canListenCandidate(track, candidate), isTrue);
+    expect(player.candidateListenLabel(track, candidate),
+        'Ouvir no YouTube Music');
+    await player.listenCandidate(track, candidate);
+    expect(files.opened.single.toString(),
+        'https://music.youtube.com/watch?v=abcdefghijk');
+    expect(player.playing, isFalse);
+    expect(player.current, current);
+    expect(engine.opens.length, 1);
+    expect(player.loading, isFalse);
+    expect(track.status, TrackStatus.completed);
+  });
   test('playlist, pausa, retorno e fim sem alterar ordem ou repetições',
       () async {
     final ids = library.items.map((i) => i.id).toList();

@@ -53,9 +53,11 @@ class WorkspaceNavigationButton extends StatelessWidget {
       required this.title,
       required this.subtitle,
       required this.icon,
-      required this.onPressed});
+      required this.onPressed,
+      this.leading});
   final String title, subtitle;
   final IconData icon;
+  final Widget? leading;
   final VoidCallback onPressed;
 
   @override
@@ -86,7 +88,7 @@ class WorkspaceNavigationButton extends StatelessWidget {
                 overlayColor: const WidgetStatePropertyAll(Colors.transparent)),
         onPressed: onPressed,
         child: Row(children: [
-          Icon(icon, size: 24),
+          leading ?? Icon(icon, size: 24),
           const SizedBox(width: 12),
           Expanded(
               child: Column(

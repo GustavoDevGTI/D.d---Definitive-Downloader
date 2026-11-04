@@ -2,6 +2,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 // Reconstruct the actual previous schema, rather than only lowering its number.
 void removeOrganizationSchema(Database db) {
+  db.execute('ALTER TABLE collections DROP COLUMN cover_path');
   db.execute('ALTER TABLE tracks DROP COLUMN redownload_state');
   db.execute('DROP INDEX collections_group_id');
   db.execute('ALTER TABLE collections DROP COLUMN group_id');

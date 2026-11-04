@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../domain/models.dart';
+import 'artwork_thumbnail.dart';
+import 'track_download_badge.dart';
 import '../../player/presentation/player_scope.dart';
 
 class TrackRow extends StatelessWidget {
@@ -54,6 +56,14 @@ class TrackRow extends StatelessWidget {
                           onChanged: !selectionEnabled
                               ? null
                               : (v) => onSelect(v ?? false))),
+                  Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ArtworkThumbnail(
+                          reference: t.resolvedCoverUrl.isEmpty
+                              ? t.coverUrl
+                              : t.resolvedCoverUrl,
+                          audioPath: t.localPath,
+                          size: compact ? 36 : 44)),
                   Expanded(
                       child: Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -100,6 +110,7 @@ class TrackRow extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                         fontSize: 10, color: AppColors.muted)),
+                                TrackDownloadBadge(track: t),
                                 if (compact)
                                   Text(
                                       '${formatDuration(t.durationMs)} · ${t.needsReview ? 'Conferir' : t.matchStatus.label}',

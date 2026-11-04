@@ -81,17 +81,13 @@ void main() {
               .byKey(ValueKey('collection-open-$originalId'))
               .evaluate()
               .isNotEmpty);
-      await tester.tap(find.byTooltip('Gerenciar grupos'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Novo grupo'));
+      await tester.tap(find.byTooltip('Novo grupo'));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('organization-name')), 'Viagens');
       await tester.tap(find.text('Salvar'));
       await ioUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
-      await tester.tap(find.byKey(ValueKey('collection-actions-$originalId')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mover para grupo'));
+      await tester.tap(find.byKey(ValueKey('collection-move-$originalId')));
       await tester.pumpAndSettle();
       await tester.tap(find.descendant(
           of: find.byType(AlertDialog),
@@ -101,9 +97,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Salvar'));
       await ioUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
-      await tester.tap(find.byKey(ValueKey('collection-actions-$originalId')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Renomear playlist'));
+      await tester.tap(find.byKey(ValueKey('collection-rename-$originalId')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('organization-name')),
           'Estrada e companhia');
@@ -154,15 +148,13 @@ void main() {
         expect(owner.outputFolderName, 'Para ouvir no caminho');
         expect(owner.groupId, (await repository.groups()).single.id);
       });
-      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.ensureVisible(find.text('Viagens (1)').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Viagens (1)').last);
       await tester.pumpAndSettle();
       await ioUntil(
           tester, () => find.text('Uma seleção nova').evaluate().isEmpty);
-      await tester.tap(find.byTooltip('Gerenciar grupos'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Renomear grupo'));
+      await tester.tap(find.byTooltip('Renomear grupo'));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('organization-name')), 'Viagens favoritas');
@@ -172,9 +164,7 @@ void main() {
           () =>
               find.byType(AlertDialog).evaluate().isEmpty &&
               find.text('Viagens favoritas (1)').evaluate().isNotEmpty);
-      await tester.tap(find.byTooltip('Gerenciar grupos'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Remover grupo'));
+      await tester.tap(find.byTooltip('Remover grupo'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Remover grupo'));
       await ioUntil(

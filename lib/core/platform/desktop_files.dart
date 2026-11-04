@@ -31,6 +31,12 @@ class DesktopFiles {
         const XTypeGroup(label: 'Lista de faixas CSV', extensions: ['csv'])
       ]))
           ?.path;
+  Future<String?> chooseCover() async => (await openFile(acceptedTypeGroups: [
+        const XTypeGroup(
+            label: 'Capa da playlist',
+            extensions: ['png', 'jpg', 'jpeg', 'webp'])
+      ]))
+          ?.path;
   Future<String?> chooseOutput() =>
       getDirectoryPath(confirmButtonText: 'Usar esta pasta');
   Future<void> openFolder(String path) async {

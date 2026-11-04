@@ -49,9 +49,10 @@ class Collection {
       required this.isPartial,
       this.editingLocked = false,
       this.groupId,
-      this.storageName = ''});
+      this.storageName = '',
+      this.coverPath = ''});
   final int? groupId;
-  final String storageName;
+  final String storageName, coverPath;
   String get outputFolderName => storageName.isEmpty ? name : storageName;
   final int id;
   final String name;

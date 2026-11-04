@@ -19,6 +19,65 @@ void main() {
   });
   tearDown(() => temp.delete(recursive: true));
 
+  test('capa persiste e excluir playlist preserva arquivo e histórico',
+      () async {
+    final id = await library.importCollection(ImportedCollection(
+        name: 'Local',
+        source: 'Teste',
+        sourceUrl: '',
+        tracks:
+            Stream.value(const TrackDraft(title: 'Faixa', artist: 'Pessoa'))));
+    final track = (await library.page(id)).items.single;
+    final file = File('${temp.path}/preservar.mp3');
+    await file.writeAsBytes([1, 2, 3]);
+    await library.setStatus(track.id, TrackStatus.completed,
+        localPath: file.path);
+    await repository.setCover(id, '${temp.path}/capa.png');
+    final restored = LibraryRepository(AppDatabase(library.database.path));
+    expect((await restored.collectionById(id))!.coverPath,
+        '${temp.path}/capa.png');
+    await repository.remove(id);
+    expect(await library.collectionById(id), isNull);
+    expect(await file.readAsBytes(), [1, 2, 3]);
+    final remaining = await library.database.run((db) => [
+          db.select('SELECT * FROM tracks').length,
+          db.select('SELECT * FROM download_history').single['track_id'],
+          db.select('PRAGMA foreign_key_check').length
+        ]);
+    expect(remaining, [0, null, 0]);
+  });
+
+  test('não exclui playlist pertencente a uma execução', () async {
+    final id = await library.importCollection(ImportedCollection(
+        name: 'Fila',
+        source: 'Teste',
+        sourceUrl: '',
+        tracks:
+            Stream.value(const TrackDraft(title: 'Faixa', artist: 'Pessoa'))));
+    final track = (await library.page(id)).items.single;
+    await library.database.run((db) => db.execute(
+        'INSERT INTO download_run_additions(run,track_id) VALUES(?,?)',
+        ['run', track.id]));
+    await expectLater(repository.remove(id), throwsFormatException);
+    expect((await library.page(id)).items.single.id, track.id);
+  });
+
+  test('migração v11 acrescenta capa sem alterar nomes ou mídia', () async {
+    final id = await repository.create('Antes da capa');
+    await library.database.run((db) {
+      db.execute('ALTER TABLE collections DROP COLUMN cover_path');
+      db.execute('PRAGMA user_version=11');
+    });
+    await library.database.initialize();
+    await library.database.initialize();
+    expect((await library.collectionById(id))!.coverPath, '');
+    expect(
+        (await library.collectionById(id))!.outputFolderName, 'Antes da capa');
+    await repository.setCover(id, 'capa');
+    await repository.setCover(id, '');
+    expect((await library.collectionById(id))!.coverPath, '');
+  });
+
   test('cria playlist vazia local e pagina busca e grupo antes do limite',
       () async {
     await repository.saveGroup('Viagens');
@@ -120,7 +179,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        11);
+        12);
     expect(
         await library.database
             .run((db) => db.select('PRAGMA foreign_key_check').length),

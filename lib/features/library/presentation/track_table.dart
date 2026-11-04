@@ -77,6 +77,7 @@ class _TrackTableState extends State<TrackTable> {
                                 ? null
                                 : (_) => unawaited(controller.selectCollection(
                                     !controller.allFilteredSelected)))),
+                    const SizedBox(width: 54),
                     Expanded(child: _header('Faixa / artista', TrackSort.name)),
                     if (!compact) ...[
                       SizedBox(
@@ -101,13 +102,13 @@ class _TrackTableState extends State<TrackTable> {
                           controller: _scroll,
                           primary: false,
                           itemExtent:
-                              (compact ? 102.0 : 80.0) * scale.clamp(1, 2),
+                              (compact ? 120.0 : 96.0) * scale.clamp(1, 2),
                           itemCount: controller.page.items.length,
                           itemBuilder: (context, index) {
                             final t = controller.page.items[index];
                             final focused = controller.focused?.id == t.id;
                             return _interactive(context, t,
-                                rowHeight: (compact ? 102.0 : 80.0) *
+                                rowHeight: (compact ? 120.0 : 96.0) *
                                     scale.clamp(1, 2),
                                 width: box.maxWidth,
                                 child: TrackRow(

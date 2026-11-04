@@ -21,8 +21,7 @@ import 'widget_io.dart';
 
 void main() {
   for (final width in [1360.0, 390.0]) {
-    testWidgets(
-        'player persiste na navegação e existe na conferência a $width px',
+    testWidgets('player pertence a Músicas e pausa ao sair a $width px',
         (tester) async {
       tester.view.physicalSize = Size(width, 820);
       tester.view.devicePixelRatio = 1;
@@ -63,16 +62,22 @@ void main() {
       await tester.pumpWidget(
           DefinitiveDownloaderApp(controller: library, player: player));
       await tester.pumpAndSettle();
+      expect(player.playing, isFalse);
+      expect(find.byKey(const ValueKey('player-play-pause')), findsNothing);
       final nav = width < 780
           ? find.byType(MobileNavigation)
           : find.byType(LibrarySidebar);
       await tester
           .tap(find.descendant(of: nav, matching: find.text('Músicas')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('player-play-pause')), findsOneWidget);
+      await player.toggle();
+      await tester.pumpAndSettle();
       final open =
           find.byKey(ValueKey('collection-open-${track.collectionId}'));
       await ioUntil(tester, () => open.evaluate().isNotEmpty);
       await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
       await tester.tap(open);
       await ioUntil(
           tester,
@@ -97,7 +102,13 @@ void main() {
       await tester
           .tap(find.descendant(of: nav, matching: find.text('Arquivos')));
       await tester.pumpAndSettle();
-      expect(player.playing, isTrue);
+      expect(player.playing, isFalse);
+      expect(find.byKey(const ValueKey('player-play-pause')), findsNothing);
+      expect(player.queue.length, 4);
+      await tester
+          .tap(find.descendant(of: nav, matching: find.text('Músicas')));
+      await tester.pumpAndSettle();
+      expect(player.playing, isFalse);
       expect(find.byKey(const ValueKey('player-play-pause')), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

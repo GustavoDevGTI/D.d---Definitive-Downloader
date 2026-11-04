@@ -30,7 +30,8 @@ class LibraryRepository {
       isPartial: r['partial'] == 1,
       editingLocked: r['editing_locked'] == 1,
       groupId: r['group_id'] as int?,
-      storageName: r['storage_name'] as String? ?? '');
+      storageName: r['storage_name'] as String? ?? '',
+      coverPath: r['cover_path'] as String? ?? '');
 
   Future<int> importCollection(ImportedCollection collection) async {
     final id = await _createCollection(

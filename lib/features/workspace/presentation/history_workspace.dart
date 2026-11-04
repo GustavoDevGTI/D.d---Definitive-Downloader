@@ -4,7 +4,6 @@ import 'package:path/path.dart' as p;
 import '../../../app/theme.dart';
 import '../application/workspace_controller.dart';
 import 'workspace_components.dart';
-import '../../player/presentation/player_scope.dart';
 
 class HistoryWorkspace extends StatefulWidget {
   const HistoryWorkspace({super.key, required this.controller});
@@ -100,19 +99,12 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                                                 ? const Color(0xFF9C4141)
                                                 : AppColors.muted)),
                                     onTap: available == true
-                                        ? () => unawaited(
-                                            PlayerScope.of(context) == null
-                                                ? c.openFile(file)
-                                                : PlayerScope.of(context)!
-                                                    .playHistory(file))
+                                        ? () => unawaited(c.openFile(file))
                                         : null,
                                     trailing: PopupMenuButton<String>(
                                         tooltip: 'Ações do arquivo',
                                         onSelected: (v) => unawaited(v == 'open'
-                                            ? (PlayerScope.of(context) == null
-                                                ? c.openFile(file)
-                                                : PlayerScope.of(context)!
-                                                    .playHistory(file))
+                                            ? (c.openFile(file))
                                             : c.reveal(file.path)),
                                         itemBuilder: (context) => [
                                               PopupMenuItem(

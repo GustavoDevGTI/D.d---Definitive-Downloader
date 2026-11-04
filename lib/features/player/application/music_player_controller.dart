@@ -32,6 +32,12 @@ class MusicPlayerController extends ChangeNotifier {
       shuffled = false,
       ended = false,
       _disposed = false;
+  bool _moduleActive = true;
+  Future<void> setModuleActive(bool value) async {
+    _moduleActive = value;
+    if (!value) await pause();
+  }
+
   AudioRepeat repeat = AudioRepeat.off;
   double volume = .65, _lastVolume = .65;
   Duration position = Duration.zero, duration = Duration.zero;
@@ -68,29 +74,37 @@ class MusicPlayerController extends ChangeNotifier {
   }
 
   bool canListenTrack(Track t) =>
+      _youtube(t.sourceKind) ||
       engine.available &&
-      (t.localPath.isNotEmpty ||
-          [SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
-              .contains(t.sourceKind));
+          (t.localPath.isNotEmpty ||
+              [SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
+                  .contains(t.sourceKind));
   bool canListenCandidate(Track t, Candidate c) =>
+      _youtube(c.kind) ||
       engine.available &&
-      ([SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
-              .contains(c.kind) ||
-          (t.localPath.isNotEmpty &&
-              t.mediaUrl == c.pageUrl &&
-              t.redownloadState.isEmpty));
+          ([SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
+                  .contains(c.kind) ||
+              (t.localPath.isNotEmpty &&
+                  t.mediaUrl == c.pageUrl &&
+                  t.redownloadState.isEmpty));
   String trackListenLabel(Track t) => t.localPath.isNotEmpty
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(t.sourceKind)
           ? 'Ouvir prévia'
-          : 'Ouvir';
+          : _youtube(t.sourceKind)
+              ? 'Ouvir no ${t.sourceKind.musicProviderName}'
+              : 'Ouvir';
+  bool _youtube(SourceKind kind) =>
+      kind == SourceKind.youtubeMusic || kind == SourceKind.youtube;
   String candidateListenLabel(Track t, Candidate c) => t.localPath.isNotEmpty &&
           t.mediaUrl == c.pageUrl &&
           t.redownloadState.isEmpty
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(c.kind)
           ? 'Ouvir prévia'
-          : 'Ouvir';
+          : _youtube(c.kind)
+              ? 'Ouvir no ${c.kind.musicProviderName}'
+              : 'Ouvir';
 
   Future<void> playCollection(int id, {int? startTrackId}) async {
     final request = ++_request;
@@ -136,6 +150,13 @@ class MusicPlayerController extends ChangeNotifier {
         final item = await library.track(track);
         if (request != _request || _disposed) return;
         if (item == null) {
+          if (_youtube(track.sourceKind)) {
+            await pause();
+            await openReference(library.referenceFor(track));
+            loading = false;
+            _notify();
+            return;
+          }
           throw const FormatException(
               'Sem áudio disponível. Abra a referência desta versão.');
         }
@@ -159,7 +180,16 @@ class MusicPlayerController extends ChangeNotifier {
     try {
       final item = await library.candidate(track, candidate);
       if (request != _request || _disposed) return;
-      if (item == null) throw const FormatException('Sem prévia disponível.');
+      if (item == null) {
+        if (_youtube(candidate.kind)) {
+          await pause();
+          await openReference(library.referenceForCandidate(candidate));
+          loading = false;
+          _notify();
+          return;
+        }
+        throw const FormatException('Sem prévia disponível.');
+      }
       await _setQueue([item], 0, request);
     } catch (_) {
       if (request == _request) {
@@ -223,8 +253,9 @@ class MusicPlayerController extends ChangeNotifier {
               await engine.volume(volume);
               await engine.open(item.uri).timeout(const Duration(seconds: 20));
               if (_disposed || request != _request) return;
+              if (!_moduleActive) await engine.pause();
               loading = false;
-              playing = true;
+              playing = _moduleActive;
               _notify();
               unawaited(_loadTags(item, request));
               return;
@@ -279,20 +310,26 @@ class MusicPlayerController extends ChangeNotifier {
     if (event.completed && !loading && !ended) {
       ended = true;
       playing = false;
-      unawaited(_complete());
+      if (_moduleActive) unawaited(_complete());
     }
     if (clockChanged) _timeline.notifyListeners();
     if (stateChanged || event.failed || event.completed) _notify();
   }
 
   Future<void> _complete() async {
+    if (!_moduleActive) return;
     if (repeat == AudioRepeat.track) {
       await seek(Duration.zero);
+      if (!_moduleActive) return;
       await _safe(engine.play);
       ended = false;
     } else {
       await next(automatic: true);
     }
+  }
+
+  Future<void> pause() async {
+    if (playing) await _safe(engine.pause);
   }
 
   Future<void> toggle() async {

@@ -6,6 +6,8 @@ import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'track_review_actions.dart';
 import 'edit_track_dialog.dart';
+import 'artwork_thumbnail.dart';
+import 'track_download_badge.dart';
 import '../../player/presentation/listening_actions.dart';
 
 class TrackInspector extends StatefulWidget {
@@ -71,12 +73,21 @@ class _TrackInspectorState extends State<TrackInspector> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          ArtworkThumbnail(
+                              reference: t.resolvedCoverUrl.isEmpty
+                                  ? t.coverUrl
+                                  : t.resolvedCoverUrl,
+                              audioPath: t.localPath,
+                              size: 112),
+                          const SizedBox(height: 12),
                           Text(t.displayTitle,
                               style: const TextStyle(
                                   fontSize: 17, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 5),
                           Text(t.artist,
                               style: const TextStyle(color: AppColors.muted)),
+                          const SizedBox(height: 8),
+                          TrackDownloadBadge(track: t),
                           const SizedBox(height: 16),
                           _line(
                               'Duração esperada', formatDuration(t.durationMs)),
