@@ -12,6 +12,7 @@ import '../domain/track_listing.dart';
 import 'track_table.dart';
 import 'add_music_links_dialog.dart';
 import '../../workspace/presentation/download_action_button.dart';
+import '../../player/presentation/player_scope.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -170,6 +171,16 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Row(children: [
+              if (PlayerScope.of(context) != null &&
+                  c.current!.completedCount > 0) ...[
+                DownloadActionButton(
+                    label: 'Ouvir playlist',
+                    icon: Icons.play_arrow_rounded,
+                    color: AppColors.navigation,
+                    onPressed: () => unawaited(PlayerScope.of(context)!
+                        .playCollection(c.current!.id))),
+                const SizedBox(width: 6),
+              ],
               DownloadActionButton(
                   label: 'Baixar selecionadas',
                   icon: Icons.download_rounded,

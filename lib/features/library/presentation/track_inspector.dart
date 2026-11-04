@@ -6,6 +6,7 @@ import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'track_review_actions.dart';
 import 'edit_track_dialog.dart';
+import '../../player/presentation/listening_actions.dart';
 
 class TrackInspector extends StatefulWidget {
   const TrackInspector({super.key, required this.controller});
@@ -107,6 +108,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                           const Divider(),
                           const SizedBox(height: 12),
                           if (_tab == 1) ...[
+                            ListeningActions(track: t),
                             _line('Álbum original',
                                 t.album.isEmpty ? 'Não informado' : t.album),
                             if (t.customTitle.isNotEmpty)
@@ -232,8 +234,15 @@ class _TrackInspectorState extends State<TrackInspector> {
         contentPadding: EdgeInsets.zero,
         value: candidate,
         title: Text(candidate.title, style: const TextStyle(fontSize: 12)),
-        subtitle: Text(
-            '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
-            style: const TextStyle(fontSize: 11)));
+        subtitle:
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
+              style: const TextStyle(fontSize: 11)),
+          ListeningActions(
+              track: widget.controller.focused!,
+              candidate: candidate,
+              library: widget.controller),
+        ]));
   }
 }

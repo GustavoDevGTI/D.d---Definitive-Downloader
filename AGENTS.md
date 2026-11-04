@@ -106,6 +106,8 @@
 
 ## Validação e entrega
 
+- Ciclo local 0.1.34: player musical e comparação em `docs/VERSAO_LOCAL_0_1_34.md`. Pedido mais recente permite forte inspiração na organização do rodapé Spotify desktop, mantendo marca/paleta D.d. Arquivos locais têm prioridade; Deezer online é prévia identificada; fontes sem player usam referência pública exata. Ouvir nunca confirma correspondência nem inicia download. Fila transitória separada de downloads; mobile tem UI compartilhada/painel completo, sem validação nativa Android/iOS. Barras usam `AudioSlider` com semântica/teclado próprios: Slider/OverlayPortal do Flutter 3.47 causou falha nativa da árvore de acessibilidade ao fechar a fila; não desabilitar acessibilidade nem reintroduzir esse caminho sem revalidar o fluxo Windows. Releases continuam suspensas conforme pedido do ciclo, com incremento de versão e commit local.
+
 - Gestão local 0.1.26: criar playlists vazias, renomear, buscar por nome e agrupar em Músicas → Coleções, conforme `docs/RELEASE_0_1_26.md`. Módulo `organization`; schema 10 com grupos de nível único (até 100), vínculo opcional e nome estável da pasta (`storage_name`). Remover grupo apenas desvincula playlists; nunca exclui ocorrências ou arquivos. Nome da coleção é distinto dos nomes das faixas bloqueadas; renomear a biblioteca não move mídia nem altera o destino dos próximos downloads. Busca/grupo antes da paginação de 30; resultados antigos não substituem filtro novo. Gestão local não implica criação/edição em contas externas.
 
 - Executar `dart format`, `flutter analyze` e `flutter test` após mudanças relevantes. Compilar Windows antes de entregar um executável.

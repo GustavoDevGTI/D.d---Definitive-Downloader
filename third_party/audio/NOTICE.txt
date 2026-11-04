@@ -1,0 +1,32 @@
+Definitive Downloader — local audio playback components
+
+media_kit 1.2.6 and media_kit_libs_audio 1.0.7: MIT.
+The MIT license for the Dart binding does not replace native-library licenses.
+https://github.com/media-kit/media-kit
+
+Windows audio native package: media_kit_libs_windows_audio 1.0.9.
+Unmodified dynamically loaded libmpv-2.dll from:
+https://github.com/media-kit/libmpv-win32-audio-build/releases/tag/2023-09-24
+Archive: mpv-dev-x86_64-20230924-git-652a1dd.7z
+Upstream archive MD5: cd738e16e2a19626d7cfa48801524f8c
+
+Build instructions, dependency sources, patches and exact revision pins:
+https://github.com/media-kit/libmpv-win32-audio-build
+https://github.com/media-kit/libmpv-win32-audio-build/blob/master/packages/mpv.cmake
+https://github.com/media-kit/libmpv-win32-audio-build/blob/master/packages/ffmpeg.cmake
+
+mpv source revision: 652a1dd; upstream audio build uses -Dgpl=false.
+https://github.com/mpv-player/mpv/tree/652a1dd
+See mpv-Copyright.txt and LGPL-2.1.txt for its notices and exceptions.
+
+FFmpeg source revision: ea3d24bbe3c58b171e55fe2151fc7ffaca3ab3d2;
+build uses --disable-gpl --disable-nonfree --enable-version3.
+https://github.com/FFmpeg/FFmpeg/tree/ea3d24bbe3c58b171e55fe2151fc7ffaca3ab3d2
+See LGPL-3.0.txt and GPL-3.0.txt (incorporated by LGPLv3).
+Other native dependencies retain their own notices in their upstream sources.
+
+The application loads the separate DLL through FFI; no native source changes
+were made. Replacement/rebuilding of the native library is not restricted by
+the application. Local validation and distribution are recorded separately
+from public releases; assess all native notices/source requirements before a
+future public release or changing platform-native bundles.

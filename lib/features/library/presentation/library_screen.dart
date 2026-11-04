@@ -17,15 +17,20 @@ import '../../workspace/presentation/settings_workspace.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'collection_workspace.dart';
 import 'sidebar.dart';
+import '../../player/application/music_player_controller.dart';
+import '../../player/presentation/player_scope.dart';
+import '../../player/presentation/player_bar.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen(
       {super.key,
       required this.controller,
+      this.player,
       this.connections,
       this.initialPlaylist = '',
       this.showConnectionsOnStart = false});
   final LibraryController controller;
+  final MusicPlayerController? player;
   final SpotifyConnectionController? connections;
   final String initialPlaylist;
   final bool showConnectionsOnStart;
@@ -56,6 +61,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void dispose() {
     widget.controller.removeListener(_requestInspector);
     _workspace.dispose();
+    widget.player?.dispose();
     super.dispose();
   }
 
@@ -101,61 +107,80 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppNoticeHost(
-      listenable: Listenable.merge([widget.controller, _workspace]),
-      readMessage: () {
-        final c = widget.controller;
-        if (!c.busy && !c.searching && c.message.isNotEmpty) return c.message;
-        return _workspace.message;
-      },
-      acknowledge: (message) {
-        widget.controller.acknowledgeMessage(message);
-        _workspace.acknowledgeMessage(message);
-      },
-      child: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.keyO, control: true): () =>
-                unawaited(widget.controller.importCsv()),
+  Widget build(BuildContext context) => PlayerScope(
+      player: widget.player,
+      child: AppNoticeHost(
+          listenable: Listenable.merge([widget.controller, _workspace]),
+          readMessage: () {
+            final c = widget.controller;
+            if (!c.busy && !c.searching && c.message.isNotEmpty) {
+              return c.message;
+            }
+            return _workspace.message;
           },
-          child: ListenableBuilder(
-              listenable: widget.controller,
-              builder: (context, child) =>
-                  LayoutBuilder(builder: (context, constraints) {
-                    final mobile = constraints.maxWidth < 780;
-                    return Scaffold(
-                        backgroundColor: AppColors.background,
-                        bottomNavigationBar: mobile
-                            ? MobileNavigation(
-                                selected: _section,
-                                onSelect: (value) => _navigate(value))
-                            : null,
-                        body: SafeArea(
-                            child: Row(
-                                key: const ValueKey('app-edge-to-edge'),
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                              if (!mobile)
-                                LibrarySidebar(
+          acknowledge: (message) {
+            widget.controller.acknowledgeMessage(message);
+            _workspace.acknowledgeMessage(message);
+          },
+          child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.keyO, control: true):
+                    () => unawaited(widget.controller.importCsv()),
+                if (widget.player != null) ...{
+                  const SingleActivator(LogicalKeyboardKey.mediaPlayPause):
+                      () => unawaited(widget.player!.toggle()),
+                  const SingleActivator(LogicalKeyboardKey.mediaTrackNext):
+                      () => unawaited(widget.player!.next()),
+                  const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious):
+                      () => unawaited(widget.player!.previous()),
+                },
+              },
+              child: ListenableBuilder(
+                  listenable: widget.controller,
+                  builder: (context, child) =>
+                      LayoutBuilder(builder: (context, constraints) {
+                        final mobile = constraints.maxWidth < 780;
+                        return Scaffold(
+                            backgroundColor: AppColors.background,
+                            bottomNavigationBar: mobile
+                                ? MobileNavigation(
                                     selected: _section,
-                                    onSelect: (value) => _navigate(value)),
+                                    onSelect: (value) => _navigate(value))
+                                : null,
+                            body: SafeArea(
+                                child: Column(children: [
                               Expanded(
-                                  child: Padding(
-                                      padding: EdgeInsets.fromLTRB(
-                                          mobile ? 16 : 28,
-                                          mobile ? 18 : 26,
-                                          mobile ? 16 : 28,
-                                          12),
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            _heading(mobile),
-                                            const SizedBox(height: 20),
-                                            Expanded(child: _sections()),
-                                            _status(),
-                                          ]))),
+                                  child: Row(
+                                      key: const ValueKey('app-edge-to-edge'),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                    if (!mobile)
+                                      LibrarySidebar(
+                                          selected: _section,
+                                          onSelect: (value) =>
+                                              _navigate(value)),
+                                    Expanded(
+                                        child: Padding(
+                                            padding: EdgeInsets.fromLTRB(
+                                                mobile ? 16 : 28,
+                                                mobile ? 18 : 26,
+                                                mobile ? 16 : 28,
+                                                12),
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  _heading(mobile),
+                                                  const SizedBox(height: 20),
+                                                  Expanded(child: _sections()),
+                                                  _status(),
+                                                ]))),
+                                  ])),
+                              if (widget.player != null)
+                                PlayerBar(player: widget.player!)
                             ])));
-                  }))));
+                      })))));
 
   Widget _heading(bool mobile) {
     if (_section == AppSection.home) {

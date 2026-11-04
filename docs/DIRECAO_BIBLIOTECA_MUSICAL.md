@@ -46,7 +46,7 @@ Quando não houver reprodução interna disponível, mostrar Abrir referência c
 
 O link original da ocorrência e o link de cada candidata têm papéis separados e devem permanecer identificáveis. Abrir/escutar uma candidata não substitui o original; só Usar esta versão muda a correspondência. Referências são URLs públicas canônicas; URLs temporárias de streaming, tokens e cookies não são links de referência. Vínculos de referência não comprovam equivalência entre gravações.
 
-Situação atual inspecionada: `Candidate.pageUrl` já identifica a página da candidata e `previewUrl` existe no modelo. A conferência ainda não apresenta uma ação de referência por candidata e não há player integrado. Este documento registra o comportamento pretendido, não uma implementação entregue.
+Situação inicial inspecionada: `Candidate.pageUrl` já identifica a página da candidata e `previewUrl` existe no modelo. A referência por candidata, player local e prévias passaram a ser implementados na versão local 0.1.34; consultar `VERSAO_LOCAL_0_1_34.md` para capacidades e limites. As demais propostas deste documento não se tornam disponíveis por essa implementação.
 
 Viabilidade pesquisada nas fontes dos provedores: o [YouTube IFrame Player](https://developers.google.com/youtube/iframe_api_reference) oferece reprodução incorporada, mas a incorporação pode ser bloqueada por vídeo e requer integração/validação em cada plataforma. O [Spotify Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk/reference) é uma integração de navegador e exige Spotify Premium; a conexão de importação existente não comprova reprodução. Prévias são opcionais e dependem da fonte e versão consultadas. Nenhuma destas capacidades foi validada dentro do D.d nesta etapa.
 
@@ -83,4 +83,4 @@ Documentação dos mantenedores consultada em 04/11/2026:
 - [just_audio](https://pub.dev/packages/just_audio): controles de áudio e sequenciamento; Windows requer uma implementação adicional.
 - [just_audio_windows](https://pub.dev/packages/just_audio_windows): implementação baseada no WinRT MediaPlayer, declara arquivos locais, seek, volume, playlist e shuffle.
 
-Nenhum pacote foi instalado ou validado neste estudo. A escolha depende de um ensaio de reprodução real, licenças, distribuição e suporte nas plataformas do produto. Documentação de um pacote não comprova reprodução no app.
+O estudo inicial não instalou pacotes. A etapa 0.1.34 escolheu media_kit e fez ensaios próprios no Windows, documentados separadamente. Documentação de um pacote e widget mobile não comprovam reprodução nativa nas demais plataformas.

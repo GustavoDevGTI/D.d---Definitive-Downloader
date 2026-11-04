@@ -195,6 +195,8 @@ void main() {
       await capture(tester, captureKey, 'music-connections-${width.toInt()}');
       await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.textContaining('Exemplo local').first);
+      await tester.pumpAndSettle();
       await tester.runAsync(
           () => tester.tap(find.textContaining('Exemplo local').first));
       await tester.runAsync(() => controller.refresh());

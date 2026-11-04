@@ -7,6 +7,10 @@ import 'app/definitive_downloader_app.dart';
 import 'core/network/bounded_http.dart';
 import 'core/platform/desktop_files.dart';
 import 'core/platform/music_engine_diagnostic.dart';
+import 'core/platform/player_diagnostic.dart';
+import 'features/player/application/music_player_controller.dart';
+import 'features/player/data/media_kit_engine.dart';
+import 'features/player/data/player_library.dart';
 import 'core/storage/database.dart';
 import 'features/downloads/download_service.dart';
 import 'features/importing/csv_importer.dart';
@@ -26,6 +30,9 @@ import 'features/matching/music_resolver.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (arguments.contains('--check-player')) {
+    exit(await diagnosePlayer(arguments));
+  }
   if (arguments.contains('--check-music-engine')) {
     exit(await diagnoseMusicEngine(WindowsMusicEngine.installed()));
   }
@@ -53,6 +60,9 @@ Future<void> main(List<String> arguments) async {
       downloader: DownloadService(http, rootBundle,
           music: MusicDownloadService(engine, deezer)));
   await controller.initialize(example: arguments.contains('--example'));
+  final player = MusicPlayerController(
+      PlayerLibrary(database), createAudioEngine(), files);
+  await player.initialize();
   final playlistArgument =
       arguments.where((value) => value.startsWith('--playlist=')).firstOrNull;
   var initialPlaylist = '';
@@ -63,6 +73,7 @@ Future<void> main(List<String> arguments) async {
   }
   runApp(DefinitiveDownloaderApp(
       controller: controller,
+      player: player,
       connections: connections,
       initialPlaylist: initialPlaylist,
       showConnectionsOnStart: arguments.contains('--connections')));

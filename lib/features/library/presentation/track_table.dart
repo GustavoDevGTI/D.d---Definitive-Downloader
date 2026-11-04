@@ -9,6 +9,7 @@ import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
 import 'edit_track_dialog.dart';
+import '../../player/presentation/player_scope.dart';
 
 class TrackTable extends StatefulWidget {
   const TrackTable(
@@ -85,6 +86,8 @@ class _TrackTableState extends State<TrackTable> {
                           child: _header(
                               'Correspondência', TrackSort.correspondence))
                     ],
+                    if (PlayerScope.of(context) != null)
+                      const SizedBox(width: 48),
                   ])),
               Expanded(
                   child: controller.page.items.isEmpty
@@ -275,6 +278,24 @@ class _TrackTableState extends State<TrackTable> {
                                                                 : FontWeight
                                                                     .w400))),
                                               ],
+                                              if (PlayerScope.of(context) != null)
+                                                IconButton(
+                                                    tooltip: PlayerScope.of(context)!.canListenTrack(t)
+                                                        ? PlayerScope.of(context)!
+                                                            .trackListenLabel(t)
+                                                        : 'Abrir referência',
+                                                    onPressed: () => unawaited(PlayerScope.of(context)!.canListenTrack(t)
+                                                        ? PlayerScope.of(context)!
+                                                            .listenTrack(t)
+                                                        : PlayerScope.of(context)!.openReference(PlayerScope.of(context)!
+                                                            .library
+                                                            .referenceFor(t))),
+                                                    icon: Icon(
+                                                        PlayerScope.of(context)!.canListenTrack(t)
+                                                            ? Icons.play_arrow_rounded
+                                                            : Icons.open_in_new_rounded,
+                                                        color: AppColors.accentActive,
+                                                        size: 21)),
                                             ])))));
                           })),
               _pageControls(),

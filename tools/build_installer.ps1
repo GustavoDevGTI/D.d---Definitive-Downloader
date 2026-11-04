@@ -9,7 +9,7 @@ $root = [IO.Path]::GetFullPath($WorkspaceRoot)
 $pubspec = Get-Content -LiteralPath (Join-Path $root 'pubspec.yaml') -Raw
 $match = [regex]::Match($pubspec, '(?m)^version:\s*(\d+\.\d+\.\d+)\+\d+\s*$')
 if (-not $match.Success) { throw 'Versão inválida em pubspec.yaml.' }
-foreach ($required in @('definitive_downloader.exe','music_engine\dd_music_worker.exe','data\flutter_assets')) {
+foreach ($required in @('definitive_downloader.exe','music_engine\dd_music_worker.exe','libmpv-2.dll','media_kit_libs_windows_audio_plugin.dll','licenses\audio\NOTICE.txt','data\flutter_assets')) {
     if (-not (Test-Path -LiteralPath (Join-Path $PackageDir $required))) { throw "Pacote incompleto: $required" }
 }
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
