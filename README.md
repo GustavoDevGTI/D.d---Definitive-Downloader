@@ -77,7 +77,7 @@ No Windows, abra `INICIAR.cmd`. Ele atualiza o pacote em `%LOCALAPPDATA%\Definit
 Para compilar a partir dos fontes:
 
 ```powershell
-& .\tools\build_windows.ps1
+& .\tools\build_windows.ps1 -TestAreas collections
 ```
 
 O script usa um diretório de compilação local em `%LOCALAPPDATA%\DefinitiveDownloaderDev`, porque o workspace pode estar em unidade de rede sem suporte a symlinks. Ele não altera os fontes no diretório local: os fontes oficiais permanecem neste workspace. São necessários Flutter e Visual Studio Build Tools com o workload C++.
@@ -135,6 +135,6 @@ Responsabilidades no fluxo musical:
 
 As tabelas mantêm navegação/gestos e delegam a apresentação das linhas. Progresso de transferência usa `transferUpdates`; recarga de dados usa a revisão da biblioteca. `test/architecture_test.dart` impede ciclos de importação e dependências de plataforma/SQL na apresentação e no domínio. Os testes de custo verificam notificações e consultas evitadas, sem equivaler a um benchmark de FPS.
 
-Validação: `dart format`, `flutter analyze` e `flutter test`. Regras de continuidade em [AGENTS.md](AGENTS.md); análise original, decisões e resultados em [docs/](docs/).
+Validação local: núcleo essencial + testes da área alterada, com `tools/test_project.ps1 -Area collections` (workspace Flutter local sincronizado). Regressão completa somente quando necessária ou antes de release: `-Profile Regression`. Divisão, comandos e critérios em [POLITICA_DE_TESTES.md](docs/POLITICA_DE_TESTES.md); regras de continuidade em [AGENTS.md](AGENTS.md).
 
 Manrope usa SIL Open Font License; texto em `assets/fonts/OFL.txt`. O áudio e a imagem do exemplo são fixtures sintéticas criadas localmente. Dependências conservam suas licenças próprias. Nenhum código C2/JDownloader foi incorporado.

@@ -1,0 +1,24 @@
+{
+  "essential": [
+    "test/architecture_test.dart",
+    "test/matching_test.dart",
+    "test/music_policy_test.dart",
+    "test/repository_test.dart",
+    "test/download_test.dart"
+  ],
+  "areas": {
+    "collections": ["test/collection_organization_test.dart", "test/playlist_editing_test.dart", "test/track_interaction_test.dart", "test/collection_composition_test.dart", "test/collection_duplicates_test.dart"],
+    "imports": ["test/csv_importer_test.dart", "test/spotify_importer_test.dart", "test/spotify_account_importer_test.dart", "test/public_playlist_import_test.dart", "test/soundcloud_import_test.dart", "test/music_link_test.dart", "test/collection_composition_test.dart"],
+    "matching": ["test/music_resolver_test.dart", "test/playlist_matching_test.dart", "test/soundcloud_source_test.dart"],
+    "downloads": ["test/workspace_repository_test.dart", "test/workspace_download_controller_test.dart", "test/download_columns_test.dart", "test/download_metrics_test.dart", "test/redownload_test.dart"],
+    "player": ["test/music_player_test.dart", "test/player_navigation_test.dart", "test/artwork_store_test.dart", "test/audio_slider_test.dart"],
+    "connections": ["test/spotify_auth_test.dart", "test/spotify_connection_test.dart", "test/spotify_account_importer_test.dart"],
+    "storage": ["test/library_migration_test.dart", "test/continuous_listing_test.dart", "test/collection_organization_test.dart", "test/collection_duplicates_test.dart"],
+    "ui_collections": ["test/collection_manager_test.dart", "test/collection_composition_layout_test.dart", "test/track_interaction_test.dart"],
+    "ui_downloads": ["test/download_table_layout_test.dart", "test/download_scroll_test.dart"],
+    "ui_player": ["test/music_player_layout_test.dart", "test/audio_slider_test.dart"],
+    "ui_common": ["test/app_notice_test.dart", "test/button_hover_motion_test.dart", "test/capture_layout_test.dart", "test/continuous_scroll_test.dart"],
+    "worker": ["test/music_resolver_test.dart", "test/music_policy_test.dart", "test/soundcloud_source_test.dart"]
+  },
+  "regression_only": ["test/layout_test.dart", "test/update_cost_test.dart"]
+}

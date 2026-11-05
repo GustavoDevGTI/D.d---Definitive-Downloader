@@ -1,5 +1,13 @@
-﻿param([switch]$SkipTests, [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent))
+﻿param(
+    [switch]$SkipTests,
+    [switch]$SkipAnalysis,
+    [ValidateSet('Local','Essential','Regression')][string]$TestProfile='Local',
+    [string[]]$TestAreas=@(),
+    [string[]]$TestFiles=@(),
+    [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent)
+)
 $ErrorActionPreference = 'Stop'
+if($SkipTests -and $TestProfile -eq 'Regression') { throw 'Regression não permite SkipTests.' }
 $workspace = [IO.Path]::GetFullPath($WorkspaceRoot)
 $flutter = Join-Path $env:LOCALAPPDATA 'DownloaderDevTools\flutter\bin\flutter.bat'
 if (-not (Test-Path -LiteralPath $flutter)) {
@@ -23,6 +31,15 @@ foreach ($folder in @('lib','assets','test','windows')) {
 }
 foreach ($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml')) {
     Copy-Item -LiteralPath (Join-Path $workspace $name) -Destination (Join-Path $stage $name) -Force
+}
+$testTools=Join-Path $stage 'tools'
+New-Item -ItemType Directory -Path $testTools -Force | Out-Null
+foreach($name in @('test_project.ps1','test_suites.json')) {
+    Copy-Item -LiteralPath (Join-Path $workspace "tools/$name") -Destination (Join-Path $testTools $name) -Force
+}
+if(-not $SkipTests -and ($TestProfile -eq 'Regression' -or 'worker' -in $TestAreas)) {
+    & robocopy (Join-Path $workspace 'runtime/music_worker') (Join-Path $stage 'runtime/music_worker') /E /XD __pycache__ /NFL /NDL /NJH /NJS /NP | Out-Null
+    if($LASTEXITCODE -ge 8) { throw 'Falha ao preparar testes do motor.' }
 }
 Push-Location $stage
 try {
@@ -85,11 +102,12 @@ try {
     $rules = $rules.Replace('flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/windows', '"${DD_PLUGIN_${ffi_plugin}}/windows"')
     $localRules = ($definitions -join [Environment]::NewLine) + [Environment]::NewLine + $rules
     Set-Content -LiteralPath 'windows\flutter\plugins_local.cmake' -Value $localRules -Encoding utf8
-    & $flutter analyze --no-pub
-    if ($LASTEXITCODE -ne 0) { throw 'A análise estática falhou.' }
+    if (-not $SkipAnalysis) {
+        & $flutter analyze --no-pub
+        if ($LASTEXITCODE -ne 0) { throw 'A análise estática falhou.' }
+    }
     if (-not $SkipTests) {
-        & $flutter test --no-pub
-        if ($LASTEXITCODE -ne 0) { throw 'Os testes falharam.' }
+        & (Join-Path $testTools 'test_project.ps1') -WorkspaceRoot $stage -FlutterPath $flutter -Profile $TestProfile -Area $TestAreas -TestFiles $TestFiles
     }
     & $flutter build windows --release --no-pub
     if ($LASTEXITCODE -ne 0) { throw 'A compilação Windows falhou.' }
