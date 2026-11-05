@@ -138,9 +138,14 @@ class LibraryRepository {
         }
       });
 
-  Future<bool> needsAutomaticMatching(int id) => database.run((db) => db.select(
-      "SELECT 1 FROM tracks WHERE collection_id=? AND status='pending' AND match_status='pending' AND source_kind='none' AND manual_url='' AND redownload_state='' LIMIT 1",
-      [id]).isNotEmpty);
+  Future<bool> needsSourcePreparation(int id, {bool deezerConnected = false}) =>
+      database.run((db) => db.select('''SELECT 1 FROM tracks
+        WHERE collection_id=? AND status='pending' AND redownload_state=''
+        AND ((match_status='pending' AND source_kind='none' AND manual_url='')
+          OR (match_status='manual' AND manual_url!='' AND
+            (source_kind IN ('youtubeMusic','youtube','soundcloud')
+              OR (source_kind='deezerFull' AND ?=1)))) LIMIT 1''',
+          [id, deezerConnected ? 1 : 0]).isNotEmpty);
 
   Future<TrackPage> page(int id,
           {int offset = 0,

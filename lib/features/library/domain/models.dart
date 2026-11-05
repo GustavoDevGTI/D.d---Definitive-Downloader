@@ -184,7 +184,7 @@ class Track {
   final String resolvedAlbum;
   final int? resolvedDurationMs;
   bool get canDownload =>
-      !(sourceKind == SourceKind.soundcloud && status == TrackStatus.pending) &&
+      !(hasManualSource && status == TrackStatus.pending) &&
       !redownloadReview &&
       hasDownloadableSource;
   bool get hasDownloadableSource =>

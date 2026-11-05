@@ -29,19 +29,20 @@ class LibraryMusicSources {
       for (final track in batch.items) {
         token.check();
         if (track.redownloadState.isNotEmpty) continue;
-        if (onlyPending && !track.needsAutomaticMatching) continue;
         if (track.hasManualSource &&
             track.status == TrackStatus.pending &&
+            track.matchStatus == MatchStatus.manual &&
             resolver.available &&
             (track.sourceKind == SourceKind.youtubeMusic ||
                 track.sourceKind == SourceKind.youtube ||
-                track.sourceKind == SourceKind.soundcloud ||
                 track.sourceKind == SourceKind.soundcloud ||
                 (track.sourceKind == SourceKind.deezerFull &&
                     resolver.connection.connected))) {
           await repository.setStatus(track.id, TrackStatus.ready);
           prepared++;
+          await recordsChanged();
         }
+        if (onlyPending && !track.needsAutomaticMatching) continue;
         if (track.status == TrackStatus.completed ||
             track.hasManualSource ||
             track.sourceKind == SourceKind.localExample) {

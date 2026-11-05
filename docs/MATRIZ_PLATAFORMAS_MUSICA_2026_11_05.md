@@ -1,5 +1,7 @@
 # Plataformas musicais: entrada e obtenção de áudio
 
+Atualização posterior: a primeira etapa (playlists Deezer/YouTube/YouTube Music) foi implementada na [0.1.45 local](VERSAO_LOCAL_0_1_45.md). A matriz abaixo mantém o diagnóstico da 0.1.44 para distinguir pesquisa e implementação.
+
 Pesquisa em 05/11/2026 sobre o D.d **0.1.44**, a pedido do usuário. Escopo: todas as 19 plataformas da captura do Tune My Music, mais Texto livre, Enviar arquivo e URL. Pesquisa e ensaios de metadados; nenhuma integração habilitada, dependência alterada, conta conectada ou versão incrementada nesta etapa.
 
 ## Conclusão para o produto

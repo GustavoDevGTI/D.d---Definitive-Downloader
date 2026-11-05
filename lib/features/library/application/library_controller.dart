@@ -10,6 +10,9 @@ import '../../importing/demo_collection.dart';
 import '../../importing/spotify_importer.dart';
 import '../../importing/soundcloud_catalog.dart';
 import '../../importing/soundcloud_link.dart';
+import '../../importing/public_playlist_link.dart';
+import '../../importing/deezer_playlist_catalog.dart';
+import '../../importing/youtube_playlist_catalog.dart';
 import '../../importing/spotify_account_importer.dart';
 import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
@@ -37,10 +40,14 @@ class LibraryController extends ChangeNotifier {
       required this.downloader,
       this.accountSpotify,
       SoundCloudCatalog? soundcloud,
+      this.deezerPlaylists = const DeezerPlaylistCatalog(),
+      this.youtubePlaylists = const YouTubePlaylistCatalog(),
       this.linkCatalog,
       this.music})
       : soundcloud = soundcloud ?? SoundCloudCatalog();
   final SoundCloudCatalog soundcloud;
+  final DeezerPlaylistCatalog deezerPlaylists;
+  final YouTubePlaylistCatalog youtubePlaylists;
   DownloadCancellation? _importCancellation;
   final MusicResolver? music;
   final MusicLinkCatalog? linkCatalog;
@@ -308,7 +315,8 @@ class LibraryController extends ChangeNotifier {
     if (!busy &&
         music?.available == true &&
         !isExample &&
-        await repository.needsAutomaticMatching(collection.id) &&
+        await repository.needsSourcePreparation(collection.id,
+            deezerConnected: music!.connection.connected) &&
         current?.id == collection.id) {
       unawaited(prepareMusic(onlyPending: true));
     }
@@ -503,19 +511,37 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> loadExample() => _import(() async => demoCollection());
   Future<void> importSpotify(String url) => importPlaylist(url);
-  Future<void> importPlaylist(String url) =>
-      _import(() => SoundCloudLink.recognizes(url)
-          ? soundcloud.open(url,
+  Future<void> importPlaylist(String url) => _import(() {
+        bool cancelled() => _disposed || _importCancellation?.cancelled == true;
+        void progress(int done, int total) {
+          message = 'Lendo faixas: $done/$total';
+          notifyListeners();
+        }
+
+        if (SoundCloudLink.recognizes(url)) {
+          return soundcloud.open(url,
               downloadAvailable: music?.available == true,
-              cancelled: () =>
-                  _disposed || _importCancellation?.cancelled == true,
-              onProgress: (done, total) {
-                message = 'Lendo faixas SoundCloud: $done/$total';
-                notifyListeners();
-              })
-          : accountSpotify?.isConnected == true
-              ? accountSpotify!.open(url)
-              : spotify.open(url));
+              cancelled: cancelled,
+              onProgress: progress);
+        }
+        final link = PublicPlaylistLink.recognize(url);
+        if (link != null) {
+          if (link.kind == PublicPlaylistKind.deezer) {
+            return deezerPlaylists.open(link,
+                downloadAvailable:
+                    music?.available == true && music!.connection.connected,
+                cancelled: cancelled,
+                onProgress: progress);
+          }
+          return youtubePlaylists.open(link,
+              downloadAvailable: music?.available == true,
+              cancelled: cancelled,
+              onProgress: progress);
+        }
+        return accountSpotify?.isConnected == true
+            ? accountSpotify!.open(url)
+            : spotify.open(url);
+      });
   Future<void> importCsv() async {
     if (busy) return;
     final path = await files.chooseCsv();
