@@ -65,6 +65,7 @@ void main() {
   test('migração v11 acrescenta capa sem alterar nomes ou mídia', () async {
     final id = await repository.create('Antes da capa');
     await library.database.run((db) {
+      removeContinuousSchema(db);
       db.execute('ALTER TABLE collections DROP COLUMN cover_path');
       db.execute('PRAGMA user_version=11');
     });
@@ -179,7 +180,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        12);
+        13);
     expect(
         await library.database
             .run((db) => db.select('PRAGMA foreign_key_check').length),

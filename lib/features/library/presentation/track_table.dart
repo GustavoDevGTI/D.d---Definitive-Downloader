@@ -31,9 +31,11 @@ class _TrackTableState extends State<TrackTable> {
   LibraryController get controller => widget.controller;
   final _scroll = ScrollController();
   final _viewportKey = GlobalKey();
-  Timer? _autoScroll, _pageTimer;
+  Timer? _autoScroll;
   int _scrollDirection = 0;
-  int? _hoverPage;
+  Object? _listingKey;
+  int _inspectorRequest = 0;
+  int? _focusedId, _focusedPosition;
   _TrackDrag? _drag;
   bool get _editable =>
       !controller.busy && controller.current?.editingLocked != true;
@@ -42,7 +44,6 @@ class _TrackTableState extends State<TrackTable> {
   @override
   void dispose() {
     _autoScroll?.cancel();
-    _pageTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -55,10 +56,41 @@ class _TrackTableState extends State<TrackTable> {
           child: LayoutBuilder(builder: (context, box) {
             final compact = box.maxWidth < 500;
             final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+            final extent = (compact ? 84.0 : 76.0) * scale.clamp(1, 2);
+            final listingKey = (
+              controller.current?.id,
+              controller.collectionQuery,
+              controller.view,
+              controller.trackSort,
+              controller.trackDescending
+            );
+            final changed = _listingKey != listingKey;
+            _listingKey = listingKey;
+            final focused = controller.focused;
+            final reveal = _inspectorRequest != controller.inspectorRequest ||
+                (focused != null &&
+                    focused.id == _focusedId &&
+                    focused.position != _focusedPosition);
+            _inspectorRequest = controller.inspectorRequest;
+            _focusedId = focused?.id;
+            _focusedPosition = focused?.position;
+            if (changed || reveal) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || !_scroll.hasClients) return;
+                final index = reveal
+                    ? controller.page.items
+                        .indexWhere((t) => t.id == focused?.id)
+                    : 0;
+                if (index >= 0) {
+                  _scroll.jumpTo((index * extent)
+                      .clamp(0, _scroll.position.maxScrollExtent));
+                }
+              });
+            }
             return Column(children: [
               Container(
                   color: AppColors.surface,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.fromLTRB(6, 0, 18, 0),
                   child: Row(children: [
                     SizedBox(
                         width: 36,
@@ -101,32 +133,48 @@ class _TrackTableState extends State<TrackTable> {
                           child: Text('Nenhuma faixa neste filtro.',
                               style: TextStyle(
                                   fontSize: 12, color: AppColors.muted)))
-                      : ListView.builder(
-                          key: _viewportKey,
-                          controller: _scroll,
-                          primary: false,
-                          itemExtent:
-                              (compact ? 84.0 : 76.0) * scale.clamp(1, 2),
-                          itemCount: controller.page.items.length,
-                          itemBuilder: (context, index) {
-                            final t = controller.page.items[index];
-                            final focused = controller.focused?.id == t.id;
-                            return _interactive(context, t,
-                                rowHeight:
-                                    (compact ? 84.0 : 76.0) * scale.clamp(1, 2),
-                                width: box.maxWidth,
-                                child: TrackRow(
-                                    track: t,
-                                    focused: focused,
-                                    compact: compact,
-                                    selectionEnabled: !controller.busy,
-                                    onTap: () => unawaited(_click(t)),
-                                    onContextMenu: (point) =>
-                                        unawaited(_contextMenu(t, point)),
-                                    onSelect: (v) =>
-                                        unawaited(controller.select(t, v))));
-                          })),
-              _pageControls(),
+                      : ClipRect(
+                          child: RawScrollbar(
+                              controller: _scroll,
+                              thumbVisibility: true,
+                              trackVisibility: true,
+                              interactive: true,
+                              thickness: 8,
+                              radius: const Radius.circular(4),
+                              thumbColor: AppColors.accent,
+                              trackColor: AppColors.surface,
+                              padding: const EdgeInsets.fromLTRB(0, 6, 1, 6),
+                              child: Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: ListView.builder(
+                                      key: _viewportKey,
+                                      controller: _scroll,
+                                      primary: false,
+                                      itemExtent: (compact ? 84.0 : 76.0) *
+                                          scale.clamp(1, 2),
+                                      itemCount: controller.page.items.length,
+                                      itemBuilder: (context, index) {
+                                        final t = controller.page.items[index];
+                                        final focused =
+                                            controller.focused?.id == t.id;
+                                        return _interactive(context, t,
+                                            rowHeight: (compact ? 84.0 : 76.0) *
+                                                scale.clamp(1, 2),
+                                            width: box.maxWidth,
+                                            child: TrackRow(
+                                                track: t,
+                                                focused: focused,
+                                                compact: compact,
+                                                selectionEnabled:
+                                                    !controller.busy,
+                                                onTap: () =>
+                                                    unawaited(_click(t)),
+                                                onContextMenu: (point) =>
+                                                    unawaited(
+                                                        _contextMenu(t, point)),
+                                                onSelect: (v) => unawaited(
+                                                    controller.select(t, v))));
+                                      }))))),
             ]);
           }));
 
@@ -198,8 +246,6 @@ class _TrackTableState extends State<TrackTable> {
 
   void _finishDrag() {
     _autoScroll?.cancel();
-    _pageTimer?.cancel();
-    _hoverPage = null;
     _scrollDirection = 0;
     if (mounted && _drag != null) setState(() => _drag = null);
   }
@@ -359,65 +405,5 @@ class _TrackTableState extends State<TrackTable> {
     if (error != null && mounted) {
       await showAppNotice(context, message: error);
     }
-  }
-
-  Widget _pageControls() => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.line))),
-      child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        Flexible(
-            child: Text(
-                controller.page.total == 0
-                    ? '0 faixas'
-                    : '${controller.offset + 1}–${controller.offset + controller.page.items.length} de ${controller.page.total}',
-                style: const TextStyle(fontSize: 11, color: AppColors.muted))),
-        _pageTarget(-1),
-        _pageTarget(1),
-      ]));
-
-  Widget _pageTarget(int direction) {
-    final enabled = direction < 0
-        ? controller.offset > 0
-        : controller.offset + controller.page.items.length <
-            controller.page.total;
-    return DragTarget<_TrackDrag>(
-      key: ValueKey('track-page-$direction'),
-      onWillAcceptWithDetails: (d) =>
-          enabled &&
-          _reorderable &&
-          d.data.collectionId == controller.current?.id,
-      onMove: (_) {
-        if (_hoverPage == direction) return;
-        _pageTimer?.cancel();
-        _hoverPage = direction;
-        _pageTimer = Timer(const Duration(milliseconds: 650), () async {
-          if (!mounted ||
-              _drag == null ||
-              !enabled ||
-              controller.reorderingBusy) {
-            return;
-          }
-          await controller.turnPage(direction);
-          if (mounted && _scroll.hasClients) {
-            _scroll
-                .jumpTo(direction > 0 ? 0 : _scroll.position.maxScrollExtent);
-          }
-        });
-      },
-      onLeave: (_) {
-        _pageTimer?.cancel();
-        _hoverPage = null;
-      },
-      builder: (context, candidates, rejected) => ColoredBox(
-          color: candidates.isEmpty ? Colors.transparent : AppColors.accentSoft,
-          child: IconButton(
-              tooltip: direction < 0 ? 'Página anterior' : 'Próxima página',
-              onPressed: enabled
-                  ? () => unawaited(controller.turnPage(direction))
-                  : null,
-              icon: Icon(
-                  direction < 0 ? Icons.chevron_left : Icons.chevron_right))),
-    );
   }
 }

@@ -19,6 +19,7 @@ import 'package:definitive_downloader/features/workspace/data/workspace_reposito
 import 'package:definitive_downloader/features/workspace/presentation/workspace_components.dart';
 import 'download_table_layout_test.dart' show capture;
 import 'widget_io.dart';
+import 'schema_fixtures.dart';
 
 class CountedDownload extends DownloadService {
   CountedDownload() : super(const BoundedHttp(), rootBundle);
@@ -153,6 +154,7 @@ void main() {
     final saved = await completeFirst();
     final bytes = await File(saved.localPath).readAsBytes();
     await repo.database.run((db) {
+      removeContinuousSchema(db);
       db.execute('ALTER TABLE tracks DROP COLUMN redownload_state');
       db.execute('ALTER TABLE collections DROP COLUMN cover_path');
       db.execute('PRAGMA user_version=10');
@@ -165,7 +167,7 @@ void main() {
     expect(
         await repo.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        12);
+        13);
   });
   test('link manual aprova a reposição sem iniciar e persiste após reinício',
       () async {

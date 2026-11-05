@@ -10,7 +10,7 @@ class RedownloadRepository {
           {int? collectionId, List<int>? ids, bool failedOnly = false}) =>
       database.run((db) {
         if (ids?.isEmpty == true) return false;
-        if (ids != null && ids.length > 100) {
+        if (ids != null && ids.length > 10000) {
           throw const FormatException('Seleção inválida.');
         }
         final scope = ids == null
@@ -31,7 +31,7 @@ class RedownloadRepository {
           int offset = 0,
           bool failedOnly = false}) =>
       database.run((db) {
-        if (offset < 0 || (ids != null && ids.length > 100)) {
+        if (offset < 0 || (ids != null && ids.length > 10000)) {
           throw const FormatException('Seleção inválida.');
         }
         if (ids?.isEmpty == true) return <Track>[];

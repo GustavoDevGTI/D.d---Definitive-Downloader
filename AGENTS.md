@@ -108,6 +108,8 @@
 
 ## Validação e entrega
 
+- Listas contínuas 0.1.41 local: pedido posterior do usuário remove a paginação visível das faixas em Coleções e de Downloads. Carregar os metadados da coleção completa na importação/abertura, com o limite existente de 10.000 ocorrências, e virtualizar widgets no scroll. Downloads usa lista única com limite defensivo de 100.000 registros e 10.000 por execução. Busca/filtro/ordem e seleção abrangem a lista; preservar repetição e restrições de movimento. Schema 13 rastreia revisões para reler apenas metadados alterados. Paginação interna de execução/importação/histórico continua sendo implementação, sem setas na playlist ou Downloads. Ver `docs/VERSAO_LOCAL_0_1_41.md`.
+
 - Coleções 0.1.40 local: voltar por ícone junto ao título; comandos de playlist, pesquisa, filtro e ordem na mesma linha quando houver largura. Garantir pelo menos quatro faixas completas no desktop com player aberto. Identificação da faixa contém somente posição/título e artista; fonte/arquivo ficam em coluna própria. Play da playlist é vinho preenchido, ações de escuta alinhadas à esquerda e iniciar Downloads usa ícone de download. Mobile adapta controles em duas linhas, preservando acesso aos comandos por rolagem. Ver `docs/VERSAO_LOCAL_0_1_40.md`.
 
 - Limites visuais 0.1.37 local: o player pertence somente a Músicas e ocupa a coluna interna, sem avançar sob a lateral comum. A lateral tem a altura completa e a versão permanece na base esquerda, independentemente do player. Em Downloads, recortar a rolagem no corpo abaixo do cabeçalho e manter a barra vertical afastada 8 px das extremidades; preservar alcance da última linha, cabeçalho fixo e sincronia horizontal. Ver `docs/VERSAO_LOCAL_0_1_37.md`.

@@ -475,8 +475,7 @@ void main() {
       await capture(tester, captureKey, 'music-downloads-${width.toInt()}');
       if (width == 1360 || width == 390) {
         final c = downloadsWidget.controller;
-        c.selectPage(true);
-        c.downloadOffset = 40;
+        c.selectFiltered(true);
         await tester.pumpAndSettle();
         final nameHeader = find.byKey(const ValueKey('sort-download-name'));
         await tester.ensureVisible(nameHeader);
@@ -485,7 +484,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(c.downloadSort, DownloadSort.name);
         expect(c.downloadDescending, isFalse);
-        expect(c.downloadOffset, 0);
         expect(c.selection, isEmpty);
         await capture(tester, captureKey, 'music-sorted-name-${width.toInt()}');
         await tester.runAsync(() => tester.tap(nameHeader));
@@ -534,7 +532,7 @@ void main() {
       }
       expect(downloadsWidget.controller.downloadQuery, isEmpty);
       expect(downloadsWidget.controller.downloads.total, greaterThan(0));
-      downloadsWidget.controller.selectPage(true);
+      downloadsWidget.controller.selectFiltered(true);
       await tester.pumpAndSettle();
       await capture(tester, captureKey, 'music-tools-active-${width.toInt()}');
       final startButton = find
@@ -590,7 +588,6 @@ void main() {
       c.downloadSort = DownloadSort.provider;
       c.downloadDescending = true;
       c.filter = DownloadFilter.failed;
-      c.downloadOffset = 40;
       await tester.ensureVisible(find.byTooltip('Resetar tabela'));
       await tester.runAsync(() => tester.tap(find.byTooltip('Resetar tabela')));
       await tester.runAsync(c.refresh);
@@ -602,7 +599,6 @@ void main() {
       expect(c.filter, DownloadFilter.all);
       expect(c.downloadSort, isNull);
       expect(c.downloadDescending, isFalse);
-      expect(c.downloadOffset, 0);
       expect(c.tableRevision, previousRevision + 1);
       expect(c.selection, isEmpty);
       final summaryAfterReset = await tester.runAsync(c.repository.summary);
@@ -630,7 +626,7 @@ void main() {
       expect(find.byTooltip('Adicionar links'), findsOneWidget);
       expect(find.text('Adicionar links'), findsNothing);
 
-      downloadsWidget.controller.selectPage(false);
+      downloadsWidget.controller.selectFiltered(false);
       await tester.pumpAndSettle();
       expect(find.byTooltip('Pausar fila'), findsOneWidget);
       final tools = find.descendant(

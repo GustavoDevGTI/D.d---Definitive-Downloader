@@ -1,12 +1,11 @@
 import 'dart:io';
-import 'package:path/path.dart' as p;
-import 'package:sqlite3/sqlite3.dart';
 import '../../../core/storage/database.dart';
 import '../../library/data/library_repository.dart';
 import '../../library/domain/models.dart';
 import '../../downloads/run_order.dart';
 import '../domain/workspace_models.dart';
 import '../domain/download_columns.dart';
+import 'download_listing_query.dart';
 
 class WorkspaceRepository {
   const WorkspaceRepository(this.database);
@@ -29,58 +28,20 @@ class WorkspaceRepository {
             (filter == DownloadFilter.paused && !pauseMode)) {
           return const DownloadPage([], 0);
         }
-        final status = switch (filter) {
-          DownloadFilter.downloading =>
-            pauseMode ? ' AND 0' : " AND t.status='downloading'",
-          DownloadFilter.queued => " AND t.status IN ('pending','ready')",
-          DownloadFilter.completed => " AND t.status='completed'",
-          DownloadFilter.failed => " AND t.status='failed'",
-          DownloadFilter.paused => " AND t.status='downloading'",
-          _ => '',
-        };
-        final search = query.trim();
-        final where =
-            "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)$status"
-            " AND (?='' OR instr(lower(t.title),lower(?))>0 OR instr(lower(t.artist),lower(?))>0"
-            " OR instr(lower(t.custom_title),lower(?))>0 OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
-            " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)";
-        final args = List<Object?>.filled(8, search);
-        const from = "FROM tracks t JOIN collections c ON c.id=t.collection_id "
-            "LEFT JOIN download_history h ON h.local_path=t.local_path AND h.track_id=t.id "
-            "AND h.category='music' AND t.status='completed'";
+        final listing = DownloadListingQuery(db,
+            filter: filter,
+            query: query,
+            pauseMode: pauseMode,
+            sort: sort,
+            descending: descending,
+            outputDirectory: outputDirectory);
+        final from = listing.from,
+            where = listing.where,
+            args = listing.args,
+            order = listing.order;
         final count = db
             .select('SELECT COUNT(*) AS n $from WHERE $where', args)
-            .first['n'] as int;
-        var order = 't.queue_priority DESC,t.collection_id,t.position,t.id';
-        if (sort != null) {
-          db.createCollation(
-              name: 'download_text',
-              function: (a, b) =>
-                  (a ?? '').toLowerCase().compareTo((b ?? '').toLowerCase()));
-          db.createFunction(
-              functionName: 'download_folder',
-              argumentCount: const AllowedArgumentCount(1),
-              deterministic: true,
-              function: (args) => (args.first as String).isEmpty
-                  ? outputDirectory
-                  : p.posix
-                      .dirname((args.first as String).replaceAll(r'\', '/')));
-          final expression = switch (sort) {
-            DownloadSort.name =>
-              "(COALESCE(NULLIF(t.custom_title,''),t.title) || ' — ' || COALESCE(NULLIF(t.artist,''),t.resolved_artist)) COLLATE download_text",
-            DownloadSort.provider =>
-              "CASE t.source_kind WHEN 'none' THEN 'A conferir' WHEN 'localExample' THEN 'Exemplo local' WHEN 'directMp3' THEN 'MP3 vinculado' WHEN 'preview' THEN 'Prévia Deezer' WHEN 'deezerFull' THEN 'Deezer' WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'youtube' THEN 'YouTube' ELSE t.source_kind END COLLATE download_text",
-            DownloadSort.status =>
-              "CASE t.status WHEN 'pending' THEN 0 WHEN 'ready' THEN 1 WHEN 'downloading' THEN 2 WHEN 'completed' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END",
-            DownloadSort.downloadedAt => 'julianday(h.created_at)',
-            DownloadSort.destination =>
-              'download_folder(t.local_path) COLLATE download_text',
-          };
-          final direction = descending ? 'DESC' : 'ASC';
-          order = sort == DownloadSort.downloadedAt
-              ? 'CASE WHEN julianday(h.created_at) IS NULL THEN 1 ELSE 0 END ASC,$expression $direction,h.id $direction,t.collection_id,t.position,t.id'
-              : '$expression $direction,t.collection_id,t.position,t.id';
-        }
+            .single['n'] as int;
         final rows = db.select(
             'SELECT t.*,c.name AS collection_name,h.created_at AS downloaded_at $from WHERE $where '
             'ORDER BY $order LIMIT 40 OFFSET ?',
@@ -160,7 +121,7 @@ class WorkspaceRepository {
       });
 
   Future<void> changePriority(List<int> ids, int delta) => database.run((db) {
-        if (ids.length > 100 || ![-1, 1].contains(delta)) {
+        if (ids.length > 10000 || ![-1, 1].contains(delta)) {
           throw ArgumentError('Seleção inválida.');
         }
         db.execute('BEGIN IMMEDIATE');
@@ -208,7 +169,9 @@ class WorkspaceRepository {
   // Removing a queue entry never deletes media, collection occurrences or the
   // independent file history. Relinking its source makes the entry visible again.
   Future<void> removeDownloads(List<int> ids) => database.run((db) {
-        if (ids.length > 100) throw ArgumentError('Seleção deve ser paginada.');
+        if (ids.length > 10000) {
+          throw ArgumentError('Limite de 10.000 itens por ação.');
+        }
         db.execute('BEGIN IMMEDIATE');
         try {
           for (final id in ids) {
@@ -231,7 +194,7 @@ class WorkspaceRepository {
       database.run((db) {
         if (run.isEmpty ||
             (ids == null && collectionId == null) ||
-            (ids != null && (ids.isEmpty || ids.length > 100))) {
+            (ids != null && (ids.isEmpty || ids.length > 10000))) {
           throw const FormatException('Seleção de execução inválida.');
         }
         db.execute('BEGIN IMMEDIATE');
@@ -280,7 +243,7 @@ class WorkspaceRepository {
       database.run((db) {
         if (run.isEmpty ||
             (!snapshot && ids == null && collectionId == null) ||
-            (ids != null && (ids.isEmpty || ids.length > 100))) {
+            (ids != null && (ids.isEmpty || ids.length > 10000))) {
           return null;
         }
         final selection = ids == null
@@ -406,7 +369,7 @@ class WorkspaceRepository {
 
   Future<void> hideCompleted(List<int> trackIds) => database.run((db) {
         if (trackIds.length > 100) {
-          throw ArgumentError('Seleção deve ser paginada.');
+          throw ArgumentError('Limite de 10.000 itens por ação.');
         }
         db.execute('BEGIN IMMEDIATE');
         try {
@@ -427,7 +390,7 @@ class WorkspaceRepository {
 
   Future<Track?> nextQueueItem(List<int>? ids, int afterId) =>
       database.run((db) {
-        if (ids != null && (ids.isEmpty || ids.length > 100)) return null;
+        if (ids != null && (ids.isEmpty || ids.length > 10000)) return null;
         final selection = ids == null
             ? 'selected=1'
             : 'id IN (${List.filled(ids.length, '?').join(',')})';

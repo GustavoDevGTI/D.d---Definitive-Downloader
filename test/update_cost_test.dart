@@ -19,6 +19,7 @@ import 'package:definitive_downloader/features/workspace/data/workspace_reposito
 import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
 import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
 import 'player_fixtures.dart';
+import 'package:definitive_downloader/features/workspace/data/continuous_download_repository.dart';
 
 class ProbeFiles extends DesktopFiles {
   int probes = 0;
@@ -54,19 +55,6 @@ class ProbeWorkspace extends WorkspaceRepository {
   }
 
   @override
-  Future<DownloadPage> downloads(ContentCategory category,
-      {DownloadFilter filter = DownloadFilter.all,
-      int offset = 0,
-      String query = '',
-      bool pauseMode = false,
-      DownloadSort? sort,
-      bool descending = false,
-      String outputDirectory = ''}) async {
-    reads++;
-    return const DownloadPage([], 0);
-  }
-
-  @override
   Future<HistoryPage> history(
       {String folder = '', String query = '', int offset = 0}) async {
     reads++;
@@ -84,6 +72,23 @@ class ProbeWorkspace extends WorkspaceRepository {
   Future<List<double>> columnWidths() async {
     reads++;
     return downloadColumns.map((c) => c.width).toList();
+  }
+}
+
+class ProbeContinuousDownloads extends ContinuousDownloadRepository {
+  ProbeContinuousDownloads(this.probe) : super(const AppDatabase('unused'));
+  final ProbeWorkspace probe;
+  @override
+  Future<DownloadListingSnapshot> read(ContentCategory category,
+      {required int since,
+      DownloadFilter filter = DownloadFilter.all,
+      String query = '',
+      bool pauseMode = false,
+      DownloadSort? sort,
+      bool descending = false,
+      String outputDirectory = ''}) async {
+    probe.reads++;
+    return const DownloadListingSnapshot(0, [], {}, []);
   }
 }
 
@@ -124,7 +129,8 @@ void main() {
       () async {
     final files = ProbeFiles();
     final c = PulseLibrary(files), repo = ProbeWorkspace();
-    final workspace = WorkspaceController(c, repository: repo);
+    final workspace = WorkspaceController(c,
+        repository: repo, downloadRepository: ProbeContinuousDownloads(repo));
     addTearDown(workspace.dispose);
     addTearDown(c.dispose);
     await workspace.refresh();
@@ -169,7 +175,7 @@ void main() {
         downloader: BurstDownload());
     c.outputDirectory = temp.path;
     await c.openCollection((await repo.collectionById(id))!);
-    await c.selectPage(true);
+    await c.selectCollection(true);
     var libraryUpdates = 0, metrics = 0;
     c.addListener(() => libraryUpdates++);
     c.transferUpdates.addListener(() => metrics++);

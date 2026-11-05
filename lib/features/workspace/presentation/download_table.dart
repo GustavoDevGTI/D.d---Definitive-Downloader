@@ -24,6 +24,8 @@ class DownloadTable extends StatefulWidget {
       this.progress,
       this.transfer,
       this.paused = false,
+      this.onVisible,
+      this.viewKey,
       required this.output});
   final List<DownloadEntry> entries;
   final List<double> widths;
@@ -39,6 +41,8 @@ class DownloadTable extends StatefulWidget {
   final double? progress;
   final TransferProgress? transfer;
   final bool paused;
+  final ValueChanged<List<int>>? onVisible;
+  final Object? viewKey;
   final String output;
   @override
   State<DownloadTable> createState() => _DownloadTableState();
@@ -51,6 +55,8 @@ class _DownloadTableState extends State<DownloadTable> {
   final _horizontal = ScrollController();
   final _headerHorizontal = ScrollController();
   bool _syncing = false;
+  final Set<int> _visible = {};
+  bool _visibilityScheduled = false;
   @override
   void initState() {
     super.initState();
@@ -82,12 +88,25 @@ class _DownloadTableState extends State<DownloadTable> {
   @override
   void didUpdateWidget(covariant DownloadTable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.entries.firstOrNull?.track.id !=
-        widget.entries.firstOrNull?.track.id) {
+    _reportVisible();
+    if (oldWidget.viewKey != widget.viewKey) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _vertical.hasClients) _vertical.jumpTo(0);
       });
     }
+  }
+
+  void _reportVisible([int? id]) {
+    if (id != null) _visible.add(id);
+    if (_visibilityScheduled || widget.onVisible == null) return;
+    _visibilityScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibilityScheduled = false;
+      if (!mounted || widget.onVisible == null) return;
+      final ids = _visible.take(100).toList();
+      _visible.clear();
+      if (ids.isNotEmpty) widget.onVisible!(ids);
+    });
   }
 
   @override
@@ -161,7 +180,7 @@ class _DownloadTableState extends State<DownloadTable> {
                                                       ? Colors.white
                                                       : Colors.transparent),
                                               semanticLabel:
-                                                  'Selecionar downloads da página',
+                                                  'Selecionar todos os downloads do filtro',
                                               value: entries.isNotEmpty &&
                                                   entries.every((e) => selection
                                                       .contains(e.track.id)),
@@ -212,11 +231,18 @@ class _DownloadTableState extends State<DownloadTable> {
                                                         'download-rows'),
                                                     controller: _vertical,
                                                     primary: false,
+                                                    itemExtent: 56 *
+                                                        (MediaQuery.textScalerOf(
+                                                                        context)
+                                                                    .scale(12) /
+                                                                12)
+                                                            .clamp(1, 3),
                                                     itemCount: entries.length,
                                                     itemBuilder:
                                                         (context, index) {
                                                       final e = entries[index],
                                                           t = e.track;
+                                                      _reportVisible(t.id);
                                                       final live =
                                                           t.id == activeId
                                                               ? widget.transfer

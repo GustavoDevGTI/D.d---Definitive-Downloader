@@ -324,7 +324,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        12);
+        13);
   });
 
   test('fonte manual persiste por ocorrência e protege contra busca automática',

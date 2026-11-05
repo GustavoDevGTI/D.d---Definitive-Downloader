@@ -49,9 +49,9 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
             final page = enabled && c.category == category
                 ? c.downloads
                 : const DownloadPage([], 0);
-            final selected = page.items
-                .where((e) => c.selection.contains(e.track.id))
-                .toList();
+            final selected = enabled && c.category == category
+                ? c.selectedDownloads
+                : const <DownloadEntry>[];
             final canStart = enabled &&
                 !library.busy &&
                 selected.any((e) =>
@@ -156,12 +156,6 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       DownloadFilter.failed => 'Erro',
                     }))
             ]);
-            final pagination = PageControls(
-                offset: c.downloadOffset,
-                showDivider: !wide,
-                count: page.items.length,
-                total: page.total,
-                onPage: (v) => unawaited(c.turnDownloads(v)));
             final footer = Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 spacing: 12,
@@ -223,18 +217,23 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                       unawaited(c.saveColumnWidths()),
                                   selection: c.selection,
                                   onSelect: c.select,
-                                  onSelectPage: c.selectPage,
+                                  onSelectPage: c.selectFiltered,
+                                  onVisible: (ids) =>
+                                      unawaited(c.checkVisibleDownloads(ids)),
+                                  viewKey: (
+                                    c.category,
+                                    c.filter,
+                                    c.downloadQuery,
+                                    c.downloadSort,
+                                    c.downloadDescending
+                                  ),
                                   activeId: library.activeTrackId,
                                   progress: library.progress,
                                   transfer: library.transfer,
                                   paused: library.pauseMode,
                                   output: library.outputDirectory))),
-                  if (wide)
-                    Row(children: [
-                      Expanded(child: footer),
-                      SizedBox(width: 260, child: pagination)
-                    ])
-                  else ...[pagination, const SizedBox(height: 6), footer],
+                  const SizedBox(height: 8),
+                  footer,
                 ]);
             final minimumHeight = constraints.maxWidth < 600
                 ? (MediaQuery.textScalerOf(context).scale(12) > 14

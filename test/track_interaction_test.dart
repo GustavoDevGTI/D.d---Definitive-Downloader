@@ -21,7 +21,7 @@ import 'package:definitive_downloader/features/workspace/data/workspace_reposito
 void main() {
   for (final width in [900.0, 390.0]) {
     testWidgets(
-        'clique direito, Ctrl e arraste em grupo/entre páginas a ${width.toInt()}px',
+        'clique direito, Ctrl e arraste em grupo e rolagem contínua a ${width.toInt()}px',
         (tester) async {
       tester.view.physicalSize = Size(width, 700);
       tester.view.devicePixelRatio = 1;
@@ -98,8 +98,11 @@ void main() {
       expect(c.page.items.take(4).map((t) => t.id),
           [original[2], original[3], original[0], original[1]]);
       expect(
-          c.page.items.map((t) => t.position), List.generate(40, (i) => i + 1));
+          c.page.items.map((t) => t.position), List.generate(85, (i) => i + 1));
       expect(c.page.selectedCount, 2);
+      final scroll = tester.widget<ListView>(find.byType(ListView)).controller!;
+      scroll.jumpTo(0);
+      await tester.pumpAndSettle();
       final unchanged = c.page.items.map((t) => t.id).toList();
       final cancel = await tester.startGesture(
           tester.getCenter(row(original[2])),
@@ -114,24 +117,35 @@ void main() {
           tester.getCenter(row(original[2])),
           kind: PointerDeviceKind.mouse);
       await tester.pump(const Duration(milliseconds: 350));
-      await across
-          .moveTo(tester.getCenter(find.byKey(const ValueKey('track-page-1'))));
-      await tester.pump(const Duration(milliseconds: 750));
-      await ioUntil(
-          tester, () => c.offset == 40 && c.page.items.first.position == 41);
-      final destination = c.page.items.first;
-      await across.moveTo(tester
-          .getCenter(find.byKey(ValueKey('drop-before-${destination.id}'))));
+      await across.moveBy(const Offset(0, 12));
+      await tester.pump();
+      final viewport = tester.getRect(find.byType(ListView));
+      await across.moveTo(Offset(viewport.center.dx, viewport.bottom - 12));
+      await tester.pump(const Duration(milliseconds: 1100));
+      expect(scroll.offset, greaterThan(400));
+      final targets = find.byWidgetPredicate((w) =>
+          w is DragTarget &&
+          w.key is ValueKey<String> &&
+          (w.key as ValueKey<String>).value.startsWith('drop-after-'));
+      final visible = targets.evaluate().where((e) {
+        final rect = tester.getRect(find.byWidget(e.widget));
+        return rect.center.dy > viewport.top + 50 &&
+            rect.center.dy < viewport.bottom - 50;
+      }).toList();
+      final destination = find.byWidget(visible.last.widget);
+      final id = int.parse(((visible.last.widget.key as ValueKey<String>).value)
+          .split('-')
+          .last);
+      final position = c.page.items.firstWhere((t) => t.id == id).position;
+      await across.moveTo(tester.getCenter(destination));
       await tester.pump(const Duration(milliseconds: 100));
       await across.up();
-      await ioUntil(
-          tester,
-          () =>
-              !c.editing &&
-              c.offset == 0 &&
-              c.page.items.last.id == original[2]);
-      expect(c.page.items.last.position, 40);
+      await ioUntil(tester,
+          () => !c.editing && c.page.items[position - 1].id == original[2]);
+      expect(c.page.items.length, 85);
       expect(c.page.selectedCount, 2);
+      scroll.jumpTo(0);
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final future = c.page.items.take(3).toList();
       await tester.runAsync(() async {

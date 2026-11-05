@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 12) {
+      if (version > 13) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -277,6 +277,52 @@ class AppDatabase {
           db.execute(
               "ALTER TABLE collections ADD COLUMN cover_path TEXT NOT NULL DEFAULT ''");
           db.execute('PRAGMA user_version = 12');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 12) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              'ALTER TABLE tracks ADD COLUMN list_revision INTEGER NOT NULL DEFAULT 0');
+          db.execute(
+              'CREATE TABLE library_revision (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL)');
+          db.execute('INSERT INTO library_revision VALUES(1,0)');
+          db.execute(
+              'CREATE INDEX tracks_list_revision ON tracks(collection_id,list_revision)');
+          final changed = db
+              .select('PRAGMA table_info(tracks)')
+              .map((r) => r['name'] as String)
+              .where((name) => name != 'id' && name != 'list_revision')
+              .map((name) => 'NEW."$name" IS NOT OLD."$name"')
+              .join(' OR ');
+          for (final event in ['INSERT', 'UPDATE']) {
+            final guard = event == 'UPDATE' ? 'WHEN $changed' : '';
+            db.execute('''CREATE TRIGGER tracks_list_${event.toLowerCase()}
+              AFTER $event ON tracks $guard BEGIN
+                UPDATE library_revision SET revision=revision+1 WHERE id=1;
+                UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE id=NEW.id;
+              END''');
+          }
+          db.execute(
+              '''CREATE TRIGGER tracks_list_delete AFTER DELETE ON tracks BEGIN
+            UPDATE library_revision SET revision=revision+1 WHERE id=1; END''');
+          for (final event in ['INSERT', 'UPDATE', 'DELETE']) {
+            final ref = event == 'DELETE' ? 'OLD' : 'NEW';
+            db.execute(
+                '''CREATE TRIGGER history_list_${event.toLowerCase()} AFTER $event ON download_history BEGIN
+              UPDATE library_revision SET revision=revision+1 WHERE id=1;
+              UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1)
+                WHERE id=$ref.track_id${event == 'UPDATE' ? ' OR id=OLD.track_id' : ''}; END''');
+          }
+          db.execute(
+              '''CREATE TRIGGER collection_list_name AFTER UPDATE OF name ON collections WHEN NEW.name IS NOT OLD.name BEGIN
+            UPDATE library_revision SET revision=revision+1 WHERE id=1;
+            UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE collection_id=NEW.id; END''');
+          db.execute('PRAGMA user_version=13');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

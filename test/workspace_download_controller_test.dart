@@ -182,7 +182,7 @@ void main() {
   });
 
   test(
-      'remover última página retorna à página disponível e erros de pasta aparecem',
+      'remover parte da lista contínua preserva as demais e erros de pasta aparecem',
       () async {
     final id = await repository.importCollection(ImportedCollection(
         name: 'Fila paginada',
@@ -198,11 +198,11 @@ void main() {
     final workspace = WorkspaceController(controller);
     try {
       await workspace.refresh();
-      await workspace.turnDownloads(1);
-      expect(workspace.downloads.items.length, 5);
-      workspace.selectPage(true);
+      expect(workspace.downloads.items.length, 45);
+      for (final entry in workspace.downloads.items.skip(40)) {
+        workspace.select(entry.track.id, true);
+      }
       await workspace.removeDownloads();
-      expect(workspace.downloadOffset, 0);
       expect(workspace.downloads.items.length, 40);
       expect((await repository.page(id)).total, 45);
       await workspace.reveal('${directory.path}/missing/file.mp3');

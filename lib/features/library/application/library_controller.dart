@@ -17,6 +17,8 @@ import '../data/redownload_repository.dart';
 import 'download_selection_check.dart';
 import 'download_queue_run.dart';
 import 'library_music_sources.dart';
+import 'continuous_track_listing.dart';
+import '../data/continuous_track_repository.dart';
 import '../../../core/application/operation_message.dart';
 import '../../importing/music_link.dart';
 import '../domain/models.dart';
@@ -110,14 +112,10 @@ class LibraryController extends ChangeNotifier {
     editing = true;
     notifyListeners();
     try {
-      final position = await PlaylistEditor(repository.database).move(
-          collectionId, trackId,
+      await PlaylistEditor(repository.database).move(collectionId, trackId,
           targetId: targetId, after: after, selectedGroup: selectedGroup);
       trackSort = TrackSort.position;
       trackDescending = false;
-      offset = collectionQuery.isEmpty && view == 'collections'
-          ? ((position - 1) ~/ 40) * 40
-          : 0;
       await refresh();
       return null;
     } catch (error) {
@@ -153,12 +151,6 @@ class LibraryController extends ChangeNotifier {
           : name;
       await PlaylistEditor(repository.database).edit(track.id,
           name: requestedName, position: position, replacement: replacement);
-      offset = collectionQuery.isEmpty &&
-              view == 'collections' &&
-              trackSort == TrackSort.position &&
-              !trackDescending
-          ? ((position - 1) ~/ 40) * 40
-          : 0;
       message = 'Faixa atualizada.';
       await refresh();
       return true;
@@ -180,6 +172,8 @@ class LibraryController extends ChangeNotifier {
   final DownloadService downloader;
   List<Collection> collections = [];
   Collection? current;
+  late final _trackListing =
+      ContinuousTrackListing(ContinuousTrackRepository(repository.database));
   TrackPage page = const TrackPage([], 0, 0);
   Track? focused;
   List<Candidate> candidates = [];
@@ -192,7 +186,6 @@ class LibraryController extends ChangeNotifier {
   String collectionQuery = '';
   int collectionOffset = 0;
   int? activeTrackId;
-  int offset = 0;
   bool importing = false;
   bool searching = false;
   bool downloading = false;
@@ -267,28 +260,23 @@ class LibraryController extends ChangeNotifier {
         filter = view == 'collections' ? '' : view,
         sort = trackSort,
         descending = trackDescending;
-    var nextOffset = offset;
     final nextCollections =
         await repository.collections(offset: collectionOffset);
     final owner = id == null ? null : await repository.collectionById(id);
-    var nextPage = owner == null
-        ? const TrackPage([], 0, 0)
-        : await repository.page(owner.id,
-            offset: nextOffset,
-            filter: filter,
-            query: query,
-            sort: sort,
-            descending: descending);
-    if (owner != null && nextOffset > 0 && nextPage.items.isEmpty) {
-      nextOffset = 0;
-      nextPage = await repository.page(owner.id,
-          filter: filter, query: query, sort: sort, descending: descending);
-    }
     if (generation != _refreshGeneration || current?.id != id) return;
+    final nextPage = owner == null
+        ? const TrackPage([], 0, 0)
+        : await _trackListing.load(owner.id,
+            filter: filter, query: query, sort: sort, descending: descending);
+    if (generation != _refreshGeneration ||
+        current?.id != id ||
+        nextPage == null) {
+      return;
+    }
+    if (owner == null) _trackListing.clear();
     collections = nextCollections;
     current = owner;
     page = nextPage;
-    offset = nextOffset;
     focused = page.items.where((t) => t.id == focused?.id).firstOrNull;
     dataRevision++;
     notifyListeners();
@@ -297,7 +285,6 @@ class LibraryController extends ChangeNotifier {
   Future<void> openCollection(Collection collection) async {
     _searchGeneration++;
     current = collection;
-    offset = 0;
     focused = null;
     candidates = [];
     selectedCandidate = null;
@@ -324,24 +311,12 @@ class LibraryController extends ChangeNotifier {
   Future<void> sortTracks(TrackSort sort) async {
     trackDescending = sort == trackSort ? !trackDescending : false;
     trackSort = sort;
-    offset = 0;
     await refresh();
   }
 
   Future<void> setView(String value) async {
     _searchGeneration++;
     view = value;
-    offset = 0;
-    focused = null;
-    candidates = [];
-    selectedCandidate = null;
-    await refresh();
-  }
-
-  Future<void> turnPage(int direction) async {
-    _searchGeneration++;
-    offset =
-        (offset + direction * 40).clamp(0, page.total > 0 ? page.total - 1 : 0);
     focused = null;
     candidates = [];
     selectedCandidate = null;
@@ -360,7 +335,6 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> searchCollection(String value) async {
     collectionQuery = value;
-    offset = 0;
     _searchGeneration++;
     focused = null;
     candidates = [];
@@ -513,11 +487,6 @@ class LibraryController extends ChangeNotifier {
     await refresh();
   }
 
-  Future<void> selectPage(bool value) async {
-    await repository.selectPage(page.items.map((t) => t.id).toList(), value);
-    await refresh();
-  }
-
   Future<void> loadExample() => _import(() async => demoCollection());
   Future<void> importSpotify(String url) =>
       _import(() => accountSpotify?.isConnected == true
@@ -543,7 +512,6 @@ class LibraryController extends ChangeNotifier {
       current = collections.firstWhere((c) => c.id == id);
       collectionOffset = 0;
       collectionQuery = '';
-      offset = 0;
       focused = null;
       candidates = [];
       selectedCandidate = null;
@@ -699,8 +667,6 @@ class LibraryController extends ChangeNotifier {
     if (owner == null) return;
     await repository.selectFromClick(owner.id, id, extend: false);
     await openCollection(owner);
-    offset = ((track.position - 1) ~/ 40) * 40;
-    await refresh();
     focus((await repository.trackById(id))!);
     inspectorRequest++;
     notifyListeners();
@@ -780,6 +746,7 @@ class LibraryController extends ChangeNotifier {
     _refreshGeneration++;
     _searchGeneration++;
     _cancellation?.cancelled = true;
+    _trackListing.clear();
     _transferUpdates.dispose();
     super.dispose();
   }
