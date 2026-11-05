@@ -129,6 +129,12 @@ class CollectionTrackToolbar extends StatelessWidget {
               ? null
               : () => unawaited(showAddMusicLinks(context, c))),
       DownloadActionButton(
+          label: 'Adicionar MP3',
+          icon: Icons.audio_file_outlined,
+          color: DownloadActionColors.add,
+          onPressed:
+              c.reorderingBusy ? null : () => unawaited(c.chooseLocalFiles())),
+      DownloadActionButton(
           label: 'Rever correspondências',
           icon: Icons.fact_check_outlined,
           color: AppColors.accentActive,

@@ -12,6 +12,9 @@ class OrganizationNameDialog extends StatefulWidget {
       this.groups,
       this.groupId,
       this.maxLength = 160,
+      this.onSaveWithLink,
+      this.onCancel,
+      this.progress,
       this.nameEditable = true});
   final String title, name;
   final int maxLength;
@@ -19,18 +22,23 @@ class OrganizationNameDialog extends StatefulWidget {
   final List<CollectionGroup>? groups;
   final int? groupId;
   final Future<String?> Function(String, int?) onSave;
+  final Future<String?> Function(String, int?, String)? onSaveWithLink;
+  final VoidCallback? onCancel;
+  final Widget? progress;
   @override
   State<OrganizationNameDialog> createState() => OrganizationNameDialogState();
 }
 
 class OrganizationNameDialogState extends State<OrganizationNameDialog> {
   late final _name = TextEditingController(text: widget.name);
+  final _link = TextEditingController();
   late int? _groupId = widget.groupId;
   String? _error;
   bool _saving = false;
   @override
   void dispose() {
     _name.dispose();
+    _link.dispose();
     super.dispose();
   }
 
@@ -40,7 +48,9 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
       _saving = true;
       _error = null;
     });
-    final error = await widget.onSave(_name.text, _groupId);
+    final error = widget.onSaveWithLink == null
+        ? await widget.onSave(_name.text, _groupId)
+        : await widget.onSaveWithLink!(_name.text, _groupId, _link.text);
     if (!mounted) return;
     if (error == null) {
       Navigator.pop(context, true);
@@ -76,6 +86,18 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
                     else
                       Text(widget.name,
                           style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (widget.onSaveWithLink != null) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                          key: const ValueKey('new-playlist-link'),
+                          controller: _link,
+                          enabled: !_saving,
+                          maxLength: 4096,
+                          decoration: const InputDecoration(
+                              labelText: 'Link da playlist (opcional)',
+                              counterText: ''),
+                          onSubmitted: (_) => unawaited(_save())),
+                    ],
                     if (widget.groups != null) ...[
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int>(
@@ -103,11 +125,17 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
                           child: Text(_error!,
                               style: const TextStyle(
                                   color: AppColors.accentActive))),
+                    if (_saving && widget.progress != null) ...[
+                      const SizedBox(height: 12),
+                      widget.progress!,
+                    ],
                   ]))),
           actions: [
             TextButton(
-                onPressed: _saving ? null : () => Navigator.pop(context, false),
-                child: const Text('Cancelar')),
+                onPressed: _saving
+                    ? widget.onCancel
+                    : () => Navigator.pop(context, false),
+                child: Text(_saving ? 'Interromper' : 'Cancelar')),
             FilledButton(
                 onPressed: _saving ? null : _save,
                 child: Text(_saving ? 'Salvando…' : 'Salvar'))

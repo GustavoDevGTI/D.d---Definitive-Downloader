@@ -31,6 +31,15 @@ class DesktopFiles {
         const XTypeGroup(label: 'Lista de faixas CSV', extensions: ['csv'])
       ]))
           ?.path;
+  Future<List<String>> chooseMp3Files() async =>
+      (await openFiles(acceptedTypeGroups: [
+        const XTypeGroup(
+            label: 'Músicas MP3',
+            extensions: ['mp3'],
+            mimeTypes: ['audio/mpeg'])
+      ]))
+          .map((file) => file.path)
+          .toList();
   Future<String?> chooseCover() async => (await openFile(acceptedTypeGroups: [
         const XTypeGroup(
             label: 'Capa da playlist',

@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 14) {
+      if (version > 15) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -353,6 +353,11 @@ class AppDatabase {
           db.execute('ROLLBACK');
           rethrow;
         }
+      }
+      if (version <= 14) {
+        // New persisted localFile variant: prevent older apps from reading it
+        // as an unknown source enum. Existing rows and files remain untouched.
+        db.execute('PRAGMA user_version=15');
       }
       // Stale run membership is not work: the occurrences themselves stay queued.
       db.execute('DELETE FROM download_run_additions');

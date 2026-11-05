@@ -118,7 +118,7 @@ class CollectionOrganizationRepository {
         }
       });
 
-  Future<void> saveGroup(String name, {int? id}) async {
+  Future<void> saveGroup(String name, {int? id, int? collectionId}) async {
     final valid = organizationName(name, maxLength: 80),
         key = organizationName(name, maxLength: 80).toLowerCase();
     await database.run((db) {
@@ -139,6 +139,14 @@ class CollectionOrganizationRepository {
           }
           db.execute('INSERT INTO collection_groups(name,name_key) VALUES(?,?)',
               [valid, key]);
+          final created = db.lastInsertRowId;
+          if (collectionId != null) {
+            db.execute('UPDATE collections SET group_id=? WHERE id=?',
+                [created, collectionId]);
+            if (db.updatedRows != 1) {
+              throw const FormatException('Playlist não encontrada.');
+            }
+          }
         } else {
           db.execute(
               'UPDATE collection_groups SET name=?,name_key=? WHERE id=?',

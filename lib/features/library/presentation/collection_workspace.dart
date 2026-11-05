@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
-import '../../../app/app_notice.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
@@ -10,6 +9,7 @@ import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
 import 'collection_track_toolbar.dart';
+import 'collection_mp3_drop_target.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -79,13 +79,15 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                 child: WorkspacePanel(child: TrackInspector(controller: c)))
           ],
         ]);
+        final drop = CollectionMp3DropTarget(
+            controller: c, collectionId: c.current!.id, child: panel);
         if (constraints.maxHeight < 560 || constraints.maxWidth < 560) {
           return ListView(
               primary: false,
               padding: EdgeInsets.zero,
-              children: [SizedBox(height: 660, child: panel)]);
+              children: [SizedBox(height: 660, child: drop)]);
         }
-        return panel;
+        return drop;
       });
     }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
@@ -156,15 +158,6 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                     style:
                         const TextStyle(fontSize: 11, color: AppColors.muted)),
               ],
-              if (c.current!.editingLocked)
-                IconButton(
-                    tooltip: 'Por que a edição está bloqueada?',
-                    onPressed: () => unawaited(showAppNotice(context,
-                        title: 'Edição bloqueada',
-                        message:
-                            'Nomes e IDs ficam bloqueados após o primeiro download. Faixas ainda não baixadas podem trocar as posições livres entre si. Concluídas ficam fixas; a faixa em andamento fica fixa até terminar ou parar.')),
-                    icon: const Icon(Icons.lock_outline,
-                        size: 18, color: AppColors.accentActive)),
             ])),
         CollectionTrackToolbar(
             controller: c,
@@ -181,8 +174,20 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               setState(_query.clear);
               unawaited(c.searchCollection(''));
             }),
-        if (c.importing || c.preparing)
+        if (c.importing || c.preparing || c.addingLinks)
           const LinearProgressIndicator(minHeight: 2),
+        if (c.addingLinks && c.linkProgress.isNotEmpty)
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Row(children: [
+                Expanded(
+                    child: Text(c.linkProgress,
+                        style: const TextStyle(fontSize: 11))),
+                IconButton(
+                    tooltip: 'Interromper adição',
+                    onPressed: c.cancelAdditions,
+                    icon: const Icon(Icons.close, size: 18))
+              ])),
         Expanded(
             child: TrackTable(
                 controller: c, onFocus: (track) => _focus(track, wide))),

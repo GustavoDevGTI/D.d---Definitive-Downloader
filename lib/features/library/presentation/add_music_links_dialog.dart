@@ -144,10 +144,9 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                       maxLength: 32768,
                       keyboardType: TextInputType.multiline,
                       decoration: const InputDecoration(
-                          labelText: 'Links das faixas',
+                          labelText: 'Links de faixas ou playlists',
                           alignLabelWithHint: true,
-                          hintText:
-                              'Spotify, SoundCloud, Deezer, YouTube ou MP3 direto\nUm link por linha · até 20',
+                          hintText: 'Cole um link por linha',
                           counterText: '')),
                   if (_saving)
                     Padding(
@@ -171,8 +170,10 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                 ]))),
         actions: [
           TextButton(
-              onPressed: _saving ? null : () => Navigator.pop(context),
-              child: const Text('Cancelar')),
+              onPressed: _saving
+                  ? widget.controller.cancelAdditions
+                  : () => Navigator.pop(context),
+              child: Text(_saving ? 'Interromper' : 'Cancelar')),
           ButtonHoverMotion(
               builder: (states) => FilledButton.icon(
                   statesController: states,

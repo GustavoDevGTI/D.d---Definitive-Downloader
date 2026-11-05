@@ -12,6 +12,7 @@ import 'organization_name_dialog.dart';
 import 'collection_group_strip.dart';
 import '../../library/data/artwork_store.dart';
 import '../../library/presentation/artwork_thumbnail.dart';
+import '../../library/presentation/collection_mp3_drop_target.dart';
 
 class CollectionManager extends StatefulWidget {
   const CollectionManager(
@@ -107,7 +108,6 @@ class _CollectionManagerState extends State<CollectionManager> {
                     _timer?.cancel();
                     unawaited(c.filter(_search.text, id));
                   },
-                  onCreate: enabled ? () => unawaited(_editGroup()) : null,
                   onRename: enabled && group != null
                       ? () => unawaited(_editGroup(group))
                       : null,
@@ -140,19 +140,30 @@ class _CollectionManagerState extends State<CollectionManager> {
                 Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: LayoutBuilder(builder: (context, box) {
-                      final tile = WorkspaceNavigationButton(
-                          key: ValueKey('collection-open-${item.id}'),
-                          title: item.name,
-                          subtitle:
-                              '${item.trackCount} faixas · ${item.completedCount} baixadas · ${item.source}${_groupLabel(item)}',
-                          leading: ArtworkThumbnail(
-                              reference: item.coverPath,
-                              size: 44,
-                              icon: Icons.library_music_outlined),
-                          icon: Icons.library_music_outlined,
-                          onPressed: () => widget.onOpen(item));
+                      final tile = CollectionMp3DropTarget(
+                          controller: widget.library,
+                          collectionId: item.id,
+                          child: WorkspaceNavigationButton(
+                              key: ValueKey('collection-open-${item.id}'),
+                              title: item.name,
+                              subtitle:
+                                  '${item.trackCount} faixas · ${item.completedCount} baixadas · ${item.source}${_groupLabel(item)}',
+                              leading: ArtworkThumbnail(
+                                  reference: item.coverPath,
+                                  size: 44,
+                                  icon: Icons.library_music_outlined),
+                              icon: Icons.library_music_outlined,
+                              onPressed: () => widget.onOpen(item)));
                       final actions =
                           Row(mainAxisSize: MainAxisSize.min, children: [
+                        _action(
+                            'Novo grupo com esta playlist',
+                            Icons.create_new_folder_outlined,
+                            enabled
+                                ? () => unawaited(_editGroup(null, item))
+                                : null,
+                            item.id,
+                            'new-group'),
                         _action(
                             'Renomear playlist',
                             Icons.edit_outlined,
@@ -282,6 +293,24 @@ class _CollectionManagerState extends State<CollectionManager> {
             name: item?.name ?? '',
             groups: item == null ? _controller.groups : null,
             groupId: _controller.groupId == 0 ? null : _controller.groupId,
+            onSaveWithLink: item != null
+                ? null
+                : (name, groupId, link) => _controller.mutate(() async {
+                      createdId = await widget.library
+                          .createPlaylist(name, groupId: groupId, link: link);
+                    }),
+            onCancel: widget.library.cancel,
+            progress: ListenableBuilder(
+                listenable: widget.library,
+                builder: (context, _) =>
+                    Column(mainAxisSize: MainAxisSize.min, children: [
+                      const LinearProgressIndicator(minHeight: 2),
+                      if (widget.library.linkProgress.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(widget.library.linkProgress,
+                            style: const TextStyle(fontSize: 12)),
+                      ]
+                    ])),
             onSave: (name, groupId) => _controller.mutate(() async {
                   if (widget.library.busy) {
                     throw const FormatException(
@@ -302,7 +331,7 @@ class _CollectionManagerState extends State<CollectionManager> {
     }
   }
 
-  Future<void> _editGroup([CollectionGroup? group]) async {
+  Future<void> _editGroup([CollectionGroup? group, Collection? item]) async {
     await showDialog<bool>(
         context: context,
         builder: (_) => OrganizationNameDialog(
@@ -314,7 +343,9 @@ class _CollectionManagerState extends State<CollectionManager> {
                     throw const FormatException(
                         'Aguarde a operação em andamento.');
                   }
-                  await _controller.repository.saveGroup(name, id: group?.id);
+                  await _controller.repository
+                      .saveGroup(name, id: group?.id, collectionId: item?.id);
+                  await widget.library.refresh();
                 })));
   }
 

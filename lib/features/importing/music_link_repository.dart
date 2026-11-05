@@ -11,7 +11,7 @@ class MusicLinkRepository {
   Future<List<int>> append(int collectionId, List<ResolvedMusicLink> links,
           {String? run}) =>
       database.run((db) {
-        if (links.isEmpty || links.length > 20 || (run?.length ?? 0) > 100) {
+        if (links.isEmpty || links.length > 10000 || (run?.length ?? 0) > 100) {
           throw ArgumentError('Lote inválido.');
         }
         db.execute('BEGIN IMMEDIATE');

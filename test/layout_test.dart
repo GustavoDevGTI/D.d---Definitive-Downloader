@@ -297,15 +297,11 @@ void main() {
           await controller.refresh();
         });
         await tester.pumpAndSettle();
-        await tester
-            .ensureVisible(find.byTooltip('Por que a edição está bloqueada?'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Por que a edição está bloqueada?'));
-        await tester.pumpAndSettle();
-        expect(find.text('Edição bloqueada'), findsOneWidget);
-        await capture(tester, captureKey, 'notice-locked-${width.toInt()}');
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
+        expect(
+            find.byTooltip('Por que a edição está bloqueada?'), findsNothing);
+        expect(controller.current!.editingLocked, isTrue);
+        await capture(
+            tester, captureKey, 'playlist-without-lock-${width.toInt()}');
         await tester.runAsync(() async {
           await fixtureEditingLock(
               controller.repository.database, controller.current!.id, false);

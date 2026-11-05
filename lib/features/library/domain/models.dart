@@ -20,6 +20,7 @@ extension MatchStatusLabel on MatchStatus {
 enum SourceKind {
   none,
   localExample,
+  localFile,
   directMp3,
   preview,
   deezerFull,
@@ -34,6 +35,7 @@ extension MusicSourceName on SourceKind {
         SourceKind.youtubeMusic => 'YouTube Music',
         SourceKind.youtube => 'YouTube',
         SourceKind.soundcloud => 'SoundCloud',
+        SourceKind.localFile => 'Arquivo local',
         _ => null,
       };
   String get musicProviderSuffix =>
@@ -189,6 +191,7 @@ class Track {
       hasDownloadableSource;
   bool get hasDownloadableSource =>
       sourceKind != SourceKind.none &&
+      sourceKind != SourceKind.localFile &&
       mediaUrl.isNotEmpty &&
       (sourceKind != SourceKind.youtube ||
           sourceAuthorization != SourceAuthorization.catalog) &&
@@ -207,6 +210,7 @@ class Track {
   String get sourceLabel => switch (sourceKind) {
         SourceKind.none => 'A conferir',
         SourceKind.localExample => 'Exemplo local',
+        SourceKind.localFile => 'Arquivo local',
         SourceKind.directMp3 => 'MP3 vinculado',
         SourceKind.preview => 'Prévia Deezer',
         SourceKind.deezerFull => 'Deezer · faixa',

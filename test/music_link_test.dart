@@ -273,7 +273,7 @@ void main() {
       expect(
           await library.database
               .run((db) => db.select('PRAGMA user_version').first.values.first),
-          14);
+          15);
       expect(
           await library.database
               .run((db) => db.select('PRAGMA quick_check').first.values.first),

@@ -47,7 +47,7 @@ Future<AudioTags> readAudioTags(String path) async {
       return String.fromCharCodes(units).replaceAll('\u0000', '').trim();
     }
 
-    String title = '', artist = '';
+    String title = '', artist = '', album = '';
     Uint8List? cover;
     for (var offset = 0; offset + 10 <= data.length;) {
       final id =
@@ -60,6 +60,7 @@ Future<AudioTags> readAudioTags(String path) async {
           Uint8List.sublistView(data, offset + 10, offset + 10 + length);
       if (id == 'TIT2') title = text(body);
       if (id == 'TPE1') artist = text(body);
+      if (id == 'TALB') album = text(body);
       if (id == 'APIC' && body.length > 5) {
         var end = body.indexOf(0, 1);
         if (end > 0 && end + 2 < body.length) {
@@ -91,7 +92,7 @@ Future<AudioTags> readAudioTags(String path) async {
       }
       offset += 10 + length;
     }
-    return AudioTags(title: title, artist: artist, cover: cover);
+    return AudioTags(title: title, artist: artist, album: album, cover: cover);
   } on FileSystemException {
     return const AudioTags();
   } finally {

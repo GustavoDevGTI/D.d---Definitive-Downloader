@@ -8,24 +8,25 @@ class CollectionGroupStrip extends StatelessWidget {
       required this.groups,
       required this.selected,
       required this.onSelect,
-      this.onCreate,
       this.onRename,
       this.onRemove});
   final List<CollectionGroup> groups;
   final int? selected;
   final ValueChanged<int?> onSelect;
-  final VoidCallback? onCreate, onRename, onRemove;
+  final VoidCallback? onRename, onRemove;
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const Expanded(
-              child: Text('Grupos',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted))),
-          IconButton(
-              tooltip: 'Novo grupo',
-              onPressed: onCreate,
-              icon: const Icon(Icons.create_new_folder_outlined, size: 19)),
+          Expanded(
+              child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
+                    _tab('Todas', null),
+                    _tab('Sem grupo', 0),
+                    for (final g in groups)
+                      _tab('${g.name} (${g.count})', g.id),
+                  ]))),
           if (selected != null && selected! > 0) ...[
             IconButton(
                 tooltip: 'Renomear grupo',
@@ -37,13 +38,6 @@ class CollectionGroupStrip extends StatelessWidget {
                 icon: const Icon(Icons.folder_delete_outlined, size: 19)),
           ]
         ]),
-        SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _tab('Todas', null),
-              _tab('Sem grupo', 0),
-              for (final g in groups) _tab('${g.name} (${g.count})', g.id),
-            ])),
         const Divider(height: 1),
       ]);
   Widget _tab(String text, int? id) => DecoratedBox(

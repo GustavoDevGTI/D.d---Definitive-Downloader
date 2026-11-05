@@ -23,8 +23,9 @@ class AudioItem {
 }
 
 class AudioTags {
-  const AudioTags({this.title = '', this.artist = '', this.cover});
-  final String title, artist;
+  const AudioTags(
+      {this.title = '', this.artist = '', this.album = '', this.cover});
+  final String title, artist, album;
   final Uint8List? cover;
 }
 

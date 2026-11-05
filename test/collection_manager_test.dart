@@ -81,7 +81,9 @@ void main() {
               .byKey(ValueKey('collection-open-$originalId'))
               .evaluate()
               .isNotEmpty);
-      await tester.tap(find.byTooltip('Novo grupo'));
+      expect(find.text('Grupos'), findsNothing);
+      await tester
+          .tap(find.byKey(ValueKey('collection-new-group-$originalId')));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('organization-name')), 'Viagens');
