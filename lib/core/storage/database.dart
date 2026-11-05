@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 15) {
+      if (version > 16) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -358,6 +358,21 @@ class AppDatabase {
         // New persisted localFile variant: prevent older apps from reading it
         // as an unknown source enum. Existing rows and files remain untouched.
         db.execute('PRAGMA user_version=15');
+      }
+      if (version <= 15) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute('''CREATE TABLE IF NOT EXISTS music_replacement_files (
+            operation TEXT NOT NULL, track_id INTEGER NOT NULL,
+            original TEXT NOT NULL, staging TEXT NOT NULL, folder TEXT NOT NULL,
+            collection_id INTEGER NOT NULL,
+            PRIMARY KEY(operation,track_id))''');
+          db.execute('PRAGMA user_version=16');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
       }
       // Stale run membership is not work: the occurrences themselves stay queued.
       db.execute('DELETE FROM download_run_additions');

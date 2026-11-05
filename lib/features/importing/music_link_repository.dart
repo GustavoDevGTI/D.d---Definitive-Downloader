@@ -9,7 +9,7 @@ class MusicLinkRepository {
   final AppDatabase database;
 
   Future<List<int>> append(int collectionId, List<ResolvedMusicLink> links,
-          {String? run}) =>
+          {String? run, List<Track> replaced = const []}) =>
       database.run((db) {
         if (links.isEmpty || links.length > 10000 || (run?.length ?? 0) > 100) {
           throw ArgumentError('Lote inválido.');
@@ -23,10 +23,50 @@ class MusicLinkRepository {
           final size = db.select(
               'SELECT COUNT(*) AS n,COALESCE(MAX(position),0) AS last FROM tracks WHERE collection_id=?',
               [collectionId]).first;
-          if ((size['n'] as int) + links.length > 10000) {
+          final removeIds = replaced.map((t) => t.id).toSet();
+          if (removeIds.length != replaced.length) {
+            throw const FormatException('Revisão inválida.');
+          }
+          var nextId = db
+              .select('SELECT COALESCE(MAX(id),0) AS n FROM tracks')
+              .single['n'] as int;
+          for (final old in replaced) {
+            final rows = db.select(
+                'SELECT * FROM tracks WHERE id=? AND collection_id=?',
+                [old.id, collectionId]);
+            if (rows.isEmpty ||
+                rows.single['status'] == 'downloading' ||
+                rows.single['local_path'] != old.localPath ||
+                rows.single['position'] != old.position ||
+                rows.single['title'] != old.title ||
+                rows.single['artist'] != old.artist ||
+                rows.single['media_url'] != old.mediaUrl ||
+                rows.single['source_url'] != old.sourceUrl) {
+              throw const FormatException(
+                  'A faixa mudou durante a revisão. Adicione os links novamente.');
+            }
+            if (old.localPath.isNotEmpty &&
+                db.select('SELECT id FROM tracks WHERE local_path=?',
+                    [old.localPath]).any((r) => !removeIds.contains(r['id']))) {
+              throw const FormatException(
+                  'O arquivo antigo também é usado por outra faixa. Nada foi substituído.');
+            }
+          }
+          if ((size['n'] as int) - replaced.length + links.length > 10000) {
             throw const FormatException('Limite de 10.000 faixas por coleção.');
           }
-          var position = size['last'] as int;
+          for (final old in replaced) {
+            if (old.localPath.isNotEmpty) {
+              db.execute(
+                  'DELETE FROM download_history WHERE track_id=? AND local_path=?',
+                  [old.id, old.localPath]);
+            }
+            db.execute('DELETE FROM tracks WHERE id=? AND collection_id=?',
+                [old.id, collectionId]);
+          }
+          var position = db.select(
+              'SELECT COALESCE(MAX(position),0) AS last FROM tracks WHERE collection_id=?',
+              [collectionId]).single['last'] as int;
           final ids = <int>[];
           for (final entry in links) {
             final draft = entry.draft, source = entry.source;
@@ -44,12 +84,13 @@ class MusicLinkRepository {
               throw const FormatException('A fonte ainda não está pronta.');
             }
             db.execute(
-                '''INSERT INTO tracks(collection_id,position,title,artist,album,
+                '''INSERT INTO tracks(id,collection_id,position,title,artist,album,
               duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,selected,
               explicit,match_status,manual_url,manual_mode,queue_added,
               resolved_title,resolved_artist,resolved_album,resolved_duration_ms,resolved_cover_url,error)
-              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,'originalAudio',1,?,?,?,?,?,?)''',
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,'originalAudio',1,?,?,?,?,?,?)''',
                 [
+                  ++nextId,
                   collectionId,
                   ++position,
                   draft.title,

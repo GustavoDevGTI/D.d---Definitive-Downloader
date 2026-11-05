@@ -47,7 +47,8 @@ class DownloadQueueRun {
       required DownloadCancellation token,
       required void Function(DownloadRunEvent) onEvent,
       required Future<void> Function() recordsChanged,
-      required Future<void>? Function() pendingAddition}) async {
+      required Future<void>? Function() pendingAddition,
+      Future<void>? Function()? pendingMutation}) async {
     final destinations = <int, String>{};
     var saved = 0, failed = 0, reviewVideos = 0;
     double? progress;
@@ -63,6 +64,17 @@ class DownloadQueueRun {
           failedOnly: failedOnly);
       onEvent(DownloadRunMembership(run));
       while (!token.cancelled) {
+        final mutation = pendingMutation?.call();
+        if (mutation != null) {
+          while (!token.cancelled &&
+              identical(pendingMutation?.call(), mutation)) {
+            await Future.any<void>([
+              mutation,
+              Future<void>.delayed(const Duration(milliseconds: 100))
+            ]);
+          }
+          if (token.cancelled) break;
+        }
         try {
           await token.waitForQueue();
         } on DownloadCancelled {

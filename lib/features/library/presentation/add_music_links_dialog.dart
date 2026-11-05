@@ -4,6 +4,8 @@ import '../../../app/button_hover_motion.dart';
 import '../../workspace/presentation/download_action_button.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
+import 'duplicate_music_dialog.dart';
+import '../../player/presentation/player_scope.dart';
 
 Future<void> showAddMusicLinks(
         BuildContext context, LibraryController controller) =>
@@ -74,7 +76,12 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
       _saving = true;
       _error = '';
     });
-    final saved = await widget.controller.addLinks(_collectionId!, _links.text);
+    final player = PlayerScope.of(context);
+    final saved = await widget.controller.addLinks(_collectionId!, _links.text,
+        chooseDuplicate: (conflict) async {
+      if (!mounted) return null;
+      return chooseDuplicateMusic(context, conflict);
+    }, beforeRemoval: player?.discardTracks);
     if (!mounted) return;
     if (saved) {
       Navigator.pop(context);

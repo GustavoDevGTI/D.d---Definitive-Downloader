@@ -334,6 +334,63 @@ class MusicPlayerController extends ChangeNotifier {
     if (playing) await _safe(engine.pause);
   }
 
+  Future<void> discardTracks(List<Track> tracks) async {
+    final ids = tracks.map((t) => 'track-${t.id}').toSet();
+    final paths = tracks
+        .where((t) => t.localPath.isNotEmpty)
+        .map((t) => Uri.file(t.localPath).toString())
+        .toSet();
+    bool affected(AudioItem item) =>
+        ids.contains(item.id) || paths.contains(item.uri);
+    if (!_queue.any(affected)) return;
+    if (current != null && affected(current!)) _request++;
+    await _serial(() async {
+      final previous = index;
+      final removedCurrent = current != null && affected(current!);
+      if (removedCurrent) {
+        await engine.stop();
+        playing = false;
+        loading = false;
+        buffering = false;
+        ended = false;
+        position = Duration.zero;
+        duration = Duration.zero;
+        title = '';
+        artist = '';
+        cover = null;
+      }
+      final mapping = <int, int>{};
+      final retained = <AudioItem>[];
+      for (var i = 0; i < _queue.length; i++) {
+        if (!affected(_queue[i])) {
+          mapping[i] = retained.length;
+          retained.add(_queue[i]);
+        }
+      }
+      _queue = retained;
+      _order = [
+        for (final i in _order)
+          if (mapping.containsKey(i)) mapping[i]!
+      ];
+      final history = [
+        for (final i in _history)
+          if (mapping.containsKey(i)) mapping[i]!
+      ];
+      _history
+        ..clear()
+        ..addAll(history);
+      final failed = {
+        for (final i in _failed)
+          if (mapping.containsKey(i)) mapping[i]!
+      };
+      _failed
+        ..clear()
+        ..addAll(failed);
+      index = mapping[previous] ?? -1;
+      _notify();
+    });
+  }
+
   Future<void> toggle() async {
     if (current == null || loading) return;
     if (playing) {

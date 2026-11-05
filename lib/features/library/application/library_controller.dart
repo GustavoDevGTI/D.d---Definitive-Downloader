@@ -33,6 +33,9 @@ import '../../organization/data/collection_organization_repository.dart';
 import '../../organization/domain/collection_organization.dart';
 import '../../importing/local_media_importer.dart';
 import '../../importing/local_mp3_inspector.dart';
+import '../../importing/collection_duplicates.dart';
+import '../../importing/collection_link_addition.dart';
+import '../../importing/replacement_media_files.dart';
 
 class LibraryController extends ChangeNotifier {
   LibraryController(
@@ -65,6 +68,7 @@ class LibraryController extends ChangeNotifier {
   int inspectorRequest = 0, inspectorRevision = 0;
   Completer<void>? _additionDone;
   DownloadCancellation? _additionCancellation;
+  bool _holdQueueForReview = false;
   void cancelAdditions() => _additionCancellation?.cancelled = true;
   final _transferUpdates = ChangeNotifier();
   Listenable get transferUpdates => _transferUpdates;
@@ -74,21 +78,29 @@ class LibraryController extends ChangeNotifier {
   Future<List<Collection>> collectionChoices(int offset) =>
       repository.collections(offset: offset);
 
-  Future<bool> addLinks(int collectionId, String input) =>
+  Future<bool> addLinks(int collectionId, String input,
+          {ChooseDuplicate? chooseDuplicate,
+          Future<void> Function(List<Track>)? beforeRemoval}) =>
       _addition((token) async {
         final owner = await repository.collectionById(collectionId);
         if (owner == null) {
           throw const FormatException('Playlist não encontrada.');
         }
         final entries = await _composer.resolve(input,
-            capacity: 10000 - owner.trackCount,
+            capacity: 10000,
+            prepare: false,
             cancellation: token,
             onProgress: _additionProgress);
         token.check();
-        final ids = await MusicLinkRepository(repository.database).append(
-            collectionId, entries,
-            run: _cancellation?.cancelled == true ? null : _activeRun);
-        return '${ids.length} faixa(s) adicionada(s). ${entries.where((e) => e.ready).length} pronta(s) para baixar.';
+        return CollectionLinkAddition(repository).add(owner, entries,
+            choose: chooseDuplicate,
+            prepare: (entry) =>
+                _composer.links.prepare(entry, cancellation: token),
+            cancellation: token,
+            holdQueue: () => _holdQueueForReview = true,
+            run: () => _cancellation?.cancelled == true ? null : _activeRun,
+            progress: _additionProgress,
+            beforeRemoval: beforeRemoval);
       });
 
   Future<bool> addLocalFiles(int collectionId, List<String> paths) => _addition(
@@ -138,6 +150,7 @@ class LibraryController extends ChangeNotifier {
       return false;
     } finally {
       addingLinks = false;
+      _holdQueueForReview = false;
       _additionCancellation = null;
       linkProgress = '';
       _additionDone?.complete();
@@ -297,6 +310,8 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> initialize({bool example = false}) async {
     await repository.database.initialize();
+    final recovery = await ReplacementMediaFiles(repository).recover();
+    if (recovery != null) message = recovery;
     outputDirectory = await repository.preference('output_directory') ??
         await files.defaultOutputDirectory();
     collections = await repository.collections(offset: collectionOffset);
@@ -818,6 +833,8 @@ class LibraryController extends ChangeNotifier {
           token: token,
           recordsChanged: refresh,
           pendingAddition: () => _additionDone?.future,
+          pendingMutation: () =>
+              _holdQueueForReview ? _additionDone?.future : null,
           onEvent: _downloadEvent);
     } catch (error) {
       message = operationMessage(error);

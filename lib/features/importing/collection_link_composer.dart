@@ -12,6 +12,7 @@ class CollectionLinkComposer {
   Future<List<ResolvedMusicLink>> resolve(String input,
       {required int capacity,
       required DownloadCancellation cancellation,
+      bool prepare = true,
       void Function(String)? onProgress}) async {
     if (input.length > 32768) {
       throw const FormatException('O lote excede o limite de leitura.');
@@ -55,6 +56,7 @@ class CollectionLinkComposer {
     if (entries.isEmpty) {
       throw const FormatException('Nenhuma faixa encontrada nos links.');
     }
+    if (!prepare) return entries;
     final result = <ResolvedMusicLink>[];
     for (var i = 0; i < entries.length; i++) {
       cancellation.check();
