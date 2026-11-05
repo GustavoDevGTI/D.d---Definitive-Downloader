@@ -1,5 +1,7 @@
 # SoundCloud como fonte e origem de playlists
 
+Ensaio posterior de 05/11: extração real sem login, arquivo completo AAC/HLS e MP3 com capa validados em [TESTE_EXTRACAO_SOUNDCLOUD_2026_11_05.md](TESTE_EXTRACAO_SOUNDCLOUD_2026_11_05.md). A avaliação abaixo registra o estado anterior a esse teste; a capacidade ainda não foi integrada ao aplicativo.
+
 Avaliação de 04/11/2026, sobre a versão local 0.1.42. Pedido: verificar o necessário para usar SoundCloud no mesmo fluxo de Deezer/YouTube Music e aceitar playlists. Esta etapa é pesquisa e ensaio de metadados; não habilita uma nova fonte no app, não altera versão, schema ou motor instalado.
 
 ## Resultado
