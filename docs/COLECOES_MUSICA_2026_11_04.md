@@ -27,6 +27,8 @@ UI e regras em Dart compartilhado. Windows exige validação nativa; testes de w
 
 ### SoundCloud
 
+Reavaliação posterior com extrator já instalado, ensaios públicos reais de metadados e plano detalhado em [VIABILIDADE_SOUNDCLOUD_2026_11_04.md](VIABILIDADE_SOUNDCLOUD_2026_11_04.md). O texto abaixo registra a avaliação anterior da API oficial; ela não é o único caminho técnico investigado.
+
 A API oferece busca, resolução de URL, playlists e reprodução; diferencia áudio completo, trecho e bloqueio. Requer app próprio registrado. Atualmente o fluxo OAuth usa PKCE e exige segredo inclusive para clientes desktop/mobile; isso pede um serviço de autenticação, sem embutir segredo no executável. Não foram criados cadastros nem usadas credenciais neste ciclo. [Guia oficial](https://developers.soundcloud.com/docs/api/guide).
 
 O widget oficial permite controlar reprodução incorporada por JavaScript. É um caminho para escuta com componente web visível e validação por plataforma; não fornece um MP3 universal para o player local. [Widget API](https://developers.soundcloud.com/docs/api/html5-widget).
