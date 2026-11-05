@@ -6,8 +6,7 @@ import '../domain/models.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'track_review_actions.dart';
 import 'edit_track_dialog.dart';
-import 'artwork_thumbnail.dart';
-import 'track_download_badge.dart';
+import 'track_identity.dart';
 import '../../player/presentation/listening_actions.dart';
 
 class TrackInspector extends StatefulWidget {
@@ -66,6 +65,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                 child: CategoryTabs(
                     labels: const ['Correspondência', 'Informações'],
                     selected: _tab,
+                    bottomSpacing: 0,
                     onSelect: (v) => setState(() => _tab = v))),
             Expanded(
                 child: SingleChildScrollView(
@@ -73,21 +73,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ArtworkThumbnail(
-                              reference: t.resolvedCoverUrl.isEmpty
-                                  ? t.coverUrl
-                                  : t.resolvedCoverUrl,
-                              audioPath: t.localPath,
-                              size: 112),
-                          const SizedBox(height: 12),
-                          Text(t.displayTitle,
-                              style: const TextStyle(
-                                  fontSize: 17, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 5),
-                          Text(t.artist,
-                              style: const TextStyle(color: AppColors.muted)),
-                          const SizedBox(height: 8),
-                          TrackDownloadBadge(track: t),
+                          TrackIdentity(track: t),
                           const SizedBox(height: 16),
                           _line(
                               'Duração esperada', formatDuration(t.durationMs)),
@@ -115,11 +101,11 @@ class _TrackInspectorState extends State<TrackInspector> {
                                     style: const TextStyle(
                                         fontSize: 12,
                                         color: Color(0xFF9C4141)))),
-                          const SizedBox(height: 16),
-                          const Divider(),
-                          const SizedBox(height: 12),
+                          const Divider(height: 24),
                           if (_tab == 1) ...[
-                            ListeningActions(track: t),
+                            Align(
+                                alignment: Alignment.center,
+                                child: ListeningActions(track: t)),
                             _line('Álbum original',
                                 t.album.isEmpty ? 'Não informado' : t.album),
                             if (t.customTitle.isNotEmpty)
@@ -227,17 +213,30 @@ class _TrackInspectorState extends State<TrackInspector> {
   }
 
   Widget _line(String label, String value) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(
-          flex: 5,
-          child: Text(label,
-              style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-            flex: 6, child: Text(value, style: const TextStyle(fontSize: 12))),
-      ]));
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: LayoutBuilder(builder: (context, box) {
+        final caption = Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.muted));
+        final detail = Text(value, style: const TextStyle(fontSize: 12));
+        if (box.maxWidth < 340 &&
+            MediaQuery.textScalerOf(context).scale(11) > 14) {
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                caption,
+                const SizedBox(height: 3),
+                detail,
+              ]);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: (box.maxWidth * .4).clamp(0, 140),
+            child: caption,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: detail),
+        ]);
+      }));
   Widget _option(Candidate candidate) {
     final assessment = widget.controller.assess(candidate);
     return RadioListTile<Candidate>(

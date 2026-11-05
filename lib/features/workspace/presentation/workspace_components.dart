@@ -6,10 +6,12 @@ class CategoryTabs extends StatelessWidget {
       {super.key,
       required this.labels,
       required this.selected,
-      required this.onSelect});
+      required this.onSelect,
+      this.bottomSpacing = 20});
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelect;
+  final double bottomSpacing;
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -43,7 +45,7 @@ class CategoryTabs extends StatelessWidget {
                                     : FontWeight.w400))),
                 ]))),
         const Divider(height: 1),
-        const SizedBox(height: 20)
+        SizedBox(height: bottomSpacing)
       ]);
 }
 
