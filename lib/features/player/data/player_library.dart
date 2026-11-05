@@ -8,6 +8,7 @@ import '../../library/domain/models.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../domain/playback.dart';
 import 'audio_tags.dart';
+import '../../importing/soundcloud_link.dart';
 
 String publicReference(String raw) {
   final uri = Uri.tryParse(raw);
@@ -18,6 +19,14 @@ String publicReference(String raw) {
     return '';
   }
   final host = uri.host.toLowerCase();
+  if (SoundCloudLink.recognizes(raw)) {
+    try {
+      final link = SoundCloudLink.parse(raw);
+      return link.resource == SoundCloudResource.track ? link.url : '';
+    } on FormatException {
+      return '';
+    }
+  }
   if (['www.deezer.com', 'deezer.com'].contains(host)) {
     final id =
         RegExp(r'^/(?:[a-z]{2}/)?track/(\d+)$').firstMatch(uri.path)?.group(1);

@@ -91,8 +91,8 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
       LinkEntryPanel(
           title: 'Importar playlist',
-          fieldLabel: 'Link da playlist',
-          hintText: 'Link de playlist do Spotify',
+          fieldLabel: 'Link da playlist ou faixa',
+          hintText: 'Playlist Spotify ou SoundCloud · faixa SoundCloud',
           controller: _url,
           focusNode: _urlFocus,
           inputKey: const ValueKey('playlist-url'),
@@ -102,6 +102,11 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
           actionIcon: Icons.playlist_add_rounded,
           onAction: c.busy ? null : () => unawaited(_import(_url.text)),
           secondaryActions: [
+            if (c.importing)
+              IconButton(
+                  tooltip: 'Cancelar importação',
+                  onPressed: c.cancel,
+                  icon: const Icon(Icons.close, color: AppColors.accentActive)),
             OutlinedButton(
                 onPressed: widget.onConnections, child: const Text('Conexões')),
             IconButton(
@@ -126,7 +131,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
       icon: const Icon(Icons.arrow_back, size: 18));
   Future<void> _import(String value) async {
     final before = widget.controller.current?.id;
-    await widget.controller.importSpotify(value);
+    await widget.controller.importPlaylist(value);
     if (mounted && widget.controller.current?.id != before) {
       setState(() => _detail = true);
     }

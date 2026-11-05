@@ -24,7 +24,7 @@ class MusicLinkService {
                 (item.source!.kind == SourceKind.youtube ||
                     music!.canUse(item.source!)));
       } else if (!item.pinned && music?.available == true) {
-        // Spotify supplies requested metadata, never a downloadable audio URL.
+        // Spotify/SoundCloud supply requested metadata, not a downloadable source.
         final track = item.matchingTrack;
         try {
           final found =

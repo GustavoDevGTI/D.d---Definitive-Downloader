@@ -10,6 +10,10 @@ class MatchAssessment {
 class TrackMatcher {
   const TrackMatcher();
   MatchAssessment assess(Track track, Candidate candidate) {
+    if (track.artist.trim().isEmpty || candidate.artist.trim().isEmpty) {
+      return const MatchAssessment(
+          0, true, 'Artista não confirmado; confira a gravação');
+    }
     if (candidate.kind == SourceKind.youtube) {
       return const MatchAssessment(
           0, true, 'Videoclipe: aprovação desta versão necessária');

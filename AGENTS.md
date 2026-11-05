@@ -108,6 +108,8 @@
 
 ## Validação e entrega
 
+- SoundCloud 0.1.43 local: links públicos de faixas/playlists servem como origem de metadados para equivalentes em Deezer/YouTube Music. Leitor Dart público sem cookies/login; não confundir identificador temporário do cliente web com cadastro OAuth próprio. Preservar origem, ordem e repetições, completar IDs antes de apresentar a coleção e não inferir artista pelo uploader. Sem artista confirmado, revisar. Adicionar links aceita faixas; listas completas entram na importação. SoundCloud não é motor de download/stream nesta etapa. Ver `docs/VERSAO_LOCAL_0_1_43.md`.
+
 - Ajustes locais 0.1.42: Coleções mantém apenas a barra vertical framboesa própria, sem scrollbar automática sobreposta. Cabeçalho separado dos controles por divisória, com seleção alinhada às linhas. Downloads sem título “Gerenciador de downloads”; comandos e busca na mesma linha desktop, filtros também quando houver espaço, contagem no rodapé direito e tabela aproveitando a altura liberada. Mobile preserva acesso aos controles e busca. Ver `docs/VERSAO_LOCAL_0_1_42.md`.
 
 - Listas contínuas 0.1.41 local: pedido posterior do usuário remove a paginação visível das faixas em Coleções e de Downloads. Carregar os metadados da coleção completa na importação/abertura, com o limite existente de 10.000 ocorrências, e virtualizar widgets no scroll. Downloads usa lista única com limite defensivo de 100.000 registros e 10.000 por execução. Busca/filtro/ordem e seleção abrangem a lista; preservar repetição e restrições de movimento. Schema 13 rastreia revisões para reler apenas metadados alterados. Paginação interna de execução/importação/histórico continua sendo implementação, sem setas na playlist ou Downloads. Ver `docs/VERSAO_LOCAL_0_1_41.md`.

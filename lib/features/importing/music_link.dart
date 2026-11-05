@@ -1,6 +1,7 @@
 import '../library/domain/models.dart';
+import 'soundcloud_link.dart';
 
-enum MusicLinkKind { spotify, deezer, youtubeMusic, youtube, mp3 }
+enum MusicLinkKind { spotify, deezer, youtubeMusic, youtube, soundcloud, mp3 }
 
 class MusicLink {
   const MusicLink(this.kind, this.url, this.id);
@@ -10,6 +11,15 @@ class MusicLink {
   static MusicLink parse(String input) {
     final value = input.trim();
     if (value.length > 4096) throw const FormatException('Link muito longo.');
+    if (SoundCloudLink.recognizes(value)) {
+      final soundcloud = SoundCloudLink.parse(value);
+      if (soundcloud.resource == SoundCloudResource.playlist) {
+        throw const FormatException(
+            'Use Importar playlist para uma lista SoundCloud.');
+      }
+      return MusicLink(
+          MusicLinkKind.soundcloud, soundcloud.url, soundcloud.url);
+    }
     if (RegExp(r'^spotify:track:[A-Za-z0-9]{22}$').hasMatch(value)) {
       return MusicLink(
           MusicLinkKind.spotify,
@@ -76,7 +86,7 @@ class MusicLink {
       return MusicLink(MusicLinkKind.mp3, uri.toString(), '');
     }
     throw const FormatException(
-        'Use uma faixa do Spotify, Deezer, YouTube ou MP3 direto sem parâmetros.');
+        'Use uma faixa do Spotify, SoundCloud, Deezer, YouTube ou MP3 direto sem parâmetros.');
   }
 
   static MusicLink fromIdentifier(MusicLinkKind kind, String input) {
@@ -89,6 +99,7 @@ class MusicLink {
       MusicLinkKind.deezer => 'https://www.deezer.com/track/$value',
       MusicLinkKind.youtubeMusic => 'https://music.youtube.com/watch?v=$value',
       MusicLinkKind.youtube => 'https://www.youtube.com/watch?v=$value',
+      MusicLinkKind.soundcloud => 'https://soundcloud.com/$value',
       MusicLinkKind.mp3 => value,
     });
   }

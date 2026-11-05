@@ -135,6 +135,8 @@ class _EditTrackDialogState extends State<EditTrackDialog> {
                                           MusicLinkKind.youtubeMusic =>
                                             'YouTube Music',
                                           MusicLinkKind.youtube => 'YouTube',
+                                          MusicLinkKind.soundcloud =>
+                                            'SoundCloud',
                                           MusicLinkKind.mp3 => 'MP3 direto'
                                         }))
                                 ],

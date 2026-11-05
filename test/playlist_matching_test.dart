@@ -102,6 +102,21 @@ void main() {
   });
 
   test(
+      'cancelar importação preserva a biblioteca anterior e não começa conferência',
+      () async {
+    final c = controller([
+      const TrackDraft(title: 'Nova', artist: 'Pessoa', durationMs: 180000)
+    ]);
+    final pending = c.importPlaylist('fixture');
+    expect(c.importing, isTrue);
+    c.cancel();
+    await pending;
+    expect(c.message, 'Importação cancelada.');
+    expect(await repository.collections(), isEmpty);
+    expect(resolver.calls, isEmpty);
+  });
+
+  test(
       'importação inicia conferência sem download; vazias, erros e vídeos ficam em revisão',
       () async {
     resolver.gate = Completer<void>();

@@ -46,6 +46,16 @@ class LibraryMusicSources {
           continue;
         }
         onTrack(track);
+        if (Uri.tryParse(track.sourceUrl)?.host == 'api.soundcloud.com' &&
+            track.durationMs == null) {
+          await repository.markForReview(track.id);
+          await repository.setStatus(track.id, TrackStatus.pending,
+              error:
+                  'Esta ocorrência não está disponível no SoundCloud. Informe uma versão na conferência.');
+          review++;
+          await recordsChanged();
+          continue;
+        }
         try {
           final found = await resolver.search(
               track, '${track.artist} ${track.title}',

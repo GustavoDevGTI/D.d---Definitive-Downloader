@@ -15,6 +15,7 @@ import 'core/storage/database.dart';
 import 'features/downloads/download_service.dart';
 import 'features/importing/csv_importer.dart';
 import 'features/importing/spotify_importer.dart';
+import 'features/importing/soundcloud_link.dart';
 import 'features/library/application/library_controller.dart';
 import 'features/library/data/library_repository.dart';
 import 'features/matching/deezer_catalog.dart';
@@ -67,9 +68,10 @@ Future<void> main(List<String> arguments) async {
       arguments.where((value) => value.startsWith('--playlist=')).firstOrNull;
   var initialPlaylist = '';
   if (playlistArgument != null) {
-    final id = const SpotifyImporter(http)
-        .playlistId(playlistArgument.substring('--playlist='.length));
-    initialPlaylist = 'https://open.spotify.com/playlist/$id';
+    final input = playlistArgument.substring('--playlist='.length);
+    initialPlaylist = SoundCloudLink.recognizes(input)
+        ? SoundCloudLink.parse(input).url
+        : 'https://open.spotify.com/playlist/${const SpotifyImporter(http).playlistId(input)}';
   }
   runApp(DefinitiveDownloaderApp(
       controller: controller,

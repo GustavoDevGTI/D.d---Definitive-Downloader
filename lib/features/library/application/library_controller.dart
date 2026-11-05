@@ -8,6 +8,8 @@ import '../../importing/music_link_service.dart';
 import '../../importing/music_link_repository.dart';
 import '../../importing/demo_collection.dart';
 import '../../importing/spotify_importer.dart';
+import '../../importing/soundcloud_catalog.dart';
+import '../../importing/soundcloud_link.dart';
 import '../../importing/spotify_account_importer.dart';
 import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
@@ -34,8 +36,12 @@ class LibraryController extends ChangeNotifier {
       required this.catalog,
       required this.downloader,
       this.accountSpotify,
+      SoundCloudCatalog? soundcloud,
       this.linkCatalog,
-      this.music});
+      this.music})
+      : soundcloud = soundcloud ?? SoundCloudCatalog();
+  final SoundCloudCatalog soundcloud;
+  DownloadCancellation? _importCancellation;
   final MusicResolver? music;
   final MusicLinkCatalog? linkCatalog;
   bool addingLinks = false;
@@ -67,7 +73,10 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
     try {
       final entries = await MusicLinkService(
-              linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify), music)
+              linkCatalog ??
+                  MusicLinkCatalog(
+                      spotify: accountSpotify, soundcloud: soundcloud),
+              music)
           .resolve(input, onProgress: (done, total) {
         linkProgress = 'Conferindo links: $done/$total';
         notifyListeners();
@@ -139,7 +148,9 @@ class LibraryController extends ChangeNotifier {
       if (sourceInput != null && platform != null) {
         final link = MusicLink.fromIdentifier(platform, sourceInput);
         replacement = (await MusicLinkService(
-                    linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify),
+                    linkCatalog ??
+                        MusicLinkCatalog(
+                            spotify: accountSpotify, soundcloud: soundcloud),
                     music)
                 .resolve(link.url))
             .single;
@@ -359,8 +370,11 @@ class LibraryController extends ChangeNotifier {
     await refresh();
   }
 
-  LibraryMusicSources get _sources => LibraryMusicSources(repository,
-      linkCatalog ?? MusicLinkCatalog(spotify: accountSpotify), music);
+  LibraryMusicSources get _sources => LibraryMusicSources(
+      repository,
+      linkCatalog ??
+          MusicLinkCatalog(spotify: accountSpotify, soundcloud: soundcloud),
+      music);
   Future<void> setManualSource(String value, ManualSourceMode mode) async {
     final track = focused;
     if (track == null || busy) return;
@@ -488,10 +502,19 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> loadExample() => _import(() async => demoCollection());
-  Future<void> importSpotify(String url) =>
-      _import(() => accountSpotify?.isConnected == true
-          ? accountSpotify!.open(url)
-          : spotify.open(url));
+  Future<void> importSpotify(String url) => importPlaylist(url);
+  Future<void> importPlaylist(String url) =>
+      _import(() => SoundCloudLink.recognizes(url)
+          ? soundcloud.open(url,
+              cancelled: () =>
+                  _disposed || _importCancellation?.cancelled == true,
+              onProgress: (done, total) {
+                message = 'Lendo faixas SoundCloud: $done/$total';
+                notifyListeners();
+              })
+          : accountSpotify?.isConnected == true
+              ? accountSpotify!.open(url)
+              : spotify.open(url));
   Future<void> importCsv() async {
     if (busy) return;
     final path = await files.chooseCsv();
@@ -502,12 +525,22 @@ class LibraryController extends ChangeNotifier {
     if (busy) return;
     _searchGeneration++;
     importing = true;
+    final token = _importCancellation = DownloadCancellation();
     message = 'Lendo a coleção…';
     var importedSuccessfully = false;
     notifyListeners();
     try {
       final imported = await source();
-      final id = await repository.importCollection(imported);
+      token.check();
+      final id = await repository.importCollection(ImportedCollection(
+          name: imported.name,
+          source: imported.source,
+          sourceUrl: imported.sourceUrl,
+          isPartial: imported.isPartial,
+          tracks: imported.tracks.map((track) {
+            token.check();
+            return track;
+          })));
       collections = await repository.collections();
       current = collections.firstWhere((c) => c.id == id);
       collectionOffset = 0;
@@ -525,10 +558,13 @@ class LibraryController extends ChangeNotifier {
               : 'Coleção importada. A ordem e as repetições foram preservadas.';
       await refresh();
       importedSuccessfully = true;
+    } on DownloadCancelled {
+      message = 'Importação cancelada.';
     } catch (error) {
       message = operationMessage(error);
     } finally {
       importing = false;
+      _importCancellation = null;
       if (importedSuccessfully && !isExample && music?.available == true) {
         unawaited(prepareMusic(onlyPending: true));
       }
@@ -729,6 +765,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   void cancel() {
+    _importCancellation?.cancelled = true;
     _cancellation?.cancelled = true;
     message = 'Interrompendo após liberar a operação atual…';
     notifyListeners();
@@ -747,6 +784,7 @@ class LibraryController extends ChangeNotifier {
     _searchGeneration++;
     _cancellation?.cancelled = true;
     _trackListing.clear();
+    _importCancellation?.cancelled = true;
     _transferUpdates.dispose();
     super.dispose();
   }

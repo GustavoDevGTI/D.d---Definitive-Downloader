@@ -2,14 +2,25 @@ import '../library/domain/models.dart';
 import 'music_link.dart';
 import 'music_catalog_transport.dart';
 import 'spotify_account_importer.dart';
+import 'soundcloud_catalog.dart';
 
 class MusicLinkCatalog {
   const MusicLinkCatalog(
-      {this.transport = const PublicMusicCatalogTransport(), this.spotify});
+      {this.transport = const PublicMusicCatalogTransport(),
+      this.spotify,
+      this.soundcloud});
   final MusicCatalogTransport transport;
   final SpotifyAccountImporter? spotify;
+  final SoundCloudCatalog? soundcloud;
 
   Future<ResolvedMusicLink> resolve(MusicLink link) async {
+    if (link.kind == MusicLinkKind.soundcloud) {
+      final draft = await (soundcloud ?? SoundCloudCatalog()).track(link.url);
+      return ResolvedMusicLink(
+          link: MusicLink(
+              MusicLinkKind.soundcloud, draft.sourceUrl, draft.sourceUrl),
+          draft: draft);
+    }
     if (link.kind == MusicLinkKind.mp3) {
       final name = Uri.parse(link.url)
           .pathSegments
