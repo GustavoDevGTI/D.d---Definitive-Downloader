@@ -72,6 +72,53 @@ class SearchPolicyEngine extends EmptyEngine {
   }
 }
 
+class ExactSoundCloudEngine extends EmptyEngine {
+  final queries = <Map<String, dynamic>>[];
+  @override
+  Future<Map<String, dynamic>> call(Map<String, dynamic> request,
+      {DownloadCancellation? cancellation,
+      void Function(String)? onStage,
+      void Function(TransferProgress)? onProgress}) async {
+    queries.add(request);
+    if (request['provider'] == 'soundcloud' &&
+        (request['query'] as String).startsWith('"')) {
+      return {
+        'candidates': [
+          candidateJson(const Candidate(
+              title: 'Entre linhas',
+              artist: 'Laboratório D.d',
+              album: 'Ensaios',
+              durationMs: 180000,
+              pageUrl: 'https://soundcloud.com/artist/entre-linhas',
+              previewUrl: '',
+              coverUrl: '',
+              sourceId: '123',
+              kind: SourceKind.soundcloud,
+              recordingType: 'SOUNDCLOUD_TRACK',
+              explicit: false))
+        ]
+      };
+    }
+    if (request['provider'] == 'youtubeMusic') {
+      return {
+        'candidates': [
+          candidateJson(const Candidate(
+              title: 'Outra música',
+              artist: 'Outra pessoa',
+              album: '',
+              durationMs: 180000,
+              pageUrl: 'https://music.youtube.com/watch?v=abcdefghijk',
+              previewUrl: '',
+              coverUrl: '',
+              kind: SourceKind.youtubeMusic,
+              recordingType: 'MUSIC_VIDEO_TYPE_ATV'))
+        ]
+      };
+    }
+    return {'candidates': []};
+  }
+}
+
 void main() {
   late MusicResolver resolver;
   late DeezerConnectionController connection;
@@ -119,7 +166,15 @@ void main() {
             engine.providers,
             audio
                 ? ['deezerFull', 'youtubeMusic', 'soundcloud']
-                : ['deezerFull', 'youtubeMusic', 'soundcloud', 'youtube']);
+                : [
+                    'deezerFull',
+                    'youtubeMusic',
+                    'soundcloud',
+                    'soundcloud',
+                    'deezerFull',
+                    'youtubeMusic',
+                    'youtube'
+                  ]);
         expect(own.automaticChoice(testTrack(), result)?.kind,
             audio ? SourceKind.youtubeMusic : null);
         if (!audio) expect(result.single.isVideoRecording, isTrue);
@@ -127,5 +182,25 @@ void main() {
         ownConnection.dispose();
       }
     }
+  });
+  test(
+      'busca a faixa exata no SoundCloud antes de recomendar outro título ou videoclipe',
+      () async {
+    final engine = ExactSoundCloudEngine();
+    final own = MusicResolver(engine, connection);
+    final found = await own.search(testTrack(), 'Entre linhas');
+    expect(engine.queries.map((r) => r['provider']), [
+      'deezerFull',
+      'youtubeMusic',
+      'soundcloud',
+      'soundcloud',
+      'deezerFull',
+      'youtubeMusic'
+    ]);
+    expect(engine.queries[3]['query'], '"Entre linhas" "Laboratório D.d"');
+    expect(found.single.kind, SourceKind.soundcloud);
+    expect(found.single.title, 'Entre linhas');
+    expect(
+        own.automaticChoice(testTrack(), found)?.kind, SourceKind.soundcloud);
   });
 }

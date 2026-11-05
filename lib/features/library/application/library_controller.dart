@@ -160,6 +160,21 @@ class LibraryController extends ChangeNotifier {
   }
 
   bool editing = false;
+  Future<void> _selectionWrites = Future<void>.value();
+  Future<void> selectSweep(List<int> ids) {
+    final owner = current?.id;
+    if (owner == null || busy || ids.isEmpty) return Future<void>.value();
+    final request = _selectionWrites.then((_) async {
+      await repository.selectSweep(owner, ids);
+      await refresh();
+    });
+    _selectionWrites = request.catchError((Object error) {
+      message = operationMessage(error);
+      notifyListeners();
+    });
+    return _selectionWrites;
+  }
+
   Future<bool> clickTrack(Track track, {required bool extend}) async {
     if (busy || current?.id != track.collectionId) return false;
     await repository.selectFromClick(track.collectionId, track.id,

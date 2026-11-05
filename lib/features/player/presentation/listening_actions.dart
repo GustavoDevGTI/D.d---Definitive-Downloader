@@ -41,40 +41,48 @@ class ListeningActions extends StatelessWidget {
                     use ? AppColors.success : AppColors.accentActive,
                 hoverColor: AppColors.accentSoft,
                 minimumSize: const Size(36, 36),
+                fixedSize: const Size(36, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.all(6),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6))),
             icon: Icon(icon, size: 18));
-    return Wrap(spacing: 3, children: [
-      if (listen)
-        TextButton.icon(
-            style: TextButton.styleFrom(
-                foregroundColor: AppColors.accentActive,
-                minimumSize: const Size(36, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                textStyle: const TextStyle(fontSize: 11)),
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-            label: Text(version == null
-                ? player.trackListenLabel(track)
-                : player.candidateListenLabel(track, version)),
-            onPressed: () => unawaited(version == null
-                ? player.listenTrack(track)
-                : player.listenCandidate(track, version))),
-      if (reference.isNotEmpty) ...[
-        action('Abrir referência', Icons.open_in_new_rounded,
-            () => unawaited(player.openReference(reference))),
-        action('Copiar link', Icons.copy_rounded,
-            () => unawaited(player.copyReference(reference))),
-      ],
-      if (version != null)
-        action(
-            'Usar esta versão',
-            Icons.check_rounded,
-            canUse
-                ? () => unawaited(
-                    confirmCandidateVersion(context, library!, choice: version))
-                : null,
-            use: true),
-    ]);
+    return Wrap(
+        spacing: 3,
+        alignment: WrapAlignment.start,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (listen)
+            TextButton.icon(
+                style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentActive,
+                    minimumSize: const Size(36, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    fixedSize: const Size.fromHeight(36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(version == null
+                    ? player.trackListenLabel(track)
+                    : player.candidateListenLabel(track, version)),
+                onPressed: () => unawaited(version == null
+                    ? player.listenTrack(track)
+                    : player.listenCandidate(track, version))),
+          if (reference.isNotEmpty) ...[
+            action('Abrir referência', Icons.open_in_new_rounded,
+                () => unawaited(player.openReference(reference))),
+            action('Copiar link', Icons.copy_rounded,
+                () => unawaited(player.copyReference(reference))),
+          ],
+          if (version != null)
+            action(
+                'Usar esta versão',
+                Icons.check_rounded,
+                canUse
+                    ? () => unawaited(confirmCandidateVersion(context, library!,
+                        choice: version))
+                    : null,
+                use: true),
+        ]);
   }
 }

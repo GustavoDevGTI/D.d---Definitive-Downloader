@@ -214,6 +214,25 @@ class LibraryRepository {
             'UPDATE tracks SET selected=? WHERE id IN (${List.filled(ids.length, '?').join(',')})',
             [value ? 1 : 0, ...ids]);
       });
+  Future<void> selectSweep(int collectionId, List<int> ids) =>
+      database.run((db) {
+        if (ids.length > 10000) {
+          throw const FormatException('Seleção acima do limite.');
+        }
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          for (var offset = 0; offset < ids.length; offset += 200) {
+            final batch = ids.skip(offset).take(200).toList();
+            db.execute(
+                'UPDATE tracks SET selected=1 WHERE collection_id=? AND selected=0 AND id IN (${List.filled(batch.length, '?').join(',')})',
+                [collectionId, ...batch]);
+          }
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      });
   Future<void> linkSource(Track track,
           {required String url,
           required SourceKind kind,

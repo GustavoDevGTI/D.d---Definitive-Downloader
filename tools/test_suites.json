@@ -14,9 +14,9 @@
     "player": ["test/music_player_test.dart", "test/player_navigation_test.dart", "test/artwork_store_test.dart", "test/audio_slider_test.dart"],
     "connections": ["test/spotify_auth_test.dart", "test/spotify_connection_test.dart", "test/spotify_account_importer_test.dart"],
     "storage": ["test/library_migration_test.dart", "test/continuous_listing_test.dart", "test/collection_organization_test.dart", "test/collection_duplicates_test.dart"],
-    "ui_collections": ["test/collection_manager_test.dart", "test/collection_composition_layout_test.dart", "test/track_interaction_test.dart"],
-    "ui_downloads": ["test/download_table_layout_test.dart", "test/download_scroll_test.dart"],
-    "ui_player": ["test/music_player_layout_test.dart", "test/audio_slider_test.dart"],
+    "ui_collections": ["test/collection_manager_test.dart", "test/collection_composition_layout_test.dart", "test/track_interaction_test.dart", "test/selection_sweep_test.dart"],
+    "ui_downloads": ["test/download_table_layout_test.dart", "test/download_scroll_test.dart", "test/selection_sweep_test.dart"],
+    "ui_player": ["test/music_player_layout_test.dart", "test/audio_slider_test.dart", "test/listening_actions_test.dart"],
     "ui_common": ["test/app_notice_test.dart", "test/button_hover_motion_test.dart", "test/capture_layout_test.dart", "test/continuous_scroll_test.dart"],
     "worker": ["test/music_resolver_test.dart", "test/music_policy_test.dart", "test/soundcloud_source_test.dart"]
   },

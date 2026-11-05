@@ -74,39 +74,29 @@ class MusicPlayerController extends ChangeNotifier {
   }
 
   bool canListenTrack(Track t) =>
-      _external(t.sourceKind) ||
       engine.available &&
-          (t.localPath.isNotEmpty ||
-              [SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
-                  .contains(t.sourceKind));
+      (t.localPath.isNotEmpty ||
+          [SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
+              .contains(t.sourceKind));
   bool canListenCandidate(Track t, Candidate c) =>
-      _external(c.kind) ||
       engine.available &&
-          ([SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
-                  .contains(c.kind) ||
-              (t.localPath.isNotEmpty &&
-                  t.mediaUrl == c.pageUrl &&
-                  t.redownloadState.isEmpty));
+      ([SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
+              .contains(c.kind) ||
+          (t.localPath.isNotEmpty &&
+              t.mediaUrl == c.pageUrl &&
+              t.redownloadState.isEmpty));
   String trackListenLabel(Track t) => t.localPath.isNotEmpty
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(t.sourceKind)
           ? 'Ouvir prévia'
-          : _external(t.sourceKind)
-              ? 'Ouvir no ${t.sourceKind.musicProviderName}'
-              : 'Ouvir';
-  bool _external(SourceKind kind) =>
-      kind == SourceKind.youtubeMusic ||
-      kind == SourceKind.youtube ||
-      kind == SourceKind.soundcloud;
+          : 'Ouvir';
   String candidateListenLabel(Track t, Candidate c) => t.localPath.isNotEmpty &&
           t.mediaUrl == c.pageUrl &&
           t.redownloadState.isEmpty
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(c.kind)
           ? 'Ouvir prévia'
-          : _external(c.kind)
-              ? 'Ouvir no ${c.kind.musicProviderName}'
-              : 'Ouvir';
+          : 'Ouvir';
 
   Future<void> playCollection(int id, {int? startTrackId}) async {
     final request = ++_request;
@@ -152,13 +142,6 @@ class MusicPlayerController extends ChangeNotifier {
         final item = await library.track(track);
         if (request != _request || _disposed) return;
         if (item == null) {
-          if (_external(track.sourceKind)) {
-            await pause();
-            await openReference(library.referenceFor(track));
-            loading = false;
-            _notify();
-            return;
-          }
           throw const FormatException(
               'Sem áudio disponível. Abra a referência desta versão.');
         }
@@ -183,13 +166,6 @@ class MusicPlayerController extends ChangeNotifier {
       final item = await library.candidate(track, candidate);
       if (request != _request || _disposed) return;
       if (item == null) {
-        if (_external(candidate.kind)) {
-          await pause();
-          await openReference(library.referenceForCandidate(candidate));
-          loading = false;
-          _notify();
-          return;
-        }
         throw const FormatException('Sem prévia disponível.');
       }
       await _setQueue([item], 0, request);

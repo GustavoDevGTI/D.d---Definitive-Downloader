@@ -213,6 +213,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                       unawaited(c.sortDownloads(value)),
                                   widths: c.columnWidths,
                                   onResize: c.resizeColumns,
+                                  onSelectMany: c.selectMany,
                                   onResizeEnd: () =>
                                       unawaited(c.saveColumnWidths()),
                                   selection: c.selection,

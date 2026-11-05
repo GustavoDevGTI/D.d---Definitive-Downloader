@@ -73,7 +73,7 @@ $optional=@('DD_PLAYLIST_REAL_OUTPUT','DD_LOCAL_REAL_DLL','DD_LOCAL_REAL_OUTPUT'
 $saved=@{}
 foreach($name in $optional) {
     $saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process')
-    [Environment]::SetEnvironmentVariable($name,$null,'Process')
+    Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
 }
 Push-Location $workspace
 try {
@@ -86,5 +86,8 @@ try {
     }
 } finally {
     Pop-Location
-    foreach($name in $optional) { [Environment]::SetEnvironmentVariable($name,$saved[$name],'Process') }
+    foreach($name in $optional) {
+        if($null -eq $saved[$name]) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
+        else { [Environment]::SetEnvironmentVariable($name,$saved[$name],'Process') }
+    }
 }

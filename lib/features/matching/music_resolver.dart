@@ -2,6 +2,7 @@ import '../connections/application/deezer_connection_controller.dart';
 import '../downloads/download_cancellation.dart';
 import '../library/domain/models.dart';
 import '../library/domain/matching.dart';
+import '../library/domain/track_listing.dart';
 import 'music_candidates.dart';
 import 'music_engine.dart';
 
@@ -46,6 +47,49 @@ class MusicResolver {
       }
     }
     const matcher = TrackMatcher();
+    if (!candidates.any((c) => sameSong(track, c))) {
+      final exactQuery = '"${track.title}" "${track.artist}"';
+      if (track.title.trim().isNotEmpty &&
+          track.artist.trim().isNotEmpty &&
+          exactQuery != query) {
+        // Exhaust the exact requested song before presenting other titles or
+        // recordings. Only providers already implemented by the motor are used.
+        for (final kind in ['soundcloud', 'deezerFull', 'youtubeMusic']) {
+          cancellation?.check();
+          try {
+            final response = await engine.call({
+              'operation': 'search',
+              'provider': kind,
+              'query': exactQuery,
+              'isrc': track.isrc
+            }, cancellation: cancellation);
+            final rows = response['candidates'];
+            if (rows is! List || rows.length > 8) {
+              throw const FormatException('Resposta de busca inválida.');
+            }
+            for (final row in rows) {
+              final c =
+                  parseMusicCandidate(Map<String, dynamic>.from(row as Map));
+              if (c.isFullRecording &&
+                  !candidates.any(
+                      (old) => old.kind == c.kind && old.pageUrl == c.pageUrl)) {
+                candidates.add(c);
+              }
+            }
+          } on DownloadCancelled {
+            rethrow;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+      }
+    }
+    final exact = candidates.where((c) => sameSong(track, c)).toList();
+    if (exact.isNotEmpty) {
+      candidates
+        ..clear()
+        ..addAll(exact);
+    }
     if (!candidates
         .any((c) => canUse(c) && !matcher.assess(track, c).needsReview)) {
       try {
@@ -58,7 +102,22 @@ class MusicResolver {
       }
     }
     if (candidates.isEmpty && lastError != null) throw lastError;
-    return candidates;
+    return candidates.take(32).toList();
+  }
+
+  static bool sameSong(Track track, Candidate candidate) {
+    String fold(String v) => foldTrackText(v)
+        .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ')
+        .trim();
+    final title = fold(track.title),
+        artist = fold(track.artist),
+        actualArtist = fold(candidate.artist);
+    if (title.isEmpty || artist.isEmpty || actualArtist.isEmpty) return false;
+    final sameTitle = fold(candidate.title) == title;
+    final artists = actualArtist.split(' ').toSet(),
+        requested = artist.split(' ').toSet();
+    return sameTitle &&
+        (actualArtist == artist || requested.every(artists.contains));
   }
 
   Future<List<Candidate>> searchVideos(Track track, String query,

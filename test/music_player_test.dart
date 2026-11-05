@@ -74,7 +74,7 @@ void main() {
     expect(actual.playing, isFalse);
     actual.dispose();
   });
-  test('YouTube Music abre versão exata sem prévia fictícia ou confirmação',
+  test('YouTube Music sem áudio interno não oferece ouvir nem abre navegador',
       () async {
     await player.playCollection(1);
     final current = player.current;
@@ -89,13 +89,10 @@ void main() {
         coverUrl: '',
         kind: SourceKind.youtubeMusic);
     final track = audioTrack(path: '');
-    expect(player.canListenCandidate(track, candidate), isTrue);
-    expect(player.candidateListenLabel(track, candidate),
-        'Ouvir no YouTube Music');
+    expect(player.canListenCandidate(track, candidate), isFalse);
     await player.listenCandidate(track, candidate);
-    expect(files.opened.single.toString(),
-        'https://music.youtube.com/watch?v=abcdefghijk');
-    expect(player.playing, isFalse);
+    expect(files.opened, isEmpty);
+    expect(player.playing, isTrue);
     expect(player.current, current);
     expect(engine.opens.length, 1);
     expect(player.loading, isFalse);

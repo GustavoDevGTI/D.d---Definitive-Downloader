@@ -80,6 +80,7 @@ void main() {
       await tester.tap(row(original[1]));
       await ioUntil(tester, () => c.page.selectedCount == 2);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
       expect(c.page.items.take(2).every((t) => t.selected), isTrue);
       final gesture = await tester.startGesture(
           tester.getCenter(row(original[0])),

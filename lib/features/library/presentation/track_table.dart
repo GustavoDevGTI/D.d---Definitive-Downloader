@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../app/app_notice.dart';
+import '../../../core/presentation/ctrl_drag_selection.dart';
 import '../application/library_controller.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
@@ -138,56 +139,91 @@ class _TrackTableState extends State<TrackTable> {
                           child: Text('Nenhuma faixa neste filtro.',
                               style: TextStyle(
                                   fontSize: 12, color: AppColors.muted)))
-                      : ClipRect(
-                          child: ScrollConfiguration(
-                              behavior: ScrollConfiguration.of(context)
-                                  .copyWith(scrollbars: false),
-                              child: RawScrollbar(
-                                  controller: _scroll,
-                                  thumbVisibility: true,
-                                  trackVisibility: true,
-                                  interactive: true,
-                                  thickness: 8,
-                                  radius: const Radius.circular(4),
-                                  thumbColor: AppColors.accent,
-                                  trackColor: AppColors.surface,
-                                  padding:
-                                      const EdgeInsets.fromLTRB(0, 6, 1, 6),
-                                  child: Padding(
-                                      padding: const EdgeInsets.only(right: 12),
-                                      child: ListView.builder(
-                                          key: _viewportKey,
-                                          controller: _scroll,
-                                          primary: false,
-                                          itemExtent: (compact ? 84.0 : 76.0) *
-                                              scale.clamp(1, 2),
-                                          itemCount:
-                                              controller.page.items.length,
-                                          itemBuilder: (context, index) {
-                                            final t =
-                                                controller.page.items[index];
-                                            final focused =
-                                                controller.focused?.id == t.id;
-                                            return _interactive(context, t,
-                                                rowHeight:
-                                                    (compact ? 84.0 : 76.0) *
-                                                        scale.clamp(1, 2),
-                                                width: box.maxWidth,
-                                                child: TrackRow(
-                                                    track: t,
-                                                    focused: focused,
-                                                    compact: compact,
-                                                    selectionEnabled:
-                                                        !controller.busy,
-                                                    onTap: () =>
-                                                        unawaited(_click(t)),
-                                                    onContextMenu: (point) =>
-                                                        unawaited(_contextMenu(
-                                                            t, point)),
-                                                    onSelect: (v) => unawaited(
-                                                        controller.select(
-                                                            t, v))));
-                                          })))))),
+                      : CtrlDragSelection(
+                          scroll: _scroll,
+                          extent: extent,
+                          count: controller.page.items.length,
+                          enabled: !controller.busy,
+                          viewKey: listingKey,
+                          onSelect: (indices) => unawaited(controller
+                                  .selectSweep([
+                                for (final i in indices)
+                                  controller.page.items[i].id
+                              ])),
+                          builder: (control) => ClipRect(
+                              child: ScrollConfiguration(
+                                  behavior: ScrollConfiguration.of(context)
+                                      .copyWith(scrollbars: false),
+                                  child: RawScrollbar(
+                                      controller: _scroll,
+                                      thumbVisibility: true,
+                                      trackVisibility: true,
+                                      interactive: true,
+                                      thickness: 8,
+                                      radius: const Radius.circular(4),
+                                      thumbColor: AppColors.accent,
+                                      trackColor: AppColors.surface,
+                                      padding:
+                                          const EdgeInsets.fromLTRB(0, 6, 1, 6),
+                                      child: Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 12),
+                                          child: ListView.builder(
+                                              key: _viewportKey,
+                                              controller: _scroll,
+                                              primary: false,
+                                              physics: control
+                                                  ? const NeverScrollableScrollPhysics()
+                                                  : null,
+                                              itemExtent:
+                                                  (compact ? 84.0 : 76.0) *
+                                                      scale.clamp(1, 2),
+                                              itemCount:
+                                                  controller.page.items.length,
+                                              findChildIndexCallback: (key) {
+                                                if (key is! ValueKey<int>) {
+                                                  return null;
+                                                }
+                                                final index = controller
+                                                    .page.items
+                                                    .indexWhere((t) =>
+                                                        t.id == key.value);
+                                                return index < 0 ? null : index;
+                                              },
+                                              itemBuilder: (context, index) {
+                                                final t = controller
+                                                    .page.items[index];
+                                                final focused =
+                                                    controller.focused?.id ==
+                                                        t.id;
+                                                return KeyedSubtree(
+                                                    key: ValueKey(t.id),
+                                                    child: _interactive(
+                                                        context, t,
+                                                        control: control,
+                                                        rowHeight: (compact
+                                                                ? 84.0
+                                                                : 76.0) *
+                                                            scale.clamp(1, 2),
+                                                        width: box.maxWidth,
+                                                        child: TrackRow(
+                                                            track: t,
+                                                            focused: focused,
+                                                            compact: compact,
+                                                            selectionEnabled:
+                                                                !controller
+                                                                    .busy,
+                                                            onTap: () =>
+                                                                unawaited(
+                                                                    _click(t)),
+                                                            onContextMenu: (point) =>
+                                                                unawaited(
+                                                                    _contextMenu(
+                                                                        t,
+                                                                        point)),
+                                                            onSelect: (v) =>
+                                                                unawaited(controller.select(t, v)))));
+                                              }))))))),
             ]);
           }));
 
@@ -300,6 +336,7 @@ class _TrackTableState extends State<TrackTable> {
 
   Widget _interactive(BuildContext context, Track track,
       {required double rowHeight,
+      required bool control,
       required double width,
       required Widget child}) {
     final payload = _TrackDrag(
@@ -366,7 +403,7 @@ class _TrackTableState extends State<TrackTable> {
       return Draggable<_TrackDrag>(
           key: ValueKey('drag-track-${track.id}'),
           data: payload,
-          maxSimultaneousDrags: 1,
+          maxSimultaneousDrags: control ? 0 : 1,
           onDragStarted: start,
           onDragUpdate: update,
           onDragEnd: end,

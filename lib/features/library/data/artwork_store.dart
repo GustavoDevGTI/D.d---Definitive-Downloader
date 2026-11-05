@@ -11,16 +11,25 @@ import '../../player/data/audio_tags.dart';
 
 /// Bounded image reads/cache shared by thumbnails and inspectors. No widget IO.
 class ArtworkStore {
-  ArtworkStore({this.http = const BoundedHttp()});
+  ArtworkStore({this.http = const BoundedHttp(), DateTime Function()? now})
+      : now = now ?? DateTime.now;
+  final DateTime Function() now;
   static final shared = ArtworkStore();
   final BoundedHttp http;
   final _cache = <String, Uint8List?>{};
   final _pending = <String, Future<Uint8List?>>{};
+  final _failed = <String, DateTime>{};
+  Uint8List? cached(String reference, {String audioPath = ''}) =>
+      _cache['$reference\n$audioPath'];
   int _bytes = 0;
   int _running = 0;
   final _waiting = Queue<Completer<void>>();
   Future<Uint8List?> load(String reference, {String audioPath = ''}) {
     final key = '$reference\n$audioPath';
+    final retryAfter = _failed[key];
+    if (retryAfter != null && now().isBefore(retryAfter)) {
+      return Future.value(null);
+    }
     if (_cache.containsKey(key)) {
       final data = _cache.remove(key);
       _cache[key] = data;
@@ -29,8 +38,16 @@ class ArtworkStore {
     return _pending.putIfAbsent(
         key,
         () => _load(reference, audioPath).then((data) {
+              if (data == null) {
+                _failed[key] = now().add(const Duration(seconds: 5));
+                while (_failed.length > 100) {
+                  _failed.remove(_failed.keys.first);
+                }
+                return null;
+              }
+              _failed.remove(key);
               _cache[key] = data;
-              _bytes += data?.length ?? 0;
+              _bytes += data.length;
               while (_cache.length > 100 || _bytes > 12 * 1024 * 1024) {
                 _bytes -= _cache.remove(_cache.keys.first)?.length ?? 0;
               }
@@ -51,8 +68,7 @@ class ArtworkStore {
     try {
       Uint8List? data;
       if (audioPath.isNotEmpty) {
-        data = await Isolate.run(
-            () async => (await readAudioTags(audioPath)).cover);
+        data = await _embeddedCover(audioPath);
       }
       if (data != null) return await normalize(data);
       if (reference.startsWith('asset:')) {
@@ -79,6 +95,9 @@ class ArtworkStore {
       }
     }
   }
+
+  static Future<Uint8List?> _embeddedCover(String path) =>
+      Isolate.run(() async => (await readAudioTags(path)).cover);
 
   Future<String> importCover(String source, String supportDirectory) async {
     final file = File(source);

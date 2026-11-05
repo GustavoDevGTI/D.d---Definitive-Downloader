@@ -197,6 +197,11 @@ class WorkspaceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void selectMany(List<int> ids) {
+    selection.addAll(ids);
+    notifyListeners();
+  }
+
   void selectFiltered(bool value) {
     for (final item in downloads.items) {
       value ? selection.add(item.track.id) : selection.remove(item.track.id);
