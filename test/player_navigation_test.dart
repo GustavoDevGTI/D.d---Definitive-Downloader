@@ -14,6 +14,7 @@ import 'package:definitive_downloader/features/library/data/library_repository.d
 import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/library/presentation/sidebar.dart';
 import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
+import 'package:definitive_downloader/features/library/presentation/track_table.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/player/application/music_player_controller.dart';
 import 'player_fixtures.dart';
@@ -38,12 +39,14 @@ void main() {
             name: 'Coleção de áudio',
             source: 'Fixture',
             sourceUrl: '',
-            tracks: Stream.value(const TrackDraft(
-                title: 'Entre linhas',
-                artist: 'Laboratório D.d',
-                mediaUrl: 'https://www.deezer.com/track/123',
-                sourceKind: SourceKind.deezerFull))));
-        track = (await repo.page(id)).items.single;
+            tracks: Stream.fromIterable(List.generate(
+                5,
+                (i) => TrackDraft(
+                    title: 'Faixa ${i + 1}',
+                    artist: 'Laboratório D.d',
+                    mediaUrl: 'https://www.deezer.com/track/123',
+                    sourceKind: SourceKind.deezerFull)))));
+        track = (await repo.page(id)).items.first;
         await repo.setStatus(track.id, TrackStatus.completed,
             localPath: '/fixture/1.mp3');
         library = LibraryController(
@@ -103,6 +106,19 @@ void main() {
               .byKey(ValueKey('track-row-${track.id}'))
               .evaluate()
               .isNotEmpty);
+      if (width >= 1360) {
+        final viewport = tester.getRect(find.descendant(
+            of: find.byType(TrackTable), matching: find.byType(ListView)));
+        final fourth =
+            tester.getRect(find.byKey(ValueKey('track-row-${track.id + 3}')));
+        expect(fourth.top, greaterThanOrEqualTo(viewport.top));
+        expect(fourth.bottom, lessThanOrEqualTo(viewport.bottom));
+        expect(
+            tester.getCenter(find.byTooltip('Ouvir playlist')).dy,
+            closeTo(
+                tester.getCenter(find.byKey(const ValueKey('track-search'))).dy,
+                4));
+      }
       await tester.ensureVisible(find.byKey(ValueKey('track-row-${track.id}')));
       await tester.tap(find.byKey(ValueKey('track-row-${track.id}')));
       await ioUntil(tester, () => library.focused?.id == track.id);

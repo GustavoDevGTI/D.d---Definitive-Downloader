@@ -8,11 +8,8 @@ import '../../workspace/presentation/workspace_components.dart';
 import '../../workspace/presentation/link_entry_panel.dart';
 import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
-import '../domain/track_listing.dart';
 import 'track_table.dart';
-import 'add_music_links_dialog.dart';
-import '../../workspace/presentation/download_action_button.dart';
-import '../../player/presentation/player_scope.dart';
+import 'collection_track_toolbar.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -83,19 +80,12 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
           ],
         ]);
         if (constraints.maxHeight < 560 || constraints.maxWidth < 560) {
-          return ListView(primary: false, padding: EdgeInsets.zero, children: [
-            _back(),
-            const SizedBox(height: 12),
-            SizedBox(height: 660, child: panel)
-          ]);
+          return ListView(
+              primary: false,
+              padding: EdgeInsets.zero,
+              children: [SizedBox(height: 660, child: panel)]);
         }
-        return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _back(),
-              const SizedBox(height: 12),
-              Expanded(child: panel)
-            ]);
+        return panel;
       });
     }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
@@ -130,12 +120,10 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     ]);
   }
 
-  Widget _back() => Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-          onPressed: () => setState(() => _detail = false),
-          icon: const Icon(Icons.arrow_back, size: 18),
-          label: const Text('Voltar às coleções')));
+  Widget _back() => IconButton(
+      tooltip: 'Voltar às coleções',
+      onPressed: () => setState(() => _detail = false),
+      icon: const Icon(Icons.arrow_back, size: 18));
   Future<void> _import(String value) async {
     final before = widget.controller.current?.id;
     await widget.controller.importSpotify(value);
@@ -149,14 +137,20 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
         Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 8, 0),
             child: Row(children: [
+              _back(),
               Expanded(
                   child: Text(c.current!.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600))),
-              Text('${c.page.selectedCount} selecionadas',
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+              if (c.page.selectedCount > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                    '${c.page.selectedCount} ${c.page.selectedCount == 1 ? 'selecionada' : 'selecionadas'}',
+                    style:
+                        const TextStyle(fontSize: 11, color: AppColors.muted)),
+              ],
               if (c.current!.editingLocked)
                 IconButton(
                     tooltip: 'Por que a edição está bloqueada?',
@@ -167,141 +161,21 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                     icon: const Icon(Icons.lock_outline,
                         size: 18, color: AppColors.accentActive)),
             ])),
-        SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: Row(children: [
-              if (PlayerScope.of(context) != null &&
-                  c.current!.completedCount > 0) ...[
-                DownloadActionButton(
-                    label: 'Ouvir playlist',
-                    icon: Icons.play_arrow_rounded,
-                    color: AppColors.navigation,
-                    onPressed: () => unawaited(PlayerScope.of(context)!
-                        .playCollection(c.current!.id))),
-                const SizedBox(width: 6),
-              ],
-              DownloadActionButton(
-                  label: 'Baixar selecionadas',
-                  icon: Icons.download_rounded,
-                  color: DownloadActionColors.start,
-                  primary: true,
-                  onPressed: c.busy || c.page.selectedCount == 0
-                      ? null
-                      : () => unawaited(_startDownloads())),
-              const SizedBox(width: 6),
-              DownloadActionButton(
-                  label: 'Adicionar links',
-                  color: DownloadActionColors.add,
-                  icon: Icons.add_link_rounded,
-                  onPressed:
-                      c.addingLinks || c.importing || c.preparing || c.editing
-                          ? null
-                          : () => unawaited(showAddMusicLinks(context, c))),
-              const SizedBox(width: 6),
-              DownloadActionButton(
-                  label: 'Rever correspondências',
-                  icon: Icons.fact_check_outlined,
-                  color: AppColors.accentActive,
-                  onPressed: c.busy || c.isExample || c.music?.available != true
-                      ? null
-                      : () => unawaited(c.prepareMusic())),
-              if (c.preparing || c.downloading) ...[
-                const SizedBox(width: 6),
-                DownloadActionButton(
-                    label: 'Interromper',
-                    icon: Icons.stop,
-                    color: DownloadActionColors.stop,
-                    onPressed: c.cancel)
-              ],
-            ])),
-        Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-            child: LayoutBuilder(builder: (context, box) {
-              final search = TextField(
-                  key: const ValueKey('track-search'),
-                  controller: _query,
-                  maxLength: 400,
-                  decoration: InputDecoration(
-                      hintText: 'Pesquisar faixas…',
-                      counterText: '',
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      suffixIcon: _query.text.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Limpar pesquisa de faixas',
-                              icon: const Icon(Icons.close, size: 18),
-                              onPressed: () {
-                                _timer?.cancel();
-                                _query.clear();
-                                unawaited(c.searchCollection(''));
-                              })),
-                  onChanged: (value) {
-                    setState(() {});
-                    _timer?.cancel();
-                    _timer = Timer(const Duration(milliseconds: 300),
-                        () => unawaited(c.searchCollection(value)));
-                  });
-              final filter = DropdownButtonFormField<String>(
-                  key: ValueKey('track-filter-${c.view}'),
-                  initialValue: c.view,
-                  isExpanded: true,
-                  menuMaxHeight: 280,
-                  decoration: const InputDecoration(
-                      labelText: 'Mostrar',
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'collections',
-                        child: Text('Todas', overflow: TextOverflow.ellipsis)),
-                    DropdownMenuItem(
-                        value: 'review',
-                        child:
-                            Text('Conferir', overflow: TextOverflow.ellipsis)),
-                    DropdownMenuItem(
-                        value: 'ready',
-                        child:
-                            Text('Prontas', overflow: TextOverflow.ellipsis)),
-                    DropdownMenuItem(
-                        value: 'files',
-                        child:
-                            Text('Concluídas', overflow: TextOverflow.ellipsis))
-                  ],
-                  onChanged: (v) {
-                    if (v != null) unawaited(c.setView(v));
-                  });
-              final sort = PopupMenuButton<TrackSort>(
-                  tooltip: 'Ordenar faixas',
-                  icon: const Icon(Icons.sort, color: AppColors.accentActive),
-                  onSelected: (v) => unawaited(c.sortTracks(v)),
-                  itemBuilder: (_) => [
-                        for (final item in const [
-                          (TrackSort.position, 'Ordem da playlist'),
-                          (TrackSort.name, 'Nome'),
-                          (TrackSort.duration, 'Duração'),
-                          (TrackSort.correspondence, 'Correspondência')
-                        ])
-                          CheckedPopupMenuItem(
-                              value: item.$1,
-                              checked: c.trackSort == item.$1,
-                              child: Text(
-                                  '${item.$2}${c.trackSort == item.$1 ? c.trackDescending ? ' ↓' : ' ↑' : ''}'))
-                      ]);
-              if (box.maxWidth >= 520) {
-                return Row(children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 10),
-                  SizedBox(width: 136, child: filter),
-                  sort
-                ]);
-              }
-              return Column(children: [
-                search,
-                const SizedBox(height: 10),
-                Row(children: [Expanded(child: filter), sort])
-              ]);
-            })),
+        CollectionTrackToolbar(
+            controller: c,
+            query: _query,
+            onDownload: () => unawaited(_startDownloads()),
+            onQueryChanged: (value) {
+              setState(() {});
+              _timer?.cancel();
+              _timer = Timer(const Duration(milliseconds: 300),
+                  () => unawaited(c.searchCollection(value)));
+            },
+            onClear: () {
+              _timer?.cancel();
+              setState(_query.clear);
+              unawaited(c.searchCollection(''));
+            }),
         if (c.importing || c.preparing)
           const LinearProgressIndicator(minHeight: 2),
         Expanded(

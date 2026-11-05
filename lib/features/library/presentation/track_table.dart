@@ -77,14 +77,18 @@ class _TrackTableState extends State<TrackTable> {
                                 ? null
                                 : (_) => unawaited(controller.selectCollection(
                                     !controller.allFilteredSelected)))),
-                    const SizedBox(width: 54),
+                    SizedBox(width: compact ? 46 : 54),
                     Expanded(child: _header('Faixa / artista', TrackSort.name)),
+                    SizedBox(
+                        width: compact ? 88 : 104,
+                        child: const Text('Fonte / arquivo',
+                            style: TextStyle(fontSize: 10))),
                     if (!compact) ...[
                       SizedBox(
-                          width: 84,
+                          width: 56,
                           child: _header('Duração', TrackSort.duration)),
                       SizedBox(
-                          width: 142,
+                          width: 108,
                           child: _header(
                               'Correspondência', TrackSort.correspondence))
                     ],
@@ -102,14 +106,14 @@ class _TrackTableState extends State<TrackTable> {
                           controller: _scroll,
                           primary: false,
                           itemExtent:
-                              (compact ? 120.0 : 96.0) * scale.clamp(1, 2),
+                              (compact ? 84.0 : 76.0) * scale.clamp(1, 2),
                           itemCount: controller.page.items.length,
                           itemBuilder: (context, index) {
                             final t = controller.page.items[index];
                             final focused = controller.focused?.id == t.id;
                             return _interactive(context, t,
-                                rowHeight: (compact ? 120.0 : 96.0) *
-                                    scale.clamp(1, 2),
+                                rowHeight:
+                                    (compact ? 84.0 : 76.0) * scale.clamp(1, 2),
                                 width: box.maxWidth,
                                 child: TrackRow(
                                     track: t,

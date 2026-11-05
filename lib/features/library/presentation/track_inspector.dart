@@ -104,7 +104,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                           const Divider(height: 24),
                           if (_tab == 1) ...[
                             Align(
-                                alignment: Alignment.center,
+                                alignment: Alignment.centerLeft,
                                 child: ListeningActions(track: t)),
                             _line('Álbum original',
                                 t.album.isEmpty ? 'Não informado' : t.album),

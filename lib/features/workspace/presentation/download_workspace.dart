@@ -304,7 +304,7 @@ class DownloadToolbar extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                   child: Row(children: [
                     _button(
-                        Icons.play_arrow_rounded,
+                        Icons.download_rounded,
                         paused ? 'Continuar fila' : 'Iniciar selecionados',
                         'Arquivos incompletos reiniciam do começo.',
                         onStart,

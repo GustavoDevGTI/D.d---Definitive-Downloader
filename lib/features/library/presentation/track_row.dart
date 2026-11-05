@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../domain/models.dart';
 import 'artwork_thumbnail.dart';
-import 'track_download_badge.dart';
+import 'track_source_cell.dart';
 import '../../player/presentation/player_scope.dart';
 
 class TrackRow extends StatelessWidget {
@@ -71,63 +71,32 @@ class TrackRow extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(children: [
-                                  if (t.needsReview)
-                                    const Tooltip(
-                                        message: 'Conferir correspondência',
-                                        child: Icon(Icons.priority_high,
-                                            size: 16,
-                                            color: AppColors.accentActive)),
-                                  if (t.hasManualSource)
-                                    const Padding(
-                                        padding: EdgeInsets.only(right: 4),
-                                        child: Tooltip(
-                                            message: 'Fonte manual definida',
-                                            child: Icon(Icons.link,
-                                                size: 14,
-                                                color: AppColors.accent))),
-                                  Expanded(
-                                      child: Text(
-                                          '${t.position}. ${t.displayTitle}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: t.needsReview
-                                                  ? AppColors.accentActive
-                                                  : AppColors.ink))),
-                                ]),
+                                Text('${t.position}. ${t.displayTitle}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: t.needsReview
+                                            ? AppColors.accentActive
+                                            : AppColors.ink)),
                                 Text(t.artist,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                         fontSize: 12, color: AppColors.muted)),
-                                Text(
-                                    t.sourceKind.musicProviderName ??
-                                        t.sourceLabel,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 10, color: AppColors.muted)),
-                                TrackDownloadBadge(track: t),
-                                if (compact)
-                                  Text(
-                                      '${formatDuration(t.durationMs)} · ${t.needsReview ? 'Conferir' : t.matchStatus.label}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.accentActive)),
                               ]))),
+                  SizedBox(
+                      width: compact ? 88 : 104,
+                      child: TrackSourceCell(track: t, compact: compact)),
                   if (!compact) ...[
                     SizedBox(
-                        width: 84,
+                        width: 56,
                         child: Text(formatDuration(t.durationMs),
                             style: const TextStyle(
                                 fontSize: 11, color: AppColors.muted))),
                     SizedBox(
-                        width: 142,
+                        width: 108,
                         child: Text(
                             t.needsReview ? 'Conferir' : t.matchStatus.label,
                             style: TextStyle(
