@@ -89,8 +89,13 @@ class _TrackTableState extends State<TrackTable> {
             }
             return Column(children: [
               Container(
-                  color: AppColors.surface,
-                  padding: const EdgeInsets.fromLTRB(6, 0, 18, 0),
+                  key: const ValueKey('track-table-header'),
+                  decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border(
+                          top: BorderSide(color: AppColors.line),
+                          bottom: BorderSide(color: AppColors.line))),
+                  padding: const EdgeInsets.fromLTRB(9, 0, 18, 0),
                   child: Row(children: [
                     SizedBox(
                         width: 36,
@@ -134,47 +139,55 @@ class _TrackTableState extends State<TrackTable> {
                               style: TextStyle(
                                   fontSize: 12, color: AppColors.muted)))
                       : ClipRect(
-                          child: RawScrollbar(
-                              controller: _scroll,
-                              thumbVisibility: true,
-                              trackVisibility: true,
-                              interactive: true,
-                              thickness: 8,
-                              radius: const Radius.circular(4),
-                              thumbColor: AppColors.accent,
-                              trackColor: AppColors.surface,
-                              padding: const EdgeInsets.fromLTRB(0, 6, 1, 6),
-                              child: Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: ListView.builder(
-                                      key: _viewportKey,
-                                      controller: _scroll,
-                                      primary: false,
-                                      itemExtent: (compact ? 84.0 : 76.0) *
-                                          scale.clamp(1, 2),
-                                      itemCount: controller.page.items.length,
-                                      itemBuilder: (context, index) {
-                                        final t = controller.page.items[index];
-                                        final focused =
-                                            controller.focused?.id == t.id;
-                                        return _interactive(context, t,
-                                            rowHeight: (compact ? 84.0 : 76.0) *
-                                                scale.clamp(1, 2),
-                                            width: box.maxWidth,
-                                            child: TrackRow(
-                                                track: t,
-                                                focused: focused,
-                                                compact: compact,
-                                                selectionEnabled:
-                                                    !controller.busy,
-                                                onTap: () =>
-                                                    unawaited(_click(t)),
-                                                onContextMenu: (point) =>
-                                                    unawaited(
-                                                        _contextMenu(t, point)),
-                                                onSelect: (v) => unawaited(
-                                                    controller.select(t, v))));
-                                      }))))),
+                          child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context)
+                                  .copyWith(scrollbars: false),
+                              child: RawScrollbar(
+                                  controller: _scroll,
+                                  thumbVisibility: true,
+                                  trackVisibility: true,
+                                  interactive: true,
+                                  thickness: 8,
+                                  radius: const Radius.circular(4),
+                                  thumbColor: AppColors.accent,
+                                  trackColor: AppColors.surface,
+                                  padding:
+                                      const EdgeInsets.fromLTRB(0, 6, 1, 6),
+                                  child: Padding(
+                                      padding: const EdgeInsets.only(right: 12),
+                                      child: ListView.builder(
+                                          key: _viewportKey,
+                                          controller: _scroll,
+                                          primary: false,
+                                          itemExtent: (compact ? 84.0 : 76.0) *
+                                              scale.clamp(1, 2),
+                                          itemCount:
+                                              controller.page.items.length,
+                                          itemBuilder: (context, index) {
+                                            final t =
+                                                controller.page.items[index];
+                                            final focused =
+                                                controller.focused?.id == t.id;
+                                            return _interactive(context, t,
+                                                rowHeight:
+                                                    (compact ? 84.0 : 76.0) *
+                                                        scale.clamp(1, 2),
+                                                width: box.maxWidth,
+                                                child: TrackRow(
+                                                    track: t,
+                                                    focused: focused,
+                                                    compact: compact,
+                                                    selectionEnabled:
+                                                        !controller.busy,
+                                                    onTap: () =>
+                                                        unawaited(_click(t)),
+                                                    onContextMenu: (point) =>
+                                                        unawaited(_contextMenu(
+                                                            t, point)),
+                                                    onSelect: (v) => unawaited(
+                                                        controller.select(
+                                                            t, v))));
+                                          })))))),
             ]);
           }));
 

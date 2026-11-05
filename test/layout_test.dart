@@ -454,6 +454,15 @@ void main() {
       }
       if (width >= 1360) {
         final viewport = tester.getRect(find.byType(DownloadTable));
+        expect(find.text('Gerenciador de downloads'), findsNothing);
+        final search =
+            tester.getRect(find.byKey(const ValueKey('download-search-music')));
+        final toolbar = tester.getRect(find.byType(DownloadToolbar));
+        expect(search.center.dy, closeTo(toolbar.center.dy, .01));
+        final count =
+            tester.getRect(find.byKey(const ValueKey('download-record-count')));
+        expect(count.top, greaterThanOrEqualTo(viewport.bottom));
+        expect(count.right, closeTo(viewport.right, .01));
         for (final column in downloadColumns.take(downloadColumns.length - 1)) {
           final cell = tester
               .getRect(find.byKey(ValueKey('download-column-${column.key}')));

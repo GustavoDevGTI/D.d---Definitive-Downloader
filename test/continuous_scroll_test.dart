@@ -46,10 +46,23 @@ void main() {
       library.page = TrackPage(rows.map((e) => e.track).toList(), 10000, 0);
       addTearDown(library.dispose);
       await tester.pumpWidget(MaterialApp(
-          theme: appTheme(),
+          theme: appTheme().copyWith(platform: TargetPlatform.windows),
           home: Scaffold(
               body: TrackTable(controller: library, onFocus: (_) {}))));
       await tester.pumpAndSettle();
+      expect(find.byType(Scrollbar), findsNothing,
+          reason: 'A barra automática desktop não deve duplicar a framboesa.');
+      expect(
+          tester
+              .getCenter(find.byKey(const ValueKey('select-all-collection')))
+              .dx,
+          closeTo(
+              tester
+                  .getCenter(find.descendant(
+                      of: find.byType(TrackRow).first,
+                      matching: find.byType(Checkbox)))
+                  .dx,
+              .01));
       expect(find.byTooltip('Próxima página'), findsNothing);
       expect(find.byType(TrackRow).evaluate().length, lessThan(30));
       final list = tester.widget<ListView>(find.byType(ListView));

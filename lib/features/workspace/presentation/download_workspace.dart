@@ -43,7 +43,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
           [controller, controller.library, controller.library.transferUpdates]),
       builder: (context, child) =>
           LayoutBuilder(builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 1040;
+            final wide = constraints.maxWidth >= 800;
+            final inlineFilters = constraints.maxWidth >= 1380;
             final c = controller, library = c.library;
             final enabled = category == ContentCategory.music;
             final page = enabled && c.category == category
@@ -62,14 +63,6 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                         [TrackStatus.ready, TrackStatus.failed]
                             .contains(e.track.status)));
             final canCancel = library.downloading && enabled;
-            final heading = Row(children: [
-              const Expanded(
-                  child: Text('Gerenciador de downloads',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600))),
-              Text('${page.total} registros',
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted))
-            ]);
             final search = Row(children: [
               Expanded(
                   child: TextField(
@@ -156,45 +149,52 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       DownloadFilter.failed => 'Erro',
                     }))
             ]);
-            final footer = Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 12,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('${c.selection.length} selecionados',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.muted)),
-                  if (!enabled)
-                    ButtonHoverMotion(
-                        builder: (states) => OutlinedButton.icon(
-                            statesController: states,
-                            style: downloadActionStyle(DownloadActionColors.add)
-                                .copyWith(
-                                    shape: const WidgetStatePropertyAll(
-                                        StadiumBorder())),
-                            onPressed: onCapture,
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Capturar novo link'))),
-                ]);
+            final footer = Row(children: [
+              Expanded(
+                  child: Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                    Text('${c.selection.length} selecionados',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.muted)),
+                    if (!enabled)
+                      ButtonHoverMotion(
+                          builder: (states) => OutlinedButton.icon(
+                              statesController: states,
+                              style:
+                                  downloadActionStyle(DownloadActionColors.add)
+                                      .copyWith(
+                                          shape: const WidgetStatePropertyAll(
+                                              StadiumBorder())),
+                              onPressed: onCapture,
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text('Capturar novo link'))),
+                  ])),
+              const SizedBox(width: 12),
+              Text('${page.total} registros',
+                  key: const ValueKey('download-record-count'),
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+            ]);
             final content = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (wide)
                     Row(children: [
-                      Expanded(child: heading),
-                      const SizedBox(width: 12),
-                      SizedBox(width: 360, child: search)
-                    ])
-                  else ...[heading, const SizedBox(height: 8), search],
-                  const SizedBox(height: 8),
-                  if (wide)
-                    Row(children: [
                       toolbar,
+                      if (inlineFilters) ...[
+                        const SizedBox(width: 12),
+                        filters,
+                      ],
                       const SizedBox(width: 12),
-                      Expanded(child: filters)
+                      Expanded(child: search)
                     ])
-                  else ...[toolbar, const SizedBox(height: 8), filters],
+                  else ...[toolbar, const SizedBox(height: 8), search],
+                  if (!inlineFilters) ...[
+                    const SizedBox(height: 8),
+                    filters,
+                  ],
                   const SizedBox(height: 8),
                   Expanded(
                       child: WorkspacePanel(
