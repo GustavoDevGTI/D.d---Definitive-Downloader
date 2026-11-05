@@ -35,6 +35,8 @@ class LibraryMusicSources {
             resolver.available &&
             (track.sourceKind == SourceKind.youtubeMusic ||
                 track.sourceKind == SourceKind.youtube ||
+                track.sourceKind == SourceKind.soundcloud ||
+                track.sourceKind == SourceKind.soundcloud ||
                 (track.sourceKind == SourceKind.deezerFull &&
                     resolver.connection.connected))) {
           await repository.setStatus(track.id, TrackStatus.ready);

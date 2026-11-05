@@ -26,7 +26,8 @@ class DownloadService {
       throw const FormatException(
           'A fonte precisa de revisão ou ainda não tem suporte para download.');
     }
-    if (track.sourceKind == SourceKind.deezerFull ||
+    if (track.sourceKind == SourceKind.soundcloud ||
+        track.sourceKind == SourceKind.deezerFull ||
         track.sourceKind == SourceKind.youtubeMusic ||
         track.sourceKind == SourceKind.youtube) {
       if (music == null) {

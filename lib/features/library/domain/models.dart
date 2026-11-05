@@ -24,7 +24,8 @@ enum SourceKind {
   preview,
   deezerFull,
   youtubeMusic,
-  youtube
+  youtube,
+  soundcloud
 }
 
 extension MusicSourceName on SourceKind {
@@ -32,6 +33,7 @@ extension MusicSourceName on SourceKind {
         SourceKind.deezerFull => 'Deezer',
         SourceKind.youtubeMusic => 'YouTube Music',
         SourceKind.youtube => 'YouTube',
+        SourceKind.soundcloud => 'SoundCloud',
         _ => null,
       };
   String get musicProviderSuffix =>
@@ -75,7 +77,14 @@ class TrackDraft {
       this.isrc = '',
       this.mediaUrl = '',
       this.sourceKind = SourceKind.none,
+      this.sourceId = '',
+      this.recordingType = '',
+      this.manualUrl = '',
+      this.pendingReason = '',
+      this.sourceReady = true,
       this.explicit});
+  final bool sourceReady;
+  final String sourceId, recordingType, manualUrl, pendingReason;
   final bool? explicit;
   final String title;
   final String artist;
@@ -91,6 +100,7 @@ class TrackDraft {
 class Track {
   const Track(
       {required this.id,
+      this.sourceId = '',
       required this.collectionId,
       required this.position,
       required this.title,
@@ -121,6 +131,7 @@ class Track {
       this.recordingType = '',
       this.sourceAuthorization = SourceAuthorization.catalog});
   final String customTitle, recordingType;
+  final String sourceId;
   final SourceAuthorization sourceAuthorization;
   String get displayTitle => customTitle.isEmpty ? title : customTitle;
   String get downloadArtist => artist.isEmpty ? outputArtist : artist;
@@ -172,7 +183,10 @@ class Track {
   final String resolvedArtist;
   final String resolvedAlbum;
   final int? resolvedDurationMs;
-  bool get canDownload => !redownloadReview && hasDownloadableSource;
+  bool get canDownload =>
+      !(sourceKind == SourceKind.soundcloud && status == TrackStatus.pending) &&
+      !redownloadReview &&
+      hasDownloadableSource;
   bool get hasDownloadableSource =>
       sourceKind != SourceKind.none &&
       mediaUrl.isNotEmpty &&
@@ -198,6 +212,7 @@ class Track {
         SourceKind.deezerFull => 'Deezer · faixa',
         SourceKind.youtubeMusic => 'YouTube Music · faixa',
         SourceKind.youtube => 'YouTube · áudio escolhido',
+        SourceKind.soundcloud => 'SoundCloud · faixa',
       };
 }
 
@@ -221,20 +236,25 @@ class Candidate {
       required this.coverUrl,
       this.isrc = '',
       this.kind = SourceKind.preview,
+      this.sourceId = '',
       this.recordingType = '',
       this.explicit});
   bool get isVideoRecording =>
       kind == SourceKind.youtube && recordingType == 'MUSIC_VIDEO_TYPE_OMV';
   final SourceKind kind;
+  final String sourceId;
   final String recordingType;
   final bool? explicit;
   bool get isFullRecording =>
-      !RegExp(r'\b(official video|music video|videoclipe)\b',
-              caseSensitive: false)
-          .hasMatch(title) &&
-      ((kind == SourceKind.deezerFull && recordingType == 'DEEZER_TRACK') ||
-          (kind == SourceKind.youtubeMusic &&
-              recordingType == 'MUSIC_VIDEO_TYPE_ATV'));
+      (kind == SourceKind.soundcloud &&
+          recordingType == 'SOUNDCLOUD_TRACK' &&
+          RegExp(r'^[1-9][0-9]{0,18}$').hasMatch(sourceId)) ||
+      (!RegExp(r'\b(official video|music video|videoclipe)\b',
+                  caseSensitive: false)
+              .hasMatch(title) &&
+          ((kind == SourceKind.deezerFull && recordingType == 'DEEZER_TRACK') ||
+              (kind == SourceKind.youtubeMusic &&
+                  recordingType == 'MUSIC_VIDEO_TYPE_ATV')));
   final String title;
   final String artist;
   final String album;

@@ -30,7 +30,7 @@ class MusicLinkRepository {
           final ids = <int>[];
           for (final entry in links) {
             final draft = entry.draft, source = entry.source;
-            if (entry.alternatives.length > 24 ||
+            if (entry.alternatives.length > 32 ||
                 draft.title.trim().isEmpty ||
                 draft.title.length > 400 ||
                 (source != null &&
@@ -77,16 +77,21 @@ class MusicLinkRepository {
                   source?.durationMs,
                   source?.coverUrl ?? '',
                   !entry.ready && entry.pinned
-                      ? 'Fonte aguardando conexão ou suporte de download nesta plataforma.'
+                      ? (entry.pendingReason.isNotEmpty
+                          ? entry.pendingReason
+                          : 'Fonte aguardando conexão ou suporte de download nesta plataforma.')
                       : '',
                 ]);
             final id = db.lastInsertRowId;
             ids.add(id);
             db.execute(
-                'UPDATE tracks SET recording_type=?,source_authorization=? WHERE id=?',
+                'UPDATE tracks SET source_id=?,recording_type=?,source_authorization=? WHERE id=?',
                 [
+                  source?.sourceId ?? draft.sourceId,
                   source?.recordingType ?? '',
-                  entry.pinned && source?.kind == SourceKind.youtube
+                  entry.pinned &&
+                          [SourceKind.youtube, SourceKind.soundcloud]
+                              .contains(source?.kind)
                       ? 'manualLink'
                       : 'catalog',
                   id
@@ -94,7 +99,7 @@ class MusicLinkRepository {
             for (var i = 0; i < entry.alternatives.length; i++) {
               final c = entry.alternatives[i];
               db.execute(
-                  'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                  'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
                   [
                     id,
                     i,
@@ -108,6 +113,7 @@ class MusicLinkRepository {
                     c.isrc,
                     c.recordingType,
                     c.explicit == null ? null : (c.explicit! ? 1 : 0),
+                    c.sourceId,
                   ]);
             }
             if (run != null) {
@@ -127,7 +133,7 @@ class MusicLinkRepository {
   static void replaceSource(Database db, int id, ResolvedMusicLink entry,
       {bool replaceRequested = false}) {
     final c = entry.source, d = entry.draft;
-    if (entry.alternatives.length > 24 ||
+    if (entry.alternatives.length > 32 ||
         (c != null &&
             !c.isFullRecording &&
             !(entry.pinned && c.kind == SourceKind.youtube))) {
@@ -153,8 +159,9 @@ class MusicLinkRepository {
           ]);
     }
     db.execute(
-        "UPDATE tracks SET media_url=?,source_kind=?,status=?,match_status=?,manual_url=?,manual_mode='originalAudio',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=?,queue_hidden=0,error='' WHERE id=?",
+        "UPDATE tracks SET source_id=?,media_url=?,source_kind=?,status=?,match_status=?,manual_url=?,manual_mode='originalAudio',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=?,queue_hidden=0,error=? WHERE id=?",
         [
+          c?.sourceId ?? d.sourceId,
           c?.pageUrl ?? d.mediaUrl,
           (c?.kind ?? d.sourceKind).name,
           entry.ready ? 'ready' : 'pending',
@@ -172,16 +179,18 @@ class MusicLinkRepository {
           c?.durationMs,
           c?.coverUrl ?? '',
           c?.recordingType ?? '',
-          entry.pinned && c?.kind == SourceKind.youtube
+          entry.pinned &&
+                  [SourceKind.youtube, SourceKind.soundcloud].contains(c?.kind)
               ? 'manualLink'
               : 'catalog',
+          entry.ready ? '' : entry.pendingReason,
           id
         ]);
     db.execute('DELETE FROM music_candidates WHERE track_id=?', [id]);
     for (var i = 0; i < entry.alternatives.length; i++) {
       final a = entry.alternatives[i];
       db.execute(
-          'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', [
+          'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', [
         id,
         i,
         a.kind.name,
@@ -197,7 +206,8 @@ class MusicLinkRepository {
             ? null
             : a.explicit!
                 ? 1
-                : 0
+                : 0,
+        a.sourceId
       ]);
     }
   }

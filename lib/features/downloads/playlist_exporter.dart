@@ -17,8 +17,9 @@ class PlaylistExporter {
         final tracks = await repository.completedPage(collectionId, after);
         if (tracks.isEmpty) break;
         for (final track in tracks) {
-          final title = '${track.outputTitle} - ${track.outputArtist}'
-              .replaceAll(RegExp(r'[\r\n]'), ' ');
+          final title =
+              '${track.outputTitle}${track.outputArtist.trim().isEmpty ? '' : ' - ${track.outputArtist}'}'
+                  .replaceAll(RegExp(r'[\r\n]'), ' ');
           sink.writeln(
               '#EXTINF:${(track.outputDurationMs ?? -1000) ~/ 1000},$title${track.sourceKind.musicProviderSuffix}');
           sink.writeln(p.basename(track.localPath));

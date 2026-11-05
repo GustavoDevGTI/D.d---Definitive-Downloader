@@ -2,6 +2,7 @@ import '../library/domain/models.dart';
 
 Map<String, Object?> candidateJson(Candidate candidate) => {
       'title': candidate.title,
+      'sourceId': candidate.sourceId,
       'artist': candidate.artist,
       'album': candidate.album,
       'durationMs': candidate.durationMs,
@@ -30,6 +31,7 @@ Candidate parseMusicCandidate(Map<String, dynamic> row) {
     'deezerFull' => SourceKind.deezerFull,
     'youtubeMusic' => SourceKind.youtubeMusic,
     'youtube' => SourceKind.youtube,
+    'soundcloud' => SourceKind.soundcloud,
     _ => throw const FormatException('Fonte de gravação inválida.'),
   };
   final page = Uri.parse(text('pageUrl'));
@@ -41,14 +43,26 @@ Candidate parseMusicCandidate(Map<String, dynamic> row) {
               (kind == SourceKind.youtube
                   ? 'www.youtube.com'
                   : 'music.youtube.com')
-          : page.host != 'www.deezer.com')) {
+          : page.host !=
+              (kind == SourceKind.soundcloud
+                  ? 'soundcloud.com'
+                  : 'www.deezer.com'))) {
     throw const FormatException('Endereço de faixa não permitido.');
   }
   final duration = row['durationMs'];
+  if (kind == SourceKind.soundcloud &&
+      (!RegExp(r'^[1-9][0-9]{0,18}$').hasMatch(text('sourceId')) ||
+          page.hasQuery ||
+          page.hasFragment ||
+          !RegExp(r'^/[A-Za-z0-9_-]{1,200}/[A-Za-z0-9_-]{1,200}$')
+              .hasMatch(page.path))) {
+    throw const FormatException('Identificação SoundCloud inválida.');
+  }
   if (duration is! int || duration < 0 || duration > 3600000) {
     throw const FormatException('Duração inválida.');
   }
   return Candidate(
+      sourceId: text('sourceId'),
       title: text('title'),
       artist: text('artist'),
       album: text('album'),

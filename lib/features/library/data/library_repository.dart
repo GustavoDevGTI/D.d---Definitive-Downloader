@@ -106,10 +106,28 @@ class LibraryRepository {
               t.sourceUrl,
               t.mediaUrl,
               t.sourceKind.name,
-              t.sourceKind == SourceKind.none ? 'pending' : 'ready',
+              t.sourceKind == SourceKind.none || !t.sourceReady
+                  ? 'pending'
+                  : 'ready',
               t.explicit == null ? null : (t.explicit! ? 1 : 0),
               t.sourceKind == SourceKind.none ? 'pending' : 'confirmed'
             ]);
+            db.execute(
+                '''UPDATE tracks SET source_id=?,recording_type=?,manual_url=?,
+                source_authorization=?,match_status=?,error=? WHERE id=?''',
+                [
+                  t.sourceId,
+                  t.recordingType,
+                  t.manualUrl,
+                  t.manualUrl.isNotEmpty ? 'manualLink' : 'catalog',
+                  t.manualUrl.isNotEmpty
+                      ? 'manual'
+                      : t.sourceKind == SourceKind.none
+                          ? 'pending'
+                          : 'confirmed',
+                  t.pendingReason,
+                  db.lastInsertRowId
+                ]);
           }
           db.execute('COMMIT');
         } catch (_) {
@@ -278,6 +296,7 @@ class LibraryRepository {
           .toList());
 
   static Track readTrack(Map<String, Object?> r) => Track(
+      sourceId: r['source_id'] as String? ?? '',
       redownloadState: r['redownload_state'] as String? ?? '',
       customTitle: r['custom_title'] as String? ?? '',
       recordingType: r['recording_type'] as String? ?? '',
@@ -317,8 +336,8 @@ class LibraryRepository {
 
   Future<void> saveCandidates(int id, List<Candidate> candidates) =>
       database.run((db) {
-        if (candidates.length > 24) {
-          throw ArgumentError('Limite de 24 candidatos por faixa.');
+        if (candidates.length > 32) {
+          throw ArgumentError('Limite de 32 candidatos por faixa.');
         }
         db.execute('BEGIN IMMEDIATE');
         try {
@@ -326,7 +345,7 @@ class LibraryRepository {
           for (var i = 0; i < candidates.length; i++) {
             final c = candidates[i];
             db.execute(
-                'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO music_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                   id,
                   i,
@@ -339,7 +358,8 @@ class LibraryRepository {
                   c.coverUrl,
                   c.isrc,
                   c.recordingType,
-                  c.explicit == null ? null : (c.explicit! ? 1 : 0)
+                  c.explicit == null ? null : (c.explicit! ? 1 : 0),
+                  c.sourceId
                 ]);
           }
           db.execute('COMMIT');
@@ -351,11 +371,12 @@ class LibraryRepository {
 
   Future<List<Candidate>> musicCandidates(int id) => database.run((db) => db
       .select(
-          'SELECT * FROM music_candidates WHERE track_id=? ORDER BY ordinal LIMIT 24',
+          'SELECT * FROM music_candidates WHERE track_id=? ORDER BY ordinal LIMIT 32',
           [
             id
           ])
       .map((r) => Candidate(
+          sourceId: r['source_id'] as String? ?? '',
           title: r['title'] as String,
           artist: r['artist'] as String,
           album: r['album'] as String,
@@ -391,7 +412,8 @@ class LibraryRepository {
           }
           if (rows.isNotEmpty &&
               rows.first['manual_url'] != '' &&
-              !replacement) {
+              !replacement &&
+              !userSelected) {
             db.execute('COMMIT');
             return;
           }
@@ -399,8 +421,12 @@ class LibraryRepository {
               (rows.first['status'] == 'completed' ||
                   (rows.first['status'] == 'downloading' &&
                       !(forFallback &&
-                          candidate.kind == SourceKind.youtubeMusic &&
-                          rows.first['source_kind'] == 'deezerFull')))) {
+                          [
+                            SourceKind.youtubeMusic,
+                            SourceKind.soundcloud,
+                            SourceKind.deezerFull
+                          ].contains(candidate.kind) &&
+                          candidate.kind.name != rows.first['source_kind'])))) {
             throw const FormatException(
                 'Esta ocorrência não permite alterar a fonte agora.');
           }
@@ -420,8 +446,9 @@ class LibraryRepository {
                 'Pesquise novamente para aprovar esta versão.');
           }
           db.execute(
-              "UPDATE tracks SET media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='downloading' THEN status ELSE 'ready' END,error='',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=? WHERE id=?",
+              "UPDATE tracks SET source_id=?,media_url=?,source_kind=?,match_status='confirmed',queue_hidden=0,status=CASE WHEN status='downloading' THEN status ELSE 'ready' END,error='',resolved_title=?,resolved_artist=?,resolved_album=?,resolved_duration_ms=?,resolved_cover_url=?,recording_type=?,source_authorization=? WHERE id=?",
               [
+                candidate.sourceId,
                 candidate.pageUrl,
                 candidate.kind.name,
                 candidate.title,
@@ -436,6 +463,11 @@ class LibraryRepository {
           if (replacement) {
             db.execute(
                 "UPDATE tracks SET redownload_state='approved',manual_url=?,manual_mode='originalAudio' WHERE id=?",
+                [candidate.pageUrl, track.id]);
+          }
+          if (userSelected && rows.first['manual_url'] != '' && !replacement) {
+            db.execute(
+                "UPDATE tracks SET manual_url=?,manual_mode='originalAudio' WHERE id=?",
                 [candidate.pageUrl, track.id]);
           }
           db.execute('COMMIT');
@@ -525,7 +557,8 @@ class LibraryRepository {
       database.run((db) {
         if (provider != SourceKind.deezerFull &&
             provider != SourceKind.youtubeMusic &&
-            provider != SourceKind.youtube) {
+            provider != SourceKind.youtube &&
+            provider != SourceKind.soundcloud) {
           return;
         }
         if (message.length > 1000) message = message.substring(0, 1000);

@@ -17,6 +17,7 @@ class MusicDownloadService {
       void Function(String) onStage,
       {void Function(TransferProgress)? onTransfer}) async {
     final candidate = Candidate(
+        sourceId: track.sourceId,
         title: track.resolvedTitle.isEmpty ? track.title : track.resolvedTitle,
         artist: track.outputArtist,
         album: track.outputAlbum,
@@ -69,6 +70,7 @@ class MusicDownloadService {
       if ((!actual.isFullRecording &&
               !(allowedVideo && actual.kind == SourceKind.youtube)) ||
           actual.kind != candidate.kind ||
+          actual.sourceId != candidate.sourceId ||
           (track.sourceAuthorization == SourceAuthorization.approvedVideo &&
               !actual.isVideoRecording) ||
           (track.customTitle.isNotEmpty &&
@@ -82,16 +84,22 @@ class MusicDownloadService {
             'O áudio recebido não corresponde à faixa escolhida.');
       }
       final source = File(result['path'] as String);
-      if (!p.isWithin(p.normalize(work.absolute.path),
-              p.normalize(source.absolute.path)) ||
-          p.basename(source.path) != 'verified.mp3' ||
+      if (p.basename(source.path) != 'verified.mp3' ||
           !await source.exists() ||
           await source.length() < 1024) {
         throw const FormatException(
             'O motor não entregou um arquivo validado.');
       }
+      // Windows can virtualize the logical AppData path across processes.
+      // Compare actual filesystem targets, including junctions, before publication.
+      final actualWork = await work.resolveSymbolicLinks();
+      final actualSource = await source.resolveSymbolicLinks();
+      if (!p.isWithin(p.normalize(actualWork), p.normalize(actualSource))) {
+        throw const FormatException(
+            'O motor retornou um arquivo fora da pasta temporária.');
+      }
       final name =
-          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(track.customTitle.isEmpty ? actual.title : track.customTitle)} - ${safeSegment(actual.artist)}${actual.kind.musicProviderSuffix}';
+          '${track.position.toString().padLeft(3, '0')} - ${safeSegment(track.customTitle.isEmpty ? actual.title : track.customTitle)}${actual.artist.trim().isEmpty ? '' : ' - ${safeSegment(actual.artist)}'}${actual.kind.musicProviderSuffix}';
       var output = File(p.join(folder.path, '$name.mp3'));
       if (await output.exists()) {
         output = File(p.join(folder.path, '$name [${track.id}].mp3'));

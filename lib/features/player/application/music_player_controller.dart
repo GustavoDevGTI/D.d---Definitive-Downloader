@@ -74,13 +74,13 @@ class MusicPlayerController extends ChangeNotifier {
   }
 
   bool canListenTrack(Track t) =>
-      _youtube(t.sourceKind) ||
+      _external(t.sourceKind) ||
       engine.available &&
           (t.localPath.isNotEmpty ||
               [SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
                   .contains(t.sourceKind));
   bool canListenCandidate(Track t, Candidate c) =>
-      _youtube(c.kind) ||
+      _external(c.kind) ||
       engine.available &&
           ([SourceKind.deezerFull, SourceKind.preview, SourceKind.directMp3]
                   .contains(c.kind) ||
@@ -91,18 +91,20 @@ class MusicPlayerController extends ChangeNotifier {
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(t.sourceKind)
           ? 'Ouvir prévia'
-          : _youtube(t.sourceKind)
+          : _external(t.sourceKind)
               ? 'Ouvir no ${t.sourceKind.musicProviderName}'
               : 'Ouvir';
-  bool _youtube(SourceKind kind) =>
-      kind == SourceKind.youtubeMusic || kind == SourceKind.youtube;
+  bool _external(SourceKind kind) =>
+      kind == SourceKind.youtubeMusic ||
+      kind == SourceKind.youtube ||
+      kind == SourceKind.soundcloud;
   String candidateListenLabel(Track t, Candidate c) => t.localPath.isNotEmpty &&
           t.mediaUrl == c.pageUrl &&
           t.redownloadState.isEmpty
       ? 'Ouvir'
       : [SourceKind.deezerFull, SourceKind.preview].contains(c.kind)
           ? 'Ouvir prévia'
-          : _youtube(c.kind)
+          : _external(c.kind)
               ? 'Ouvir no ${c.kind.musicProviderName}'
               : 'Ouvir';
 
@@ -150,7 +152,7 @@ class MusicPlayerController extends ChangeNotifier {
         final item = await library.track(track);
         if (request != _request || _disposed) return;
         if (item == null) {
-          if (_youtube(track.sourceKind)) {
+          if (_external(track.sourceKind)) {
             await pause();
             await openReference(library.referenceFor(track));
             loading = false;
@@ -181,7 +183,7 @@ class MusicPlayerController extends ChangeNotifier {
       final item = await library.candidate(track, candidate);
       if (request != _request || _disposed) return;
       if (item == null) {
-        if (_youtube(candidate.kind)) {
+        if (_external(candidate.kind)) {
           await pause();
           await openReference(library.referenceForCandidate(candidate));
           loading = false;

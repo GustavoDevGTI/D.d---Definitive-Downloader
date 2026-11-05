@@ -136,7 +136,9 @@ class ResolvedMusicLink {
       this.source,
       this.alternatives = const [],
       this.pinned = false,
+      this.pendingReason = '',
       this.ready = false});
+  final String pendingReason;
   final MusicLink link;
   final TrackDraft draft;
   final Candidate? source;
@@ -153,6 +155,7 @@ class ResolvedMusicLink {
           source: source ?? this.source,
           alternatives: alternatives,
           pinned: pinned,
+          pendingReason: pendingReason,
           ready: ready);
 
   Track get matchingTrack => Track(

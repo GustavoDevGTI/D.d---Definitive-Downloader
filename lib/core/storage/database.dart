@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 13) {
+      if (version > 14) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -323,6 +323,31 @@ class AppDatabase {
             UPDATE library_revision SET revision=revision+1 WHERE id=1;
             UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE collection_id=NEW.id; END''');
           db.execute('PRAGMA user_version=13');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
+      if (version <= 13) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute(
+              "ALTER TABLE tracks ADD COLUMN source_id TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              "ALTER TABLE music_candidates ADD COLUMN source_id TEXT NOT NULL DEFAULT ''");
+          db.execute('DROP TRIGGER tracks_list_update');
+          final changed = db
+              .select('PRAGMA table_info(tracks)')
+              .map((r) => r['name'] as String)
+              .where((name) => name != 'id' && name != 'list_revision')
+              .map((name) => 'NEW."$name" IS NOT OLD."$name"')
+              .join(' OR ');
+          db.execute(
+              '''CREATE TRIGGER tracks_list_update AFTER UPDATE ON tracks WHEN $changed BEGIN
+            UPDATE library_revision SET revision=revision+1 WHERE id=1;
+            UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE id=NEW.id; END''');
+          db.execute('PRAGMA user_version=14');
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

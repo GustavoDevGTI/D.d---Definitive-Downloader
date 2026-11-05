@@ -18,7 +18,15 @@ class TrackMatcher {
       return const MatchAssessment(
           0, true, 'Videoclipe: aprovação desta versão necessária');
     }
-    final full = candidate.kind == SourceKind.youtubeMusic ||
+    if (candidate.kind == SourceKind.soundcloud &&
+        RegExp(r'\b(official video|music video|videoclipe)\b',
+                caseSensitive: false)
+            .hasMatch(candidate.title)) {
+      return const MatchAssessment(
+          0, true, 'Vídeo indicado no título: confira esta versão');
+    }
+    final full = candidate.kind == SourceKind.soundcloud ||
+        candidate.kind == SourceKind.youtubeMusic ||
         candidate.kind == SourceKind.deezerFull;
     if (full && !candidate.isFullRecording) {
       return const MatchAssessment(

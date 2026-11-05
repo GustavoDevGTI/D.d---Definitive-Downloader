@@ -25,7 +25,17 @@ Map<String, dynamic> sound(int id, {bool artist = true}) => {
       'public': true,
       'permalink_url': 'https://soundcloud.com/pessoa/cancao-$id',
       'full_duration': 180000,
-      'duration': 30000,
+      'duration': 180000,
+      'policy': 'ALLOW',
+      'streamable': true,
+      'media': {
+        'transcodings': [
+          {
+            'url': 'https://api-v2.soundcloud.com/media/test',
+            'format': {'protocol': 'hls'}
+          }
+        ]
+      },
       'artwork_url': 'https://i1.sndcdn.com/cover.jpg',
       'user': {'username': 'Uploader diferente'},
       'publisher_metadata': artist ? {'artist': 'Pessoa'} : null,
@@ -117,8 +127,8 @@ void main() {
     final draft = await catalog.track('https://soundcloud.com/pessoa/cancao-1');
     expect(draft.artist, '');
     expect(draft.durationMs, 180000);
-    expect(draft.sourceKind, SourceKind.none);
-    expect(draft.mediaUrl, '');
+    expect(draft.sourceKind, SourceKind.soundcloud);
+    expect(draft.mediaUrl, draft.sourceUrl);
     final linked =
         ResolvedMusicLink(link: MusicLink.parse(draft.sourceUrl), draft: draft);
     final assessment = const TrackMatcher().assess(
@@ -196,7 +206,7 @@ void main() {
         throwsFormatException);
   });
   test(
-      'link vira equivalente YT Music sem baixar, persiste origem e entra no fim da execução',
+      'link fixa versão SoundCloud, persiste ID e entra no fim da execução sem buscar outra versão',
       () async {
     final directory = await Directory.systemTemp.createTemp('dd-soundcloud-');
     final db = AppDatabase('${directory.path}/test.db');
@@ -217,16 +227,18 @@ void main() {
         MusicResolver(engine, connection));
     final links = await service.resolve(
         'https://soundcloud.com/pessoa/cancao-2\nhttps://soundcloud.com/pessoa/cancao-2');
-    expect(links.every((e) => e.ready && !e.pinned), isTrue);
+    expect(links.every((e) => e.ready && e.pinned), isTrue);
     final added = await MusicLinkRepository(db)
         .append(collection, links, run: 'soundcloud-fixture');
     final page = await repo.page(collection);
     expect(page.items.length, 3);
     expect(page.items.last.position, 3);
     expect(page.items.last.sourceUrl, 'https://soundcloud.com/pessoa/cancao-2');
-    expect(page.items.last.sourceKind, SourceKind.youtubeMusic);
+    expect(page.items.last.sourceKind, SourceKind.soundcloud);
+    expect(page.items.last.sourceId, '2');
+    expect(page.items.last.hasManualSource, isTrue);
     expect(page.items.last.localPath, '');
-    expect(engine.providers, containsAll(['deezerFull', 'youtubeMusic']));
+    expect(engine.providers, isEmpty);
     final membership = await db.run((db) => db
         .select(
             'SELECT track_id FROM download_run_additions WHERE run=? ORDER BY track_id',
@@ -240,7 +252,7 @@ void main() {
                     transport: FixtureSoundCloud(sound(2, artist: false)))),
             MusicResolver(engine, connection))
         .resolve('https://soundcloud.com/pessoa/cancao-2');
-    expect(unknown.single.ready, isFalse);
-    expect(unknown.single.alternatives, isNotEmpty);
+    expect(unknown.single.ready, isTrue);
+    expect(unknown.single.draft.artist, isEmpty);
   });
 }

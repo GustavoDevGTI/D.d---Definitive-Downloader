@@ -46,7 +46,7 @@ def json_response(response):
 
 def public_bytes(url, maximum=5_000_000):
     # This transport never carries an account cookie or authorization header.
-    domains = ['dzcdn.net', 'ytimg.com', 'googleusercontent.com', 'ggpht.com']
+    domains = ['dzcdn.net', 'ytimg.com', 'googleusercontent.com', 'ggpht.com', 'sndcdn.com']
     with requests.Session() as session:
         for _ in range(4):
             allowed_url(url, domains)

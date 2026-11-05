@@ -19,6 +19,23 @@ class MusicLinkCatalog {
       return ResolvedMusicLink(
           link: MusicLink(
               MusicLinkKind.soundcloud, draft.sourceUrl, draft.sourceUrl),
+          pinned: true,
+          pendingReason: draft.pendingReason,
+          source: draft.sourceKind == SourceKind.soundcloud
+              ? Candidate(
+                  sourceId: draft.sourceId,
+                  kind: SourceKind.soundcloud,
+                  recordingType: draft.recordingType,
+                  title: draft.title,
+                  artist: draft.artist,
+                  album: draft.album,
+                  durationMs: draft.durationMs ?? 0,
+                  pageUrl: draft.sourceUrl,
+                  coverUrl: draft.coverUrl,
+                  previewUrl: '',
+                  isrc: draft.isrc,
+                  explicit: draft.explicit)
+              : null,
           draft: draft);
     }
     if (link.kind == MusicLinkKind.mp3) {

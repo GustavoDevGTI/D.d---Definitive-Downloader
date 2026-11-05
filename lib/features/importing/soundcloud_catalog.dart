@@ -40,7 +40,7 @@ class SoundCloudCatalog {
           .firstMatch(text)
           ?.group(1));
   static Future<List<TrackDraft>> _drafts(List<Map<String, dynamic>> ordered,
-          Map<String, Map<String, dynamic>> resolved) =>
+          Map<String, Map<String, dynamic>> resolved, bool downloadAvailable) =>
       Isolate.run(() => ordered.map((row) {
             final id = _id(row['id']);
             final full = row['title'] == null ? resolved[id] : row;
@@ -49,7 +49,7 @@ class SoundCloudCatalog {
                     title: 'Faixa indisponível (SoundCloud $id)',
                     artist: '',
                     sourceUrl: 'https://api.soundcloud.com/tracks/$id')
-                : _draft(full);
+                : _draft(full, downloadAvailable: downloadAvailable);
           }).toList());
 
   static Map<String, dynamic> _hydration(
@@ -102,7 +102,9 @@ class SoundCloudCatalog {
   }
 
   Future<ImportedCollection> open(String input,
-      {void Function(int, int)? onProgress, bool Function()? cancelled}) async {
+      {void Function(int, int)? onProgress,
+      bool Function()? cancelled,
+      bool downloadAvailable = true}) async {
     void check() {
       if (cancelled?.call() == true) throw const DownloadCancelled();
     }
@@ -111,7 +113,7 @@ class SoundCloudCatalog {
     final data = await _read(input);
     check();
     if (data.link.resource == SoundCloudResource.track) {
-      final draft = _draft(data.row);
+      final draft = _draft(data.row, downloadAvailable: downloadAvailable);
       return ImportedCollection(
           name: draft.title,
           source: 'SoundCloud · público',
@@ -167,7 +169,7 @@ class SoundCloudCatalog {
       }
     }
     check();
-    final drafts = await _drafts(ordered, resolved);
+    final drafts = await _drafts(ordered, resolved, downloadAvailable);
     check();
     return ImportedCollection(
         name: _text(data.row['title']),
@@ -196,7 +198,8 @@ class SoundCloudCatalog {
         'O leitor público do SoundCloud mudou. Tente novamente mais tarde.');
   }
 
-  static TrackDraft _draft(Map<String, dynamic> row) {
+  static TrackDraft _draft(Map<String, dynamic> row,
+      {bool downloadAvailable = true}) {
     _id(row['id']);
     final reference = SoundCloudLink.parse(_text(row['permalink_url']));
     if (reference.resource != SoundCloudResource.track ||
@@ -215,6 +218,17 @@ class SoundCloudCatalog {
         ? cover
         : '';
     return TrackDraft(
+        sourceReady: downloadAvailable,
+        sourceId: _id(row['id']),
+        sourceKind: _complete(row) ? SourceKind.soundcloud : SourceKind.none,
+        mediaUrl: _complete(row) ? reference.url : '',
+        recordingType: _complete(row) ? 'SOUNDCLOUD_TRACK' : '',
+        manualUrl: reference.url,
+        pendingReason: _complete(row)
+            ? downloadAvailable
+                ? ''
+                : 'Download SoundCloud não está disponível nesta plataforma.'
+            : 'SoundCloud: somente prévia ou áudio completo indisponível. Escolha outra fonte na conferência.',
         title: _text(row['title']),
         artist:
             publisher is Map ? _text(publisher['artist'], optional: true) : '',
@@ -227,6 +241,26 @@ class SoundCloudCatalog {
             : null,
         coverUrl: image,
         sourceUrl: reference.url);
+  }
+
+  static bool _complete(Map<String, dynamic> row) {
+    final media = row['media'];
+    final streams = media is Map ? media['transcodings'] : null;
+    final duration = row['full_duration'] ?? row['duration'];
+    return row['policy'] == 'ALLOW' &&
+        row['streamable'] == true &&
+        duration is num &&
+        duration >= 1000 &&
+        duration <= 3600000 &&
+        (row['duration'] is! num ||
+            (duration - (row['duration'] as num)).abs() <= 2000) &&
+        streams is List &&
+        streams.whereType<Map>().any((t) =>
+            t['snipped'] != true &&
+            t['format'] is Map &&
+            ['hls', 'progressive'].contains(t['format']['protocol']) &&
+            t['url'] is String &&
+            !(t['url'] as String).contains('/preview/'));
   }
 
   static String _id(Object? value) {

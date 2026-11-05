@@ -118,8 +118,8 @@ void main() {
         expect(
             engine.providers,
             audio
-                ? ['deezerFull', 'youtubeMusic']
-                : ['deezerFull', 'youtubeMusic', 'youtube']);
+                ? ['deezerFull', 'youtubeMusic', 'soundcloud']
+                : ['deezerFull', 'youtubeMusic', 'soundcloud', 'youtube']);
         expect(own.automaticChoice(testTrack(), result)?.kind,
             audio ? SourceKind.youtubeMusic : null);
         if (!audio) expect(result.single.isVideoRecording, isTrue);

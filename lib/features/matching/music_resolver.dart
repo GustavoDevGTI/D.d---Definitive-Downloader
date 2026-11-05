@@ -15,13 +15,14 @@ class MusicResolver {
       (candidate.isVideoRecording ||
           (candidate.isFullRecording &&
               (candidate.kind == SourceKind.youtubeMusic ||
+                  candidate.kind == SourceKind.soundcloud ||
                   connection.connected)));
 
   Future<List<Candidate>> search(Track track, String query,
       {DownloadCancellation? cancellation}) async {
     final candidates = <Candidate>[];
     Object? lastError;
-    for (final kind in ['deezerFull', 'youtubeMusic']) {
+    for (final kind in ['deezerFull', 'youtubeMusic', 'soundcloud']) {
       cancellation?.check();
       try {
         final response = await engine.call({
@@ -82,7 +83,11 @@ class MusicResolver {
   Candidate? automaticChoice(Track track, List<Candidate> candidates,
       {SourceKind? only}) {
     const matcher = TrackMatcher();
-    for (final provider in [SourceKind.deezerFull, SourceKind.youtubeMusic]) {
+    for (final provider in [
+      SourceKind.deezerFull,
+      SourceKind.youtubeMusic,
+      SourceKind.soundcloud
+    ]) {
       if (only != null && only != provider) continue;
       final eligible = candidates
           .where((c) =>

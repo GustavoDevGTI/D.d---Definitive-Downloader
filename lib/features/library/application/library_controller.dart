@@ -506,6 +506,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> importPlaylist(String url) =>
       _import(() => SoundCloudLink.recognizes(url)
           ? soundcloud.open(url,
+              downloadAvailable: music?.available == true,
               cancelled: () =>
                   _disposed || _importCancellation?.cancelled == true,
               onProgress: (done, total) {
@@ -588,7 +589,7 @@ class LibraryController extends ChangeNotifier {
             ? 'Nenhum resultado. Tente ajustar título ou artista.'
             : music == null
                 ? 'A Deezer oferece prévias nesta integração; os resultados não habilitam download de faixa completa.'
-                : 'Fontes em Deezer e YouTube Music; videoclipes só como última alternativa e com aprovação.';
+                : 'Fontes em Deezer, YouTube Music e SoundCloud; videoclipes só como última alternativa e com aprovação.';
         if (music != null && focused != null) {
           await repository.saveCandidates(focused!.id, found);
         }

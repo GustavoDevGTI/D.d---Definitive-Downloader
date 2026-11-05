@@ -130,13 +130,17 @@ class DownloadQueueRun {
             token.check();
             if (track.redownloadState.isNotEmpty ||
                 track.hasManualSource ||
-                track.sourceKind != SourceKind.deezerFull ||
+                ![
+                  SourceKind.deezerFull,
+                  SourceKind.youtubeMusic,
+                  SourceKind.soundcloud
+                ].contains(track.sourceKind) ||
                 music == null) {
               rethrow;
             }
             final alternatives = await repository.musicCandidates(track.id);
-            final fallback = music!.automaticChoice(track, alternatives,
-                only: SourceKind.youtubeMusic);
+            final fallback = music!.automaticChoice(track,
+                alternatives.where((c) => c.kind != track.sourceKind).toList());
             if (fallback == null) {
               final videos = await music!.searchVideos(
                   track, '${track.artist} ${track.title}',
@@ -147,7 +151,7 @@ class DownloadQueueRun {
                   [
                     ...alternatives.where((c) => c.kind != SourceKind.youtube),
                     ...videos
-                  ].take(24).toList());
+                  ].take(32).toList());
               await repository.markForReview(track.id);
               await repository.setStatus(track.id, TrackStatus.pending,
                   error:
@@ -157,7 +161,7 @@ class DownloadQueueRun {
               continue;
             }
             message =
-                'Deezer indisponível para esta faixa; tentando a correspondência de áudio no YouTube Music.';
+                '${track.sourceKind.musicProviderName} indisponível para esta faixa; tentando a correspondência de áudio em ${fallback.kind.musicProviderName}.';
             onEvent(DownloadRunNotice(message));
             await repository.chooseMusicSource(track, fallback,
                 forFallback: true);

@@ -7,6 +7,8 @@ import traceback
 from common import MusicError, clean_text, emit
 import deezer
 import youtube_music
+import soundcloud_catalog
+import soundcloud_audio
 from audio_files import finish
 from transfer_control import TransferControl
 
@@ -34,6 +36,8 @@ def execute(request, control=None):
             return {'candidates': youtube_music.search(query)}
         if request.get('provider') == 'youtube':
             return {'candidates': youtube_music.search_videos(query)}
+        if request.get('provider') == 'soundcloud':
+            return {'candidates': soundcloud_catalog.search(query)}
         raise MusicError('Fonte musical inválida.')
     if operation == 'download':
         candidate = request.get('candidate', {})
@@ -60,6 +64,8 @@ def execute(request, control=None):
                 source, actual = session.download(candidate, directory, control)
             finally:
                 session.close()
+        elif candidate.get('kind') == 'soundcloud':
+            source, actual = soundcloud_audio.download(candidate, directory, ffmpeg, control)
         else:
             raise MusicError('Não é uma fonte de faixa completa.')
         return finish(source, actual, directory, ffmpeg, expected, output_title)

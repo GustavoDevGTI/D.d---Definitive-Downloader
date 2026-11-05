@@ -17,6 +17,16 @@ void removeContinuousSchema(Database db) {
     db.execute('DROP TRIGGER IF EXISTS history_list_$event');
   }
   db.execute('DROP TRIGGER collection_list_name');
+  if (db
+      .select('PRAGMA table_info(tracks)')
+      .any((r) => r['name'] == 'source_id')) {
+    db.execute('ALTER TABLE tracks DROP COLUMN source_id');
+  }
+  if (db
+      .select('PRAGMA table_info(music_candidates)')
+      .any((r) => r['name'] == 'source_id')) {
+    db.execute('ALTER TABLE music_candidates DROP COLUMN source_id');
+  }
   db.execute('DROP INDEX tracks_list_revision');
   db.execute('ALTER TABLE tracks DROP COLUMN list_revision');
   db.execute('DROP TABLE library_revision');
