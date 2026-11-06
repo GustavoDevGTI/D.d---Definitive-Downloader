@@ -1,6 +1,5 @@
 package br.com.definitivedownloader.app
 
-import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,17 +19,17 @@ import java.io.File
 import java.util.concurrent.Executors
 
 /** All MediaPlayer operations and callbacks belong to the Android main thread. */
-class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMessenger) {
+class AndroidAudioChannel(private val context: Context, messenger: BinaryMessenger,
+    private val onState: (Boolean, Boolean, Long, Long) -> Unit) {
     private val channel = MethodChannel(messenger, "br.com.definitivedownloader/audio")
     private val handler = Handler(Looper.getMainLooper())
     private val inspector = Executors.newSingleThreadExecutor()
-    private val manager = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val manager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
     private var player: MediaPlayer? = null
     private var prepared = false
     private var disposed = false
-    private var foreground = true
     private var volume = 0.65f
     private var pending: MethodChannel.Result? = null
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
@@ -53,8 +52,8 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
 
     init {
         val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-        if (Build.VERSION.SDK_INT >= 33) activity.registerReceiver(noisy, filter, Context.RECEIVER_NOT_EXPORTED)
-        else @Suppress("DEPRECATION") activity.registerReceiver(noisy, filter)
+        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(noisy, filter, Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("DEPRECATION") context.registerReceiver(noisy, filter)
         handler.post(clock)
         channel.setMethodCallHandler { call, result ->
             try {
@@ -63,7 +62,7 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
                     "open" -> open(requireNotNull(call.argument<String>("uri")), result)
                     "play" -> { play(); result.success(null) }
                     "pause" -> { pause(); result.success(null) }
-                    "stop" -> { release(); snapshot(); result.success(null) }
+                    "stop" -> { stop(); result.success(null) }
                     "seek" -> {
                         if (prepared) {
                             val value = (call.argument<Number>("milliseconds")?.toLong() ?: 0L).coerceAtLeast(0L)
@@ -77,7 +76,7 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
                         if (prepared) player?.setVolume(volume, volume)
                         result.success(null)
                     }
-                    "dispose" -> { release(); result.success(null) }
+                    "dispose" -> { stop(); result.success(null) }
                     else -> result.notImplemented()
                 }
             } catch (_: Exception) {
@@ -95,13 +94,14 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
         player = current
         pending = result
         current.setAudioAttributes(attributes)
+        current.setWakeMode(context, android.os.PowerManager.PARTIAL_WAKE_LOCK)
         current.setOnPreparedListener {
             if (player !== current) return@setOnPreparedListener
             prepared = true
             current.setVolume(volume, volume)
             val completion = pending; pending = null
             try { play(); completion?.success(null) }
-            catch (_: Exception) { completion?.error("audio", "Áudio indisponível neste momento.", null) }
+            catch (_: Exception) { release(); runCatching { snapshot() }; completion?.error("audio", "Áudio indisponível neste momento.", null) }
             handler.post { if (player === current) snapshot() }
         }
         current.setOnCompletionListener {
@@ -121,7 +121,7 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
             true
         }
         if (uri.scheme == "file") current.setDataSource(requireNotNull(uri.path))
-        else current.setDataSource(activity, uri)
+        else current.setDataSource(context, uri)
         current.prepareAsync()
         handler.postDelayed({
             if (player === current && !prepared && pending != null) {
@@ -133,9 +133,8 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
     }
 
     @Suppress("DEPRECATION")
-    private fun play() {
+    fun play() {
         if (!prepared) return
-        if (!foreground) { snapshot(); return }
         val granted = if (Build.VERSION.SDK_INT >= 26) manager.requestAudioFocus(focusRequest!!)
             else manager.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
         check(granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
@@ -148,9 +147,12 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
         snapshot()
     }
 
-    fun setForeground(value: Boolean) {
-        foreground = value
-        if (!value) pause()
+    fun stop() { release(); snapshot() }
+    fun seek(value: Long) {
+        if (!prepared) return
+        if (Build.VERSION.SDK_INT >= 26) player?.seekTo(value.coerceAtLeast(0), MediaPlayer.SEEK_CLOSEST)
+        else @Suppress("DEPRECATION") player?.seekTo(value.coerceIn(0, Int.MAX_VALUE.toLong()).toInt())
+        snapshot()
     }
 
     private fun snapshot(extra: Map<String, Any> = emptyMap()) {
@@ -164,6 +166,8 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
             prepared = false
             mapOf("playing" to false, "failed" to true)
         }
+        onState(prepared, state["playing"] == true, (state["positionMs"] as? Number)?.toLong() ?: 0L,
+            (state["durationMs"] as? Number)?.toLong() ?: 0L)
         channel.invokeMethod("event", state + extra)
     }
 
@@ -186,9 +190,9 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
                 reader.setDataSource(path)
                 val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
                 val mime = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE) ?: ""
-                activity.runOnUiThread { result.success(mapOf("durationMs" to duration, "mime" to mime)) }
+                handler.post { result.success(mapOf("durationMs" to duration, "mime" to mime)) }
             } catch (_: Exception) {
-                activity.runOnUiThread { result.error("metadata", "Não foi possível conferir este MP3.", null) }
+                handler.post { result.error("metadata", "Não foi possível conferir este MP3.", null) }
             } finally { runCatching { reader.release() } }
         }
     }
@@ -199,7 +203,7 @@ class AndroidAudioChannel(private val activity: Activity, messenger: BinaryMesse
         disposed = true
         handler.removeCallbacksAndMessages(null)
         inspector.shutdown()
-        activity.unregisterReceiver(noisy)
+        context.unregisterReceiver(noisy)
         channel.setMethodCallHandler(null)
     }
 }

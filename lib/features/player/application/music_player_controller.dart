@@ -33,9 +33,12 @@ class MusicPlayerController extends ChangeNotifier {
       ended = false,
       _disposed = false;
   bool _moduleActive = true;
+  bool get moduleActive => _moduleActive;
   Future<void> setModuleActive(bool value) async {
+    if (_moduleActive == value) return;
     _moduleActive = value;
     if (!value) await pause();
+    _notify();
   }
 
   AudioRepeat repeat = AudioRepeat.off;
@@ -308,6 +311,23 @@ class MusicPlayerController extends ChangeNotifier {
 
   Future<void> pause() async {
     if (playing) await _safe(engine.pause);
+  }
+
+  Future<void> stop() async {
+    _request++;
+    await _serial(() async {
+      await _safe(engine.stop);
+      _queue = const [];
+      _order = [];
+      _history.clear();
+      _failed.clear();
+      index = -1;
+      playing = loading = buffering = ended = false;
+      position = duration = Duration.zero;
+      title = artist = '';
+      cover = null;
+      _notify();
+    });
   }
 
   Future<void> discardTracks(List<Track> tracks) async {

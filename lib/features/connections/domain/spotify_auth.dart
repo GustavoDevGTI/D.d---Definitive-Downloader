@@ -7,6 +7,8 @@ abstract final class SpotifyConfig {
   static const clientId = String.fromEnvironment('SPOTIFY_CLIENT_ID',
       defaultValue: 'bef27a897e96427996bc49e0cf2b4bf2');
   static final windowsRedirect = Uri.parse('http://127.0.0.1:43821/callback');
+  static final androidRedirect =
+      Uri.parse('http://127.0.0.1:43822/android/spotify/callback');
   static const scopes = [
     'playlist-read-private',
     'playlist-read-collaborative'
@@ -53,12 +55,21 @@ class SpotifyAuthorizationRequest {
 
   String acceptCallback(Uri callback) {
     final parameters = callback.queryParametersAll;
-    if (callback.path != redirectUri.path ||
+    if (callback.toString().length > 8192 ||
+        callback.scheme != redirectUri.scheme ||
+        callback.host != redirectUri.host ||
+        callback.port != redirectUri.port ||
+        callback.userInfo.isNotEmpty ||
+        callback.hasFragment ||
+        callback.path != redirectUri.path ||
         parameters['state']?.length != 1 ||
         parameters['state']?.single != state) {
       throw const SpotifyException('Retorno de autenticação inválido.');
     }
     if (parameters.containsKey('error')) {
+      if (parameters.containsKey('code')) {
+        throw const SpotifyException('Retorno de autenticação inválido.');
+      }
       if (parameters['error']?.singleOrNull == 'access_denied') {
         throw const SpotifyAuthCancelled();
       }

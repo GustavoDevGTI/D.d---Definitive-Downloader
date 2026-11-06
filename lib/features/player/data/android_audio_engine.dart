@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import '../domain/playback.dart';
 
-/// Android owns MediaPlayer and its lifecycle. No Dart FFI callback survives an
-/// Activity/FlutterEngine teardown, including closing and reopening the app.
+/// Android owns MediaPlayer in the process runtime, independent of the Activity.
+/// Foreground work keeps the engine alive; no libmpv/FFI teardown is involved.
 class AndroidAudioEngine implements AudioEngine {
   AndroidAudioEngine() {
     channel.setMethodCallHandler((call) async {

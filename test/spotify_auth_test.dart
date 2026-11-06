@@ -23,25 +23,47 @@ void main() {
     final request =
         SpotifyAuthorizationRequest.generate(SpotifyConfig.windowsRedirect);
     expect(
-        () => request
-            .acceptCallback(Uri.parse('/callback?state=wrong&code=test')),
+        () => request.acceptCallback(
+            Uri.parse('http://127.0.0.1:43821/callback?state=wrong&code=test')),
         throwsA(isA<SpotifyException>()));
     expect(
         () => request.acceptCallback(Uri.parse(
             '/callback?state=${request.state}&state=${request.state}&code=test')),
         throwsA(isA<SpotifyException>()));
     expect(
-        () => request.acceptCallback(
-            Uri.parse('/other?state=${request.state}&code=test')),
+        () => request.acceptCallback(Uri.parse(
+            'http://127.0.0.1:43821/other?state=${request.state}&code=test')),
         throwsA(isA<SpotifyException>()));
     expect(
-        request.acceptCallback(
-            Uri.parse('/callback?state=${request.state}&code=test')),
+        request.acceptCallback(Uri.parse(
+            'http://127.0.0.1:43821/callback?state=${request.state}&code=test')),
         'test');
   });
   test('credenciais de resposta inválida não viram sessão', () {
     expect(() => SpotifyTokens.fromResponse({'access_token': 'fixture'}),
         throwsA(isA<SpotifyException>()));
+  });
+  test(
+      'callback absoluto valida origem e não confunde retornos Android/Windows',
+      () {
+    final request =
+        SpotifyAuthorizationRequest.generate(SpotifyConfig.androidRedirect);
+    final query = 'state=${request.state}&code=fixture';
+    for (final uri in [
+      'http://evil.example:43822/android/spotify/callback?$query',
+      'http://127.0.0.1:43821/android/spotify/callback?$query',
+      'http://user@127.0.0.1:43822/android/spotify/callback?$query',
+      'http://127.0.0.1:43822/android/spotify/callback?$query#fragment',
+      'http://127.0.0.1:43822/android/spotify/callback?$query&error=access_denied',
+    ]) {
+      expect(() => request.acceptCallback(Uri.parse(uri)),
+          throwsA(isA<SpotifyException>()));
+    }
+    expect(
+        request.acceptCallback(
+            SpotifyConfig.androidRedirect.replace(query: query)),
+        'fixture');
+    expect(SpotifyConfig.androidRedirect, isNot(SpotifyConfig.windowsRedirect));
   });
   test('transporte recusa domínios estranhos e HTTP antes de transmitir',
       () async {
@@ -117,6 +139,24 @@ void main() {
       await expectLater(
           flow.authorize(SpotifyAuthorizationRequest.generate(uri)),
           throwsA(isA<SpotifyAuthCancelled>()));
+      final released =
+          await HttpServer.bind(InternetAddress.loopbackIPv4, uri.port);
+      await released.close(force: true);
+    }, skip: !Platform.isWindows);
+    test('cancelar durante bind não abre o navegador nem deixa o listener',
+        () async {
+      final uri = await redirect();
+      var opened = false;
+      final flow = WindowsSpotifyAuthorization(
+          redirectUri: uri,
+          openBrowser: (_) async {
+            opened = true;
+          });
+      final response =
+          flow.authorize(SpotifyAuthorizationRequest.generate(uri));
+      flow.cancel();
+      await expectLater(response, throwsA(isA<SpotifyAuthCancelled>()));
+      expect(opened, isFalse);
       final released =
           await HttpServer.bind(InternetAddress.loopbackIPv4, uri.port);
       await released.close(force: true);

@@ -4,6 +4,8 @@ Pedido de 05/11/2026: todas as funções já operacionais do app devem funcionar
 
 Estados: **validado** (cenário Android executado), **parcial** (parte implementada ou validação faltante), **pendente** (integração faltante). “Validado” não significa todo aparelho/catálogo.
 
+Orientação posterior de 06/11/2026: testes humanos no APK somente depois de implementar a paridade das funções já operacionais no desktop. Até lá, continuar com testes automatizados essenciais/focados e emulador isolado; não pedir login, desbloqueio de sessão ou conferência manual de cada APK. Cadastro externo de OAuth, ensaio de conta real e aparelho físico são evidências distintas, sem marcá-los como aprovados por fixtures.
+
 ## 1. Base Android e uso por toque
 
 - [x] Projeto Android, APK versionado, marca, SQLite nativo e cofre — validado no emulador API 36.
@@ -36,7 +38,7 @@ Estados: **validado** (cenário Android executado), **parcial** (parte implement
 
 ## 4. Contas e importação de todas as origens presentes
 
-- [ ] Spotify PKCE com retorno Android próprio, configuração no cadastro e autenticação/renovação reais.
+- [ ] Spotify — parcial: retorno Android próprio e PKCE implementados; origem/state, cofre nativo, restauração, refresh, cancelamento/timeout passaram automaticamente com respostas sintéticas no Android. Falta confirmar cadastro externo do novo redirect e autenticação/renovação reais; não reutiliza callback Windows.
 - [ ] Deezer com campo local mascarado e cofre Android; não ler nem copiar cookies/credenciais Windows.
 - [ ] Importar playlists públicas Spotify, Deezer, YouTube, YouTube Music e SoundCloud integralmente, com páginas lidas na importação.
 - [ ] Conta Spotify: playlists privadas/colaborativas e sessão restaurada no Android.
@@ -53,10 +55,10 @@ Estados: **validado** (cenário Android executado), **parcial** (parte implement
 
 ## 6. Ciclo de vida e execução em segundo plano
 
-- [ ] Serviço de primeiro plano para trabalho ativo, notificação e controles de fila.
-- [ ] Serviço/sessão de mídia, controles na notificação/tela bloqueada e player em segundo plano.
+- [x] Serviço de primeiro plano para trabalho ativo, notificação e controles de fila: HTTP completou duas ocorrências com Activity encerrada. Pausa/retomada pelo mesmo controlador das notificações passou; timeout e force-stop ainda exigem cenários próprios abaixo.
+- [x] Serviço/sessão de mídia e player em segundo plano: MediaPlayer e motor persistem fora da Activity; avanço automático e transportes passaram com Activity encerrada/reaberta. Notificações de mídia e downloads coexistem; testes concedem permissão somente ao pacote isolado.
 - [ ] Foco de áudio/fones já têm tratamento básico nativo; validar chamadas, desconexões e competição com outro áudio em aparelho físico.
-- [ ] Encerrar/rotacionar/reabrir não pode deixar processos, referências nativas ou transferências órfãs.
+- [ ] Ciclo de vida — parcial: encerrar/reabrir a Activity duas vezes conservou o mesmo Dart/MediaPlayer/fila e encerrou o serviço ao finalizar. Rotação/force-stop/morte do processo/fones e limites temporais do sistema ainda têm cenários próprios pendentes; não há autorestart de trabalho.
 - [ ] Persistência e reconciliação após encerramento do processo/OS; retomada respeita aprovação manual e estados anteriores.
 
 ## 7. Critério de conclusão
@@ -67,4 +69,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Checkpoints 0.1.49/0.1.50: base e motor Android, descritos em `ANDROID_MOTOR_COMPARTILHADO.md`. Busca nativa real passou em Deezer (2 candidatas), YouTube Music (8) e SoundCloud (8); obtenção SoundCloud passou, com pausa/cancelamento em fases reais; YouTube Music entregou MP3 completo com capa/duração verificadas. Bloco 0.1.51: fila HTTP/MP3, extras/ordem na execução, recuperação manual e popup de substituição no Android; detalhes em `VERSAO_LOCAL_0_1_51.md`. Próximos: contas/retornos próprios, importações públicas por origem, armazenamento público, serviços e demais casos de fila/UI ainda abertos. A presença do núcleo compartilhado não comprova sessão Deezer, todos os provedores ou segundo plano.
+Checkpoints 0.1.49/0.1.50: base e motor Android. Bloco 0.1.51: fila HTTP/MP3, extras/ordem, reposição e substituição. Bloco 0.1.52: callback Android separado, controles/serviço/sessão, engine mantido pelo processo e segundo plano com fechamento da Activity; ver `VERSAO_LOCAL_0_1_52.md`. Próximos: armazenamento público/SD, compartilhamento recebido, configuração externa de contas, importações públicas por origem e demais cenários de fila/UI/sistema ainda abertos. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.

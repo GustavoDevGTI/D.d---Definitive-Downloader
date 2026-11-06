@@ -5,7 +5,8 @@ param(
     [string]$FlutterPath=(Join-Path $env:LOCALAPPDATA 'DownloaderDevTools/flutter/bin/flutter.bat'),
     [string]$SdkRoot=(Join-Path $env:LOCALAPPDATA 'Android/Sdk'),
     [string]$PlainName='',
-    [switch]$LiveSources
+    [switch]$LiveSources,
+    [switch]$GrantNotifications
 )
 $ErrorActionPreference='Stop'
 $workspace=[IO.Path]::GetFullPath($WorkspaceRoot)
@@ -45,6 +46,19 @@ try {
         if($LASTEXITCODE -ne 0){throw 'Falha ao preparar o pacote isolado de testes.'}
     }
     if(-not (Test-IntegrationApk)){throw 'APK de teste não possui o identificador isolado esperado.'}
+    if($GrantNotifications) {
+        $adb=Join-Path $SdkRoot 'platform-tools/adb.exe'
+        if(-not ([bool]((& $aapt dump permissions $apk) -match 'android.permission.POST_NOTIFICATIONS'))) {
+            throw 'Compile o APK de integração atualizado antes de testar notificações.'
+        }
+        & $adb -s $Device install -r $apk
+        if($LASTEXITCODE -ne 0){throw 'Falha ao preparar permissões do pacote isolado.'}
+        $sdk=& $adb -s $Device shell getprop ro.build.version.sdk
+        if([int]$sdk -ge 33) {
+            & $adb -s $Device shell pm grant br.com.definitivedownloader.app.integration android.permission.POST_NOTIFICATIONS
+            if($LASTEXITCODE -ne 0){throw 'Falha ao conceder notificações somente ao pacote de teste.'}
+        }
+    }
     $selection=@()
     if($PlainName){$selection=@('--plain-name',$PlainName)}
     & $FlutterPath test $TestFile --no-pub -d $Device --timeout 360s --disable-dds --no-uninstall @defines @selection

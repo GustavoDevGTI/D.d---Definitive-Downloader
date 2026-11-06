@@ -2,32 +2,28 @@ package br.com.definitivedownloader.app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import android.content.Context
 
 class MainActivity : FlutterActivity() {
     private lateinit var files: AndroidFilesChannel
-    private lateinit var audio: AndroidAudioChannel
-    private lateinit var music: AndroidMusicChannel
+    override fun provideFlutterEngine(context: Context): FlutterEngine = (application as DdApplication).runtime.engine
+    override fun shouldDestroyEngineWithHost() = false
+    override fun onResume() {
+        super.onResume()
+        (application as DdApplication).runtime.background.activity = this
+    }
+    override fun onPause() {
+        (application as DdApplication).runtime.background.activity = null
+        super.onPause()
+    }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         files = AndroidFilesChannel(this, flutterEngine.dartExecutor.binaryMessenger)
-        audio = AndroidAudioChannel(this, flutterEngine.dartExecutor.binaryMessenger)
-        music = AndroidMusicChannel(this, flutterEngine.dartExecutor.binaryMessenger)
-    }
-
-    override fun onPause() {
-        if (::audio.isInitialized) audio.setForeground(false)
-        super.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::audio.isInitialized) audio.setForeground(true)
+        (application as DdApplication).runtime.start(dartEntrypointArgs)
     }
 
     override fun onDestroy() {
-        if (::music.isInitialized) music.dispose()
         if (::files.isInitialized) files.dispose()
-        if (::audio.isInitialized) audio.dispose()
         super.onDestroy()
     }
 

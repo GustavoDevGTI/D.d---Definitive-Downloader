@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'app/definitive_downloader_app.dart';
 import 'core/network/bounded_http.dart';
 import 'core/platform/platform_services.dart';
+import 'core/platform/android_background.dart';
 import 'core/platform/music_engine_diagnostic.dart';
 import 'core/platform/player_diagnostic.dart';
 import 'features/player/application/music_player_controller.dart';
@@ -24,6 +25,7 @@ import 'features/connections/application/spotify_connection_controller.dart';
 import 'features/connections/data/spotify_token_store.dart';
 import 'features/connections/data/spotify_transport.dart';
 import 'features/connections/data/windows_spotify_authorization.dart';
+import 'features/connections/data/android_spotify_authorization.dart';
 import 'features/connections/application/deezer_connection_controller.dart';
 import 'features/downloads/music_download_service.dart';
 import 'features/matching/music_engine.dart';
@@ -55,7 +57,9 @@ Future<void> main(List<String> arguments) async {
       transport: const SpotifyHttpTransport(),
       authorization: Platform.isWindows
           ? WindowsSpotifyAuthorization(openBrowser: files.openUrl)
-          : UnavailableSpotifyAuthorization());
+          : Platform.isAndroid
+              ? AndroidSpotifyAuthorization(openBrowser: files.openUrl)
+              : UnavailableSpotifyAuthorization());
   final controller = LibraryController(
       repository: LibraryRepository(database),
       files: files,
@@ -71,6 +75,7 @@ Future<void> main(List<String> arguments) async {
   final player = MusicPlayerController(
       PlayerLibrary(database), createAudioEngine(), files);
   await player.initialize();
+  if (Platform.isAndroid) AndroidBackground(controller, player);
   final playlistArgument =
       arguments.where((value) => value.startsWith('--playlist=')).firstOrNull;
   var initialPlaylist = '';

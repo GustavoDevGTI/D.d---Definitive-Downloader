@@ -3,11 +3,26 @@ param(
     [string]$StageRoot=(Join-Path $env:LOCALAPPDATA 'DdbAndroid'),
     [string]$FlutterPath=(Join-Path $env:LOCALAPPDATA 'DownloaderDevTools/flutter/bin/flutter.bat'),
     [string]$JavaHome='',
-    [string]$PythonPath=(Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev/music-engine-venv/Scripts/python.exe'),
+    [string]$PythonPath='',
     [switch]$SkipTests,
     [switch]$SkipAnalysis
 )
 $ErrorActionPreference='Stop'
+if(-not $PythonPath) {
+    $candidates=@((Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev/music-engine-venv/Scripts/python.exe'))
+    # The desktop runtime may be updated and remove a venv's original base.
+    # Preparation uses only stdlib; locate the currently installed runtime,
+    # without installing Python or modifying any existing environment.
+    $runtime=Get-AppxPackage '*CodexPrimaryRuntime*' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if($runtime){$candidates+=Join-Path $runtime.InstallLocation 'dependencies/python/python.exe'}
+    foreach($candidate in $candidates) {
+        if(Test-Path -LiteralPath $candidate) {
+            & $candidate --version *> $null
+            if($LASTEXITCODE -eq 0){$PythonPath=$candidate;break}
+        }
+    }
+    if(-not $PythonPath){throw 'Informe -PythonPath com Python disponível para preparar os módulos Android.'}
+}
 $workspace=[IO.Path]::GetFullPath($WorkspaceRoot)
 $stage=[IO.Path]::GetFullPath($StageRoot)
 if($stage.StartsWith('\\')) { throw 'O estágio Android deve ser local.' }
