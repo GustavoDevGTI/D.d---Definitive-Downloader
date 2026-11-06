@@ -12,3 +12,5 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+/app/src/main/assets/dd_music_bundle.zip
+/app/src/main/assets/dd_music_bundle.sha256

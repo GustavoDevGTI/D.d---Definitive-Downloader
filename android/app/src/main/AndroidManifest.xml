@@ -3,6 +3,7 @@
     <application
         android:label="Definitive Downloader"
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

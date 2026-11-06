@@ -36,5 +36,5 @@ Requisitos locais: Flutter 3.47.8/Dart 3.13.7, JDK 21 (Android Studio), Android 
 
 1. Executar `tools/build_android.ps1` a partir de checkout local, ou copiar o script para uma pasta local e passar `-WorkspaceRoot` com a UNC. Estágio padrão: `%LOCALAPPDATA%\DdbAndroid`. Não usar a pasta de outro projeto como estágio.
 2. Instalar o APK de `dist/Android` no emulador ou aparelho Android ARM64/x86-64. O emulador dedicado desta rodada é `Definitive_API_36`, Android 16/API 36 x86-64, separado dos emuladores de outros projetos.
-3. Teste nativo focado no estágio já preparado: `flutter test integration_test/android_smoke_test.dart --no-pub -d emulator-5560 --timeout 180s --disable-dds`. Não executar contra uma biblioteca pessoal. O teste usa banco/mídia temporários e elimina somente sua própria árvore, inclusive após falha.
+3. Teste nativo focado no estágio já preparado: a partir da 0.1.50, usar `./tools/test_android.ps1 -TestFile integration_test/android_smoke_test.dart`, com pacote `.integration` e sem desinstalação automática. Não executar contra uma biblioteca pessoal. O teste usa banco/mídia temporários e elimina somente sua própria árvore, inclusive após falha.
 4. Se o mesmo código já passou em análise e testes, usar `-SkipTests -SkipAnalysis` para reempacotar; não repetir a regressão completa.

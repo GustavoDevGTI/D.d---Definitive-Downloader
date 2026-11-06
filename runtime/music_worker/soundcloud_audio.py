@@ -6,6 +6,7 @@ from common import MusicError, check_duration, emit, allowed_url
 from soundcloud_catalog import PublicCatalog, track_url
 from audio_files import run_ffmpeg
 from transfer_progress import TransferProgress
+from runtime_paths import extractor_options
 
 
 class QuietLogger:
@@ -67,6 +68,7 @@ def download(candidate, directory, ffmpeg, control=None):
         'socket_timeout': 20, 'retries': 1, 'fragment_retries': 1,
         'max_filesize': 80_000_000, 'progress_hooks': [progress], 'overwrites': False,
         'ffmpeg_location': str(ffmpeg), 'outtmpl': str(Path(directory) / 'received.%(ext)s')}
+    options.update(extractor_options())
     with yt_dlp.YoutubeDL(options) as engine:
         info = engine.extract_info(url, download=False)
         if info.get('id') != source_id or info.get('is_live'):

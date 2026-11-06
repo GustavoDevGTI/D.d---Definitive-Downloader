@@ -34,6 +34,8 @@ Manrope; fundo #FAFAFC, superfície #F3F4F6, texto #1E293B, ação #C9345B, ativ
 
 Os resultados reais e os próximos bloqueios serão registrados na nota da versão. APK de teste não é publicação Play Store, release GitHub nem conclusão de todas as funções mobile.
 
+Acompanhamento atual: [checklist de execução](ANDROID_PARIDADE_CHECKLIST.md) e [motor Android compartilhado](ANDROID_MOTOR_COMPARTILHADO.md). A matriz acima registra a situação inicial; o runtime Android foi implementado depois do checkpoint e seus ensaios por fonte ficam no checklist.
+
 ## Próximas integrações, preservando o escopo
 
 1. **Motor musical Android:** manter a interface de operações e as regras Dart; implementar transportes e processamento nativos/compartilhados, sem lançar Python/EXE do Windows. Validar cada provedor separadamente com arquivo completo, identidade, duração, capa, cancelamento e publicação atômica. Não aceitar prévia ou mídia protegida como arquivo completo.

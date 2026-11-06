@@ -15,23 +15,23 @@ Estados: **validado** (cenário Android executado), **parcial** (parte implement
 
 ## 2. Motor de fontes musicais — prioridade de implementação
 
-- [ ] Criar runtime Android de extração/processamento com executáveis/bibliotecas próprios da plataforma; nenhum EXE Windows.
-- [ ] SoundCloud: busca exata, revalidar ID/duração/versão, obter áudio completo público, validar/transcodificar MP3 e incorporar capa/tags.
-- [ ] YouTube Music: busca de áudio de catálogo, versões/explícita, revalidação e download.
-- [ ] YouTube: links escolhidos manualmente e último recurso de videoclipe com aprovação específica.
-- [ ] Deezer: busca/ISRC, conexão de sessão local/cofre, obtenção, transformação em blocos, validação e metadados.
+- [x] Runtime Android CPython/FFmpeg/QuickJS, módulos portáveis travados por hash, processo/grupo próprios e codecs executados no emulador; nenhum EXE Windows.
+- [x] SoundCloud: busca pública nativa, revalidar ID/duração/versão, áudio completo público, MP3 validado, capa/tags. Ensaio real sem conta com duas ocorrências da mesma faixa; não comprova todo catálogo.
+- [x] YouTube Music: busca pública e download de áudio de catálogo com revalidação, MP3 completo e capa/tags — LEAP/Sick Sense, 4.801.742 bytes, sem conta. Regras de versão/explícita seguem o domínio; não é cobertura de todo catálogo.
+- [ ] YouTube — parcial: núcleo compartilhado de link manual/aprovação implementado no Android; falta ensaio nativo separado de links manuais/videoclipes.
+- [ ] Deezer — parcial: busca pública executada no Android e backend portátil dos blocos validado por vetor conhecido. Conexão/cofre/obtenção completos implementados no núcleo, mas ainda sem ensaio de sessão/arquivo real no Android.
 - [ ] Preservar referência original, origem efetiva, tentativas por provedor e mensagens sanitizadas em todos os adaptadores.
 - [ ] Fonte indisponível/DRM/prévia nunca pode produzir conclusão simulada; ouvir não confirma nem baixa.
 
 ## 3. Fila completa e integridade de arquivos
 
 - [ ] Downloads de MP3 direto no Android, com bytes/tamanho/velocidade/tempo medidos.
-- [ ] Iniciar, pausar/limitar, parar, cancelar processo próprio e tentar novamente por ocorrência.
+- [ ] Iniciar, pausar/limitar, parar e tentar novamente na UI — parcial: pausa durante recebimento e cancelamento durante processamento passaram no serviço real SoundCloud; nenhum grupo próprio restante. Falta rodada pela fila/UI e outros estados.
 - [ ] Extras entram no final durante a execução e são baixados na mesma rodada quando prontos.
 - [ ] Reordenar somente slots livres; concluídas fixas; origem/nomes protegidos conforme regras existentes.
 - [ ] Recuperar arquivo removido externamente: abrir conferência, exigir fonte e novo clique de download.
 - [ ] Duplicatas com escolher existente/recebida e Fazer para todos, exclusão apenas autorizada e diário de recuperação.
-- [ ] Publicação atômica, MP3 completo validado, capa/tags, M3U8 ordenada e histórico persistido.
+- [ ] Publicação/histórico — parcial: duas cópias SoundCloud numeradas, duração nativa, capa/tags, conclusão SQLite e M3U8 ordenada passaram no serviço Android. Falta rodada completa da fila e cenários de recuperação.
 - [ ] Busca, filtros, ordenação, seleção, colunas ajustáveis/reset e listas contínuas com grande volume no dispositivo.
 
 ## 4. Contas e importação de todas as origens presentes
@@ -67,4 +67,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Primeiro: concluir o checkpoint 0.1.49 e começar o runtime de extração/transcodificação Android, aproveitando biblioteca Android mantida e adaptadores D.d. A implementação do runtime não habilita automaticamente todos os provedores; cada operação preserva as validações existentes e passa por ensaio próprio. Depois, completar contas, armazenamento público e serviços sem interromper as regras compartilhadas.
+Checkpoints 0.1.49 e 0.1.50 locais: base e motor Android, descritos em `ANDROID_MOTOR_COMPARTILHADO.md`. Busca nativa real passou em Deezer (2 candidatas), YouTube Music (8) e SoundCloud (8); obtenção SoundCloud passou, com pausa/cancelamento em fases reais; YouTube Music entregou MP3 completo com capa/duração verificadas. A presença do núcleo compartilhado não comprova sessão Deezer, downloads de todos os provedores nem ciclo de vida. Próximos blocos: fila/UI, contas com retornos próprios, armazenamento público e serviços, sem interromper as regras compartilhadas.

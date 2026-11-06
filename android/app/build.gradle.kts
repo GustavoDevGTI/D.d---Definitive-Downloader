@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -35,8 +37,23 @@ android {
 
     // The pilot is built in debug mode. Production signing is intentionally
     // unconfigured: a GitHub/Play release must never silently use a debug key.
+    buildTypes {
+        debug {
+            val entry = project.findProperty("target")?.toString()?.replace('\\', '/') ?: "lib/main.dart"
+            // Flutter may wrap an integration target in a generated listener.
+            // The explicit define keeps native tests isolated in that case too.
+            val integration = project.findProperty("dart-defines")?.toString()?.split(',')?.any {
+                runCatching { String(Base64.getDecoder().decode(it)) == "DD_ANDROID_INTEGRATION=true" }.getOrDefault(false)
+            } ?: false
+            if (integration || entry.startsWith("integration_test/") || entry.contains("/integration_test/")) {
+                applicationIdSuffix = ".integration"
+            }
+        }
+    }
     packaging {
         jniLibs.excludes.addAll(listOf("lib/armeabi-v7a/**", "lib/x86/**"))
+        jniLibs.useLegacyPackaging = true
+        jniLibs.keepDebugSymbols.addAll(listOf("**/libpython.zip.so", "**/libffmpeg.zip.so"))
     }
 }
 
@@ -48,4 +65,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
 }

@@ -1,6 +1,6 @@
 """Streaming decoder for the provider's 2048-byte striped block format."""
 import hashlib
-from Crypto.Cipher import Blowfish
+from portable_crypto import block_decoder
 from common import identifier
 
 
@@ -13,6 +13,7 @@ def recording_key(track_id):
 
 def decoded_blocks(chunks, track_id):
     key = recording_key(track_id)
+    decrypt = block_decoder(key)
     pending = bytearray()
     index = 0
     for chunk in chunks:
@@ -21,7 +22,7 @@ def decoded_blocks(chunks, track_id):
             block = bytes(pending[:2048])
             del pending[:2048]
             if index % 3 == 0:
-                block = Blowfish.new(key, Blowfish.MODE_CBC, bytes(range(8))).decrypt(block)
+                block = decrypt(block, bytes(range(8)))
             yield block
             index += 1
     if pending:

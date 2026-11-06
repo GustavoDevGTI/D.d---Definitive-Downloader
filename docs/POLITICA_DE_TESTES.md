@@ -31,6 +31,7 @@ Executar uma vez junto dos focados, não novamente por grupo ou no build do mesm
 | `storage` | Schema/migração, consultas e persistência, inclusive diário de substituição. |
 | `ui_collections`, `ui_downloads`, `ui_player`, `ui_common` | Somente a interface/gesto afetado. Somar a área de comportamento se ela também mudou. |
 | `worker` | Contratos Dart e testes Python offline do motor. |
+| `mobile` | Adaptadores Android e layouts por toque/teclado; selecionar arquivos individuais quando só o protocolo nativo mudou. |
 
 Pode selecionar várias áreas ou um arquivo específico com `-TestFiles`. Para um bug pontual, preferir o teste que o reproduz mais o essencial; não executar todos os grupos por precaução. Se uma alteração compartilhada tiver impacto real em mais módulos, incluir os respectivos grupos. Um teste novo precisa entrar no grupo adequado ou ser passado explicitamente; nada deve ficar sem classificação.
 

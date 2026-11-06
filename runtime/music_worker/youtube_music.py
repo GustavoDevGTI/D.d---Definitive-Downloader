@@ -4,6 +4,7 @@ from ytmusicapi import YTMusic
 import yt_dlp
 import requests
 from common import MusicError, check_duration, clean_text, emit, identifier
+from runtime_paths import extractor_options
 
 ATV = 'MUSIC_VIDEO_TYPE_ATV'
 
@@ -137,6 +138,7 @@ def download(candidate, directory, ffmpeg, control=None, authorization='catalog'
         'retries': 1, 'fragment_retries': 1, 'max_filesize': 80_000_000,
         'progress_hooks': [progress], 'overwrites': False,
     }
+    options.update(extractor_options())
     with yt_dlp.YoutubeDL(options) as engine:
         info = engine.extract_info(candidate['pageUrl'], download=True)
         if info.get('id') != video or info.get('is_live') or info.get('live_status') in ('is_live', 'post_live'):

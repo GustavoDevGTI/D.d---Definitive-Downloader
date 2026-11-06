@@ -6,10 +6,12 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : FlutterActivity() {
     private lateinit var files: AndroidFilesChannel
     private lateinit var audio: AndroidAudioChannel
+    private lateinit var music: AndroidMusicChannel
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         files = AndroidFilesChannel(this, flutterEngine.dartExecutor.binaryMessenger)
         audio = AndroidAudioChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+        music = AndroidMusicChannel(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 
     override fun onPause() {
@@ -23,6 +25,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        if (::music.isInitialized) music.dispose()
         if (::files.isInitialized) files.dispose()
         if (::audio.isInitialized) audio.dispose()
         super.onDestroy()

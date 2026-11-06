@@ -11,6 +11,7 @@ import soundcloud_catalog
 import soundcloud_audio
 from audio_files import finish
 from transfer_control import TransferControl
+from runtime_paths import ffmpeg_path, android_health
 
 logging.disable(logging.CRITICAL)
 
@@ -18,7 +19,7 @@ logging.disable(logging.CRITICAL)
 def execute(request, control=None):
     operation = request.get('operation')
     if operation == 'health':
-        return {'ready': True, 'protocol': 1}
+        return {'ready': True, 'protocol': 1, **android_health()}
     if operation == 'deezerConnect':
         session = deezer.DeezerSession(request.get('arl', ''))
         try:
@@ -44,10 +45,7 @@ def execute(request, control=None):
         directory = Path(request.get('directory', ''))
         if not directory.is_absolute() or not directory.is_dir() or any(directory.iterdir()):
             raise MusicError('A pasta temporária precisa estar vazia.')
-        ffmpeg = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'ffmpeg.exe'
-        if not getattr(sys, 'frozen', False):
-            import imageio_ffmpeg
-            ffmpeg = Path(imageio_ffmpeg.get_ffmpeg_exe())
+        ffmpeg = ffmpeg_path()
         if not ffmpeg.is_file():
             raise MusicError('O validador de áudio não foi instalado.')
         output_title = request.get('outputTitle', '')

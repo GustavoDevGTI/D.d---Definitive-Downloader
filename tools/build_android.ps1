@@ -3,6 +3,7 @@ param(
     [string]$StageRoot=(Join-Path $env:LOCALAPPDATA 'DdbAndroid'),
     [string]$FlutterPath=(Join-Path $env:LOCALAPPDATA 'DownloaderDevTools/flutter/bin/flutter.bat'),
     [string]$JavaHome='',
+    [string]$PythonPath=(Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev/music-engine-venv/Scripts/python.exe'),
     [switch]$SkipTests,
     [switch]$SkipAnalysis
 )
@@ -20,8 +21,8 @@ if((Test-Path -LiteralPath $marker) -and
 }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Set-Content -LiteralPath $marker -Value $workspace
-foreach($folder in @('lib','assets','test','integration_test','android','tools')) {
-    & robocopy (Join-Path $workspace $folder) (Join-Path $stage $folder) /E /R:1 /W:1 /XD .gradle build .cxx /XF local.properties /NFL /NDL /NJH /NJS /NP | Out-Null
+foreach($folder in @('lib','assets','test','integration_test','android','tools','runtime')) {
+    & robocopy (Join-Path $workspace $folder) (Join-Path $stage $folder) /E /R:1 /W:1 /XD .gradle build .cxx __pycache__ /XF local.properties /NFL /NDL /NJH /NJS /NP | Out-Null
     if($LASTEXITCODE -ge 8) { throw "Falha ao copiar $folder." }
 }
 foreach($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml')) {
@@ -42,6 +43,8 @@ Push-Location $stage
 try {
     if($JavaHome){$env:JAVA_HOME=$JavaHome}
     $env:JAVA_TOOL_OPTIONS=($savedOptions+' "-Djdk.net.unixdomain.tmpdir='+$socketTemp+'"').Trim()
+    & $PythonPath (Join-Path $stage 'tools/prepare_android_music.py') --root $stage --cache (Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev/android-runtime-wheels') --output (Join-Path $stage 'android/app/src/main/assets')
+    if($LASTEXITCODE -ne 0){throw 'Falha ao preparar os módulos portáteis Android.'}
     & $FlutterPath pub get
     if($LASTEXITCODE -ne 0){throw 'Falha ao resolver dependências Android.'}
     if(-not $SkipAnalysis){
@@ -63,9 +66,12 @@ try {
             throw 'APK anuncia uma ABI sem runtime Flutter completo.'
         }
         foreach($abi in @('arm64-v8a','x86_64')) {
-            foreach($library in @('libflutter.so','libsqlite3.so')) {
+            foreach($library in @('libflutter.so','libsqlite3.so','libpython.so','libffmpeg.so','libqjs.so','libpython.zip.so','libffmpeg.zip.so')) {
                 if("lib/$abi/$library" -notin $entries){throw "Biblioteca ausente: $abi/$library"}
             }
+        }
+        foreach($asset in @('assets/dd_music_bundle.zip','assets/dd_music_bundle.sha256')) {
+            if($asset -notin $entries){throw "Módulos Android ausentes: $asset"}
         }
     } finally {$archive.Dispose()}
     $version=(Select-String -LiteralPath pubspec.yaml -Pattern '^version:\s*([\d.]+)').Matches[0].Groups[1].Value
