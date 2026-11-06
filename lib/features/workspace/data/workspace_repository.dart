@@ -1,4 +1,4 @@
-import 'dart:io';
+import '../../../core/platform/platform_services.dart';
 import '../../../core/storage/database.dart';
 import '../../library/data/library_repository.dart';
 import '../../library/domain/models.dart';
@@ -61,8 +61,9 @@ class WorkspaceRepository {
           int? size;
           if (track.status == TrackStatus.completed &&
               track.localPath.isNotEmpty) {
-            final stat = await FileStat.stat(track.localPath);
-            if (stat.type == FileSystemEntityType.file) size = stat.size;
+            try {
+              size = await createPlatformFiles().fileSize(track.localPath);
+            } catch (_) {/* Unavailable public volume. */}
           }
           return DownloadEntry(track, entry.collectionName,
               downloadedAt: entry.downloadedAt, fileBytes: size);

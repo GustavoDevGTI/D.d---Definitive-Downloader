@@ -74,7 +74,7 @@ Future<void> main(List<String> arguments) async {
           music: MusicDownloadService(engine, deezer)));
   await controller.initialize(example: arguments.contains('--example'));
   final player = MusicPlayerController(
-      PlayerLibrary(database), createAudioEngine(), files);
+      PlayerLibrary(database, files: files), createAudioEngine(), files);
   await player.initialize();
   if (Platform.isAndroid) AndroidBackground(controller, player);
   final playlistArgument =

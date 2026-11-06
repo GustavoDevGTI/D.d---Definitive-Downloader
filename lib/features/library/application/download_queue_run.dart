@@ -7,6 +7,10 @@ import '../../matching/music_resolver.dart';
 import '../../workspace/data/workspace_repository.dart';
 import '../data/library_repository.dart';
 import '../domain/models.dart';
+import '../../../core/platform/desktop_files.dart';
+import '../../../core/platform/media_publication.dart';
+import '../../importing/local_mp3_inspector.dart';
+import '../../downloads/cached_media_publication.dart';
 
 sealed class DownloadRunEvent {
   const DownloadRunEvent();
@@ -35,7 +39,10 @@ class DownloadRunNotice extends DownloadRunEvent {
 
 /// Owns queue membership, fallback, publication and export; never owns UI state.
 class DownloadQueueRun {
-  const DownloadQueueRun(this.repository, this.downloader, this.music);
+  const DownloadQueueRun(this.repository, this.downloader, this.music,
+      {this.files, this.inspector = const MediaKitLocalAudioInspector()});
+  final LocalAudioInspector inspector;
+  final DesktopFiles? files;
   final LibraryRepository repository;
   final DownloadService downloader;
   final MusicResolver? music;
@@ -112,14 +119,17 @@ class DownloadQueueRun {
           Future<String> receive(Track item) async {
             transfer = null;
             try {
-              final path =
-                  await downloader.save(item, directory, token, (value) {
+              final work = await files?.transferDirectory(directory, item.id,
+                      item.collectionId, mediaPublicationKey(item)) ??
+                  directory;
+              final path = await downloader.save(item, work, token, (value) {
                 progress = value;
                 onEvent(DownloadRunProgress(progress, transfer));
               }, onTransfer: (value) {
                 transfer = value;
                 onEvent(DownloadRunProgress(progress, transfer));
               });
+              if (work != directory) await inspector.inspect(path);
               await repository.recordMusicAttempt(item.id, item.sourceKind,
                   succeeded: true);
               return path;
@@ -127,6 +137,7 @@ class DownloadQueueRun {
               rethrow;
             } catch (error) {
               token.check();
+              if (error is MediaPublicationFailure) rethrow;
               await repository.recordMusicAttempt(item.id, item.sourceKind,
                   succeeded: false, message: operationMessage(error));
               rethrow;
@@ -134,55 +145,83 @@ class DownloadQueueRun {
           }
 
           String path;
-          try {
-            path = await receive(track);
-          } on DownloadCancelled {
-            rethrow;
-          } catch (error) {
-            token.check();
-            if (track.redownloadState.isNotEmpty ||
-                track.hasManualSource ||
-                ![
-                  SourceKind.deezerFull,
-                  SourceKind.youtubeMusic,
-                  SourceKind.soundcloud
-                ].contains(track.sourceKind) ||
-                music == null) {
+          var received = track;
+          final reusable = await files?.reusableTransfer(
+              directory, track.id, mediaPublicationKey(track));
+          if (reusable != null) {
+            path = await prepareCachedMedia(reusable, track, inspector);
+          } else {
+            try {
+              path = await receive(track);
+            } on DownloadCancelled {
               rethrow;
+            } catch (error) {
+              token.check();
+              if (error is MediaPublicationFailure ||
+                  track.redownloadState.isNotEmpty ||
+                  track.hasManualSource ||
+                  ![
+                    SourceKind.deezerFull,
+                    SourceKind.youtubeMusic,
+                    SourceKind.soundcloud
+                  ].contains(track.sourceKind) ||
+                  music == null) {
+                rethrow;
+              }
+              final alternatives = await repository.musicCandidates(track.id);
+              final fallback = music!.automaticChoice(
+                  track,
+                  alternatives
+                      .where((c) => c.kind != track.sourceKind)
+                      .toList());
+              if (fallback == null) {
+                final videos = await music!.searchVideos(
+                    track, '${track.artist} ${track.title}',
+                    cancellation: token);
+                if (videos.isEmpty) rethrow;
+                await repository.saveCandidates(
+                    track.id,
+                    [
+                      ...alternatives
+                          .where((c) => c.kind != SourceKind.youtube),
+                      ...videos
+                    ].take(32).toList());
+                await repository.markForReview(track.id);
+                await repository.setStatus(track.id, TrackStatus.pending,
+                    error:
+                        'Áudio indisponível. Videoclipe encontrado: aprove a versão na coleção.');
+                reviewVideos++;
+                await recordsChanged();
+                continue;
+              }
+              message =
+                  '${track.sourceKind.musicProviderName} indisponível para esta faixa; tentando a correspondência de áudio em ${fallback.kind.musicProviderName}.';
+              onEvent(DownloadRunNotice(message));
+              await repository.chooseMusicSource(track, fallback,
+                  forFallback: true);
+              final updated = await repository.trackById(track.id);
+              received = updated!;
+              await repository.setStatus(track.id, TrackStatus.downloading);
+              path = await receive(updated);
             }
-            final alternatives = await repository.musicCandidates(track.id);
-            final fallback = music!.automaticChoice(track,
-                alternatives.where((c) => c.kind != track.sourceKind).toList());
-            if (fallback == null) {
-              final videos = await music!.searchVideos(
-                  track, '${track.artist} ${track.title}',
-                  cancellation: token);
-              if (videos.isEmpty) rethrow;
-              await repository.saveCandidates(
-                  track.id,
-                  [
-                    ...alternatives.where((c) => c.kind != SourceKind.youtube),
-                    ...videos
-                  ].take(32).toList());
-              await repository.markForReview(track.id);
-              await repository.setStatus(track.id, TrackStatus.pending,
-                  error:
-                      'Áudio indisponível. Videoclipe encontrado: aprove a versão na coleção.');
-              reviewVideos++;
-              await recordsChanged();
-              continue;
-            }
-            message =
-                '${track.sourceKind.musicProviderName} indisponível para esta faixa; tentando a correspondência de áudio em ${fallback.kind.musicProviderName}.';
-            onEvent(DownloadRunNotice(message));
-            await repository.chooseMusicSource(track, fallback,
-                forFallback: true);
-            final updated = await repository.trackById(track.id);
-            await repository.setStatus(track.id, TrackStatus.downloading);
-            path = await receive(updated!);
           }
+          // Publication failures occur outside the provider fallback block.
+          // Validated bytes remain available for a write-only retry.
+          token.check();
+          path = await files?.publishMedia(path, directory, received.id,
+                  received.collectionId, mediaPublicationKey(received),
+                  cancellation: token,
+                  fileName: p.basename(path).replaceFirst(RegExp(r'^\d+ - '),
+                      '${received.position.toString().padLeft(3, '0')} - ')) ??
+              path;
           await repository.setStatus(track.id, TrackStatus.completed,
               localPath: path);
+          try {
+            await files?.acknowledgeMedia(path);
+          } catch (_) {
+            onEvent(const DownloadRunNotice(
+                'Mídia publicada. O registro de confirmação será reconciliado ao reabrir.'));
+          }
           saved++;
         } on DownloadCancelled {
           await repository.setStatus(track.id, TrackStatus.ready,
@@ -200,7 +239,8 @@ class DownloadQueueRun {
       onEvent(const DownloadRunMembership(null));
       if (saved > 0) {
         for (final entry in destinations.entries) {
-          await PlaylistExporter(repository).export(entry.key, entry.value);
+          await PlaylistExporter(repository, files: files)
+              .export(entry.key, entry.value);
         }
       }
       message = token.cancelled

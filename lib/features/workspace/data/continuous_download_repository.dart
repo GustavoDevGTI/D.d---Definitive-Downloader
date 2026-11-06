@@ -1,4 +1,4 @@
-import 'dart:io';
+import '../../../core/platform/platform_services.dart';
 import '../../../core/storage/database.dart';
 import '../../library/data/library_repository.dart';
 import '../../library/domain/models.dart';
@@ -95,9 +95,11 @@ class ContinuousDownloadRepository {
       await Future.wait(visible.skip(start).take(8).map((entry) async {
         final t = entry.track;
         if (t.status != TrackStatus.completed || t.localPath.isEmpty) return;
-        final stat = await FileStat.stat(t.localPath);
-        result[t.id] =
-            stat.type == FileSystemEntityType.file ? stat.size : null;
+        try {
+          result[t.id] = await createPlatformFiles().fileSize(t.localPath);
+        } catch (_) {
+          result[t.id] = null;
+        }
       }));
     }
     return result;

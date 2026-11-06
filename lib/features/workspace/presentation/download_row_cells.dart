@@ -4,6 +4,7 @@ import '../../../app/theme.dart';
 import '../../library/domain/models.dart';
 import '../../downloads/transfer_progress.dart';
 import '../domain/workspace_models.dart';
+import '../../../core/platform/platform_services.dart';
 
 List<Widget> downloadRowCells(
     {required DownloadEntry entry,
@@ -23,7 +24,7 @@ List<Widget> downloadRowCells(
         onChanged: (v) => onSelect(t.id, v ?? false)),
     Tooltip(
         message:
-            '${t.downloadName} · ${e.collectionName}${t.localPath.isEmpty ? '' : '\n${t.localPath}'}',
+            '${t.downloadName} · ${e.collectionName}${t.localPath.isEmpty ? '' : '\n${createPlatformFiles().displayPath(t.localPath)}'}',
         child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,8 +101,11 @@ List<Widget> downloadRowCells(
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12))),
     Tooltip(
-        message: t.localPath.isEmpty ? output : p.dirname(t.localPath),
-        child: Text(t.localPath.isEmpty ? output : p.dirname(t.localPath),
+        message: createPlatformFiles()
+            .displayPath(t.localPath.isEmpty ? output : p.dirname(t.localPath)),
+        child: Text(
+            createPlatformFiles().displayPath(
+                t.localPath.isEmpty ? output : p.dirname(t.localPath)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12))),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
-import '../../../core/platform/desktop_files.dart';
+import '../../../core/platform/platform_services.dart';
 import '../domain/models.dart';
 
 class TrackDownloadBadge extends StatefulWidget {
@@ -21,7 +21,7 @@ class _TrackDownloadBadgeState extends State<TrackDownloadBadge> {
   void _load() {
     _exists = widget.track.localPath.isEmpty
         ? null
-        : DesktopFiles().fileExists(widget.track.localPath);
+        : createPlatformFiles().fileExists(widget.track.localPath);
   }
 
   @override
@@ -40,7 +40,7 @@ class _TrackDownloadBadgeState extends State<TrackDownloadBadge> {
         final t = widget.track;
         final saved =
             t.localPath.isNotEmpty || t.status == TrackStatus.completed;
-        final missing = saved && snapshot.data == false;
+        final missing = saved && (snapshot.data == false || snapshot.hasError);
         final text = missing
             ? 'Arquivo indisponível'
             : saved

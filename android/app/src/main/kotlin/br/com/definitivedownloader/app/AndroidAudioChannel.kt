@@ -88,7 +88,7 @@ class AndroidAudioChannel(private val context: Context, messenger: BinaryMesseng
 
     private fun open(value: String, result: MethodChannel.Result) {
         val uri = Uri.parse(value)
-        require(uri.scheme in listOf("file", "https", "http"))
+        require(uri.scheme in listOf("file", "content", "https", "http"))
         release()
         val current = MediaPlayer()
         player = current

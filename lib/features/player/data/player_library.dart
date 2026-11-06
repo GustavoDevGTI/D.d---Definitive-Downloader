@@ -9,6 +9,9 @@ import '../../workspace/domain/workspace_models.dart';
 import '../domain/playback.dart';
 import 'audio_tags.dart';
 import '../../importing/soundcloud_link.dart';
+import '../../../core/platform/desktop_files.dart';
+import '../../../core/platform/platform_services.dart';
+import '../../../core/platform/android_documents.dart';
 
 String publicReference(String raw) {
   final uri = Uri.tryParse(raw);
@@ -53,7 +56,9 @@ String publicReference(String raw) {
 }
 
 class PlayerLibrary {
-  const PlayerLibrary(this.database, {this.http = const BoundedHttp()});
+  const PlayerLibrary(this.database,
+      {this.http = const BoundedHttp(), this.files});
+  final DesktopFiles? files;
   final AppDatabase database;
   final BoundedHttp http;
   String referenceFor(Track t) => t.sourceKind == SourceKind.preview
@@ -85,12 +90,29 @@ class PlayerLibrary {
         }
         return rows.map((r) => local(LibraryRepository.readTrack(r))).toList();
       });
-  Future<bool> available(AudioItem item) async =>
-      item.kind != PlaybackKind.local ||
-      await File.fromUri(Uri.parse(item.uri)).exists();
+  Future<bool> available(AudioItem item) async {
+    if (item.kind != PlaybackKind.local) return true;
+    try {
+      return await (files ?? createPlatformFiles())
+          .fileExists(File.fromUri(Uri.parse(item.uri)).path);
+    } on Exception {
+      return false;
+    }
+  }
+
   Future<AudioTags> tags(AudioItem item) async {
     if (item.kind != PlaybackKind.local) return const AudioTags();
     final path = File.fromUri(Uri.parse(item.uri)).path;
+    if (Platform.isAndroid) {
+      final tags = await AndroidDocuments().tags(path);
+      if (tags != null) {
+        return AudioTags(
+            title: tags['title'] as String? ?? '',
+            artist: tags['artist'] as String? ?? '',
+            album: tags['album'] as String? ?? '',
+            cover: tags['cover']);
+      }
+    }
     return Isolate.run(() => readAudioTags(path));
   }
 

@@ -31,7 +31,9 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FolderBreadcrumb(
-                  folder: c.folder, onOpen: (v) => unawaited(c.openFolder(v))),
+                  folder: c.folder,
+                  displayPath: c.library.files.displayPath,
+                  onOpen: (v) => unawaited(c.openFolder(v))),
               const SizedBox(height: 10),
               TextField(
                   controller: _query,
@@ -60,7 +62,8 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                             if (index < c.history.folders.length) {
                               final folder = c.history.folders[index];
                               return Tooltip(
-                                  message: folder.path,
+                                  message:
+                                      c.library.files.displayPath(folder.path),
                                   child: WorkspaceNavigationButton(
                                       key: ValueKey(
                                           'history-folder-${folder.path}'),
@@ -134,9 +137,13 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
 
 class FolderBreadcrumb extends StatelessWidget {
   const FolderBreadcrumb(
-      {super.key, required this.folder, required this.onOpen});
+      {super.key,
+      required this.folder,
+      required this.onOpen,
+      this.displayPath});
   final String folder;
   final ValueChanged<String> onOpen;
+  final String Function(String)? displayPath;
   @override
   Widget build(BuildContext context) =>
       Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -149,12 +156,18 @@ class FolderBreadcrumb extends StatelessWidget {
                     fontSize: 12, decoration: TextDecoration.underline))),
         if (folder.isNotEmpty) ...[
           const Icon(Icons.chevron_right, size: 16),
-          for (var index = 0; index < p.split(folder).length; index++)
+          if (displayPath != null && displayPath!(folder) != folder)
             TextButton(
-                onPressed: () =>
-                    onOpen(p.joinAll(p.split(folder).take(index + 1))),
-                child: Text(p.split(folder)[index],
+                onPressed: () => onOpen(folder),
+                child: Text(displayPath!(folder),
                     style: const TextStyle(fontSize: 11)))
+          else
+            for (var index = 0; index < p.split(folder).length; index++)
+              TextButton(
+                  onPressed: () =>
+                      onOpen(p.joinAll(p.split(folder).take(index + 1))),
+                  child: Text(p.split(folder)[index],
+                      style: const TextStyle(fontSize: 11)))
         ],
       ]);
 }

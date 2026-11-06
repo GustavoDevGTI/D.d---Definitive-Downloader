@@ -5,8 +5,45 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app_identity.dart';
 import '../storage/legacy_library_migration.dart';
+import 'media_publication.dart';
+import '../../features/downloads/download_cancellation.dart';
 
 class DesktopFiles {
+  Future<void> initializeMedia() async {}
+  String displayPath(String path) => path;
+  bool publicDestination(String path) => false;
+  Future<void> revokeDestination(String path) async {}
+  Future<String> transferDirectory(
+          String directory, int trackId, int collectionId, String key) async =>
+      directory;
+  Future<String?> reusableTransfer(
+          String directory, int trackId, String key) async =>
+      null;
+  Future<String> publishMedia(String path, String directory, int trackId,
+          int collectionId, String key,
+          {DownloadCancellation? cancellation, String? fileName}) async =>
+      path;
+  Future<bool> isManagedMedia(String path) async => false;
+  Future<void> acknowledgeMedia(String path) async {}
+  Future<String> publishImported(
+          String path, String directory, int collectionId) async =>
+      path;
+  Future<void> bindImported(
+      String path, int trackId, int collectionId, String key) async {}
+  Future<void> rollbackImported(String path) async {}
+  Future<void> publishPlaylist(String path) async {}
+  Future<List<PendingMediaPublication>> pendingMedia() async => const [];
+  Future<void> stagePublicRemoval(
+      String operation, int trackId, String path) async {}
+  Future<void> finishPublicRemoval(
+      String operation, String path, bool retained) async {}
+  Future<void> cancelPublicRemovals(String operation) async {}
+  Future<List<PendingPublicRemoval>> pendingPublicRemovals() async => const [];
+  Future<int?> fileSize(String path) async {
+    final stat = await FileStat.stat(path);
+    return stat.type == FileSystemEntityType.file ? stat.size : null;
+  }
+
   Future<String> dataDirectory() async =>
       (await getApplicationSupportDirectory()).path;
   Future<String> databasePath() async {

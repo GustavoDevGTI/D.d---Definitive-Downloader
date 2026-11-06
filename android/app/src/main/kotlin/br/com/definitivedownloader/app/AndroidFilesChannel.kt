@@ -3,10 +3,6 @@ package br.com.definitivedownloader.app
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.net.Uri
-import android.provider.OpenableColumns
-import android.webkit.MimeTypeMap
-import androidx.core.content.FileProvider
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -14,8 +10,9 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 /** Storage stays app-owned; document URIs are never mistaken for filesystem paths. */
-class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMessenger) {
+class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMessenger, private val documents: ManagedDocumentsChannel) {
     private val folders = AndroidMediaFolders(activity)
+    private val destinationPicker = ManagedDocumentsPicker(activity, documents)
     private val channel = MethodChannel(messenger, "br.com.definitivedownloader/files")
     private val requestCode = 4910
     private val executor = Executors.newSingleThreadExecutor()
@@ -31,15 +28,9 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
                     "defaultOutput" -> result.success(outputDirectory().path)
                     "chooseOutput" -> chooseOutput(result)
                     "pickFiles" -> pick(call.argument<String>("kind") ?: "", result)
-                    "openFolder" -> folders.open(requireNotNull(call.argument<String>("path")), result)
+                    "openFolder" -> documents.openFolder(activity, requireNotNull(call.argument<String>("path")), result) { path -> folders.open(path, result) }
                     "openFile" -> {
-                        val file = File(requireNotNull(call.argument<String>("path")))
-                        require(file.isFile) { "Arquivo indisponível." }
-                        val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.files", file)
-                        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
-                        activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime ?: "application/octet-stream")
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                        result.success(null)
+                        documents.openFile(activity, requireNotNull(call.argument<String>("path")), result)
                     }
                     else -> result.notImplemented()
                 }
@@ -54,9 +45,10 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
 
     private fun chooseOutput(result: MethodChannel.Result) {
         val roots = listOf(activity.filesDir) + activity.getExternalFilesDirs(null).filterNotNull()
-        val labels = roots.mapIndexed { index, _ -> if (index == 0) "Armazenamento interno do app" else "Mídias do app — volume $index" }
+        val labels = roots.mapIndexed { index, _ -> if (index == 0) "Armazenamento interno do app" else "Mídias do app — volume $index" } + "Pasta pública ou cartão SD"
         AlertDialog.Builder(activity).setTitle("Pasta de mídia do app")
             .setItems(labels.toTypedArray()) { _, which ->
+                if (which == roots.size) { destinationPicker.choose(result); return@setItems }
                 val directory = File(roots[which], "Definitive Downloader")
                 if (directory.isDirectory || directory.mkdirs()) result.success(directory.path)
                 else result.error("storage", "Pasta indisponível.", null)
@@ -77,6 +69,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     }
 
     fun onActivityResult(request: Int, code: Int, data: Intent?): Boolean {
+        if (destinationPicker.onResult(request, code, data)) return true
         if (folders.onActivityResult(request, code, data)) return true
         if (request != requestCode) return false
         val result = pending ?: return true
@@ -103,6 +96,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     fun dispose() {
         disposed = true
         folders.dispose()
+        destinationPicker.dispose()
         pending?.error("cancelled", "Seleção interrompida.", null); pending = null
         executor.shutdownNow()
         channel.setMethodCallHandler(null)

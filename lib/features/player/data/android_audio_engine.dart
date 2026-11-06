@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../domain/playback.dart';
+import '../../../core/platform/android_documents.dart';
 
 /// Android owns MediaPlayer in the process runtime, independent of the Activity.
 /// Foreground work keeps the engine alive; no libmpv/FFI teardown is involved.
@@ -37,7 +38,8 @@ class AndroidAudioEngine implements AudioEngine {
   }
 
   @override
-  Future<void> open(String uri) => _call('open', {'uri': uri});
+  Future<void> open(String uri) async =>
+      _call('open', {'uri': await AndroidDocuments().playback(uri)});
   @override
   Future<void> play() => _call('play');
   @override

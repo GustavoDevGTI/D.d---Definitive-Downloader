@@ -5,6 +5,7 @@ import '../../../core/app_identity.dart';
 import 'package:flutter/foundation.dart';
 import '../../library/application/library_controller.dart';
 import 'workspace_components.dart';
+import '../../../app/app_notice.dart';
 
 class SettingsWorkspace extends StatelessWidget {
   const SettingsWorkspace(
@@ -69,7 +70,9 @@ class SettingsWorkspace extends StatelessWidget {
                   _row('Contas conectadas', onConnections),
                   _row(
                       'Notificações',
-                      () => _info(context, 'Notificações',
+                      () => _info(
+                          context,
+                          'Notificações',
                           defaultTargetPlatform == TargetPlatform.android
                               ? 'Downloads e reprodução usam notificações com controles durante o trabalho ativo. A permissão pode ser alterada nas configurações do Android.'
                               : 'O progresso aparece no aplicativo. Notificações do sistema ainda não estão disponíveis.')),
@@ -120,7 +123,8 @@ class SettingsWorkspace extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                        SelectableText(controller.outputDirectory),
+                        SelectableText(controller.files
+                            .displayPath(controller.outputDirectory)),
                         const SizedBox(height: 14),
                         const Text(
                             'Novos downloads usarão esta pasta. Arquivos existentes permanecem no local atual.',
@@ -129,10 +133,47 @@ class SettingsWorkspace extends StatelessWidget {
                           const Padding(
                               padding: EdgeInsets.only(top: 12),
                               child: Text(
-                                  'No Android, esta pasta pertence ao app e é removida ao desinstalar. Em Pasta principal, use Exportar cópia para guardar MP3 e M3U8 numa pasta pública ou cartão SD.',
+                                  'Pastas públicas mantêm suas mídias após desinstalar. Pastas pertencentes ao app são removidas. Arquivos existentes conservam o destino anterior.',
                                   style: TextStyle(fontSize: 12, height: 1.6)))
                       ]))),
               actions: [
+                if (controller.files
+                    .publicDestination(controller.outputDirectory))
+                  TextButton(
+                      onPressed: controller.busy
+                          ? null
+                          : () async {
+                              final revoke = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                          title: const Text(
+                                              'Revogar acesso à pasta?'),
+                                          content: const Text(
+                                              'Os arquivos públicos serão preservados. Para tocar ou salvar nessa pasta novamente, selecione-a de novo.'),
+                                          actions: [
+                                            TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                    context, false),
+                                                child: const Text('Cancelar')),
+                                            FilledButton(
+                                                onPressed: () => Navigator.pop(
+                                                    context, true),
+                                                child: const Text(
+                                                    'Revogar acesso'))
+                                          ]));
+                              if (revoke != true || !context.mounted) return;
+                              try {
+                                await controller.files.revokeDestination(
+                                    controller.outputDirectory);
+                              } catch (_) {
+                                if (context.mounted) {
+                                  await showAppNotice(context,
+                                      message:
+                                          'Não foi possível revogar o acesso. Confira as permissões nas configurações do Android.');
+                                }
+                              }
+                            },
+                      child: const Text('Revogar acesso')),
                 TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Fechar')),

@@ -353,6 +353,15 @@ class LibraryRepository {
       manualMode: ManualSourceMode.values.byName(r['manual_mode'] as String),
       resolvedCoverUrl: (r['resolved_cover_url'] as String?) ?? '');
 
+  Future<Track?> trackAtPath(String path) => database.run((db) {
+        final rows = db.select(
+            'SELECT * FROM tracks WHERE local_path=? ORDER BY id LIMIT 1',
+            [path]);
+        return rows.isEmpty ? null : readTrack(rows.single);
+      });
+  Future<bool> hasMediaHistory(String path) => database.run((db) => db.select(
+      'SELECT id FROM download_history WHERE local_path=? LIMIT 1',
+      [path]).isNotEmpty);
   Future<Track?> trackById(int id) => database.run((db) {
         final rows = db.select('SELECT * FROM tracks WHERE id=?', [id]);
         return rows.isEmpty ? null : readTrack(rows.first);

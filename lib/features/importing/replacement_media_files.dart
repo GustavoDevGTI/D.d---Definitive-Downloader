@@ -5,12 +5,16 @@ import '../downloads/download_file_name.dart';
 import '../downloads/playlist_exporter.dart';
 import '../library/data/library_repository.dart';
 import '../library/domain/models.dart';
+import '../../core/platform/desktop_files.dart';
+import '../../core/platform/platform_services.dart';
 
 /// Reversible removal with a relational crash journal; never touches originals
 /// imported from outside the collection or files shared by another occurrence.
 class ReplacementMediaFiles {
-  const ReplacementMediaFiles(this.repository);
+  ReplacementMediaFiles(this.repository, {DesktopFiles? files})
+      : files = files ?? createPlatformFiles();
   final LibraryRepository repository;
+  final DesktopFiles files;
 
   Future<String> stage(
       Collection owner, List<Track> tracks, DownloadCancellation token) async {
@@ -42,12 +46,16 @@ class ReplacementMediaFiles {
           throw const FormatException(
               'O arquivo antigo não é exclusivo desta playlist. Nada foi excluído.');
         }
+        await files.stagePublicRemoval(operation, t.id, t.localPath);
         final type = await FileSystemEntity.type(file.path, followLinks: false);
-        if (type == FileSystemEntityType.notFound) continue;
-        if (type != FileSystemEntityType.file ||
-            await file.resolveSymbolicLinks() !=
-                p.join(await file.parent.resolveSymbolicLinks(),
-                    p.basename(file.path))) {
+        final publicOnly = type == FileSystemEntityType.notFound &&
+            await files.isManagedMedia(file.path);
+        if (type == FileSystemEntityType.notFound && !publicOnly) continue;
+        if (!publicOnly &&
+            (type != FileSystemEntityType.file ||
+                await file.resolveSymbolicLinks() !=
+                    p.join(await file.parent.resolveSymbolicLinks(),
+                        p.basename(file.path)))) {
           throw const FormatException(
               'O arquivo antigo não é uma mídia local regular.');
         }
@@ -57,11 +65,12 @@ class ReplacementMediaFiles {
         await repository.database.run((db) => db.execute(
             'INSERT INTO music_replacement_files VALUES(?,?,?,?,?,?)',
             [operation, t.id, file.path, staged, canonicalFolder, owner.id]));
-        await file.rename(staged);
+        if (!publicOnly) await file.rename(staged);
       }
       return operation;
     } catch (_) {
       final warning = await recover(operation: operation);
+      await files.cancelPublicRemovals(operation);
       if (warning != null) throw FormatException(warning);
       rethrow;
     }
@@ -108,6 +117,8 @@ class ReplacementMediaFiles {
         final retained = await repository.database.run((db) => db.select(
             'SELECT id FROM tracks WHERE id=? AND local_path=?',
             [r['track_id'], original.path]).isNotEmpty);
+        await files.finishPublicRemoval(
+            r['operation'] as String, original.path, retained);
         if (await staged.exists()) {
           if (retained) {
             if (await original.exists()) {
@@ -137,7 +148,8 @@ class ReplacementMediaFiles {
         try {
           if (await repository.collectionById(item.$1) != null &&
               await Directory(item.$2).exists()) {
-            await PlaylistExporter(repository).export(item.$1, item.$2);
+            await PlaylistExporter(repository, files: files)
+                .export(item.$1, item.$2);
           }
         } catch (_) {
           exportFailed = true;

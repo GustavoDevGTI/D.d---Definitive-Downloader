@@ -1,4 +1,5 @@
 import 'package:definitive_downloader/core/platform/android_files.dart';
+import 'package:definitive_downloader/core/platform/android_documents.dart';
 import 'package:definitive_downloader/core/platform/platform_services.dart';
 import 'package:definitive_downloader/features/player/data/android_audio_engine.dart';
 import 'package:definitive_downloader/features/player/domain/playback.dart';
@@ -10,6 +11,11 @@ void main() {
   final calls = <MethodCall>[];
   setUp(() {
     calls.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(AndroidDocuments.channel, (call) async => switch (call.method) {
+      'destinations' => [],
+      'playback' => (call.arguments as Map)['uri'],
+      _ => null,
+    });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(AndroidFiles.channel, (call) async {
       calls.add(call);
@@ -21,9 +27,11 @@ void main() {
       };
     });
   });
-  tearDown(() => TestDefaultBinaryMessengerBinding
-      .instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(AndroidFiles.channel, null));
+  tearDown(() {
+    final binding = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    binding.setMockMethodCallHandler(AndroidFiles.channel, null);
+    binding.setMockMethodCallHandler(AndroidDocuments.channel, null);
+  });
 
   test('seletor Android entrega cópias por caminho e conserva cancelamento',
       () async {

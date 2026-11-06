@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import '../platform/media_publication.dart';
 
 String operationMessage(Object error) {
+  if (error is MediaPublicationFailure) return error.message;
   if (error is HandshakeException) {
     return 'Não foi possível validar o certificado da conexão. Verifique a rede e os certificados do sistema; você também pode importar um CSV.';
   }

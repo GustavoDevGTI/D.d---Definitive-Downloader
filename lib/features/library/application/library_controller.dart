@@ -22,6 +22,7 @@ import '../data/redownload_repository.dart';
 import 'download_selection_check.dart';
 import 'download_queue_run.dart';
 import 'library_music_sources.dart';
+import 'media_publication_recovery.dart';
 import 'continuous_track_listing.dart';
 import '../data/continuous_track_repository.dart';
 import '../../../core/application/operation_message.dart';
@@ -104,10 +105,11 @@ class LibraryController extends ChangeNotifier {
             beforeRemoval: beforeRemoval);
       });
 
-  Future<bool> addLocalFiles(int collectionId, List<String> paths) => _addition(
-      (token) => LocalMediaImporter(repository, inspector: localInspector).add(
-          collectionId, paths, outputDirectory,
-          cancellation: token, onProgress: _additionProgress));
+  Future<bool> addLocalFiles(int collectionId, List<String> paths) =>
+      _addition((token) => LocalMediaImporter(repository,
+              inspector: localInspector, files: files)
+          .add(collectionId, paths, outputDirectory,
+              cancellation: token, onProgress: _additionProgress));
   Future<void> chooseLocalFiles() async {
     final id = current?.id;
     if (id == null || reorderingBusy) return;
@@ -326,8 +328,13 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> initialize({bool example = false}) async {
     await repository.database.initialize();
-    final recovery = await ReplacementMediaFiles(repository).recover();
+    await files.initializeMedia();
+    final recovery =
+        await ReplacementMediaFiles(repository, files: files).recover();
     if (recovery != null) message = recovery;
+    final publications =
+        await MediaPublicationRecovery(repository, files).recover();
+    if (publications != null) message = publications;
     outputDirectory = await repository.preference('output_directory') ??
         await files.defaultOutputDirectory();
     collections = await repository.collections(offset: collectionOffset);
@@ -743,12 +750,16 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> chooseOutput() async {
     if (busy) return;
-    final path = await files.chooseOutput();
-    if (path != null) {
-      outputDirectory = path;
-      await repository.setPreference('output_directory', path);
-      notifyListeners();
+    try {
+      final path = await files.chooseOutput();
+      if (path != null) {
+        await repository.setPreference('output_directory', path);
+        outputDirectory = path;
+      }
+    } catch (error) {
+      message = operationMessage(error);
     }
+    notifyListeners();
   }
 
   Future<void> openOutput() async {
@@ -841,17 +852,19 @@ class LibraryController extends ChangeNotifier {
     _cancellation = token;
     notifyListeners();
     try {
-      message = await DownloadQueueRun(repository, downloader, music).execute(
-          outputDirectory: outputDirectory,
-          collectionId: collection?.id,
-          queueIds: queueIds,
-          failedOnly: failedOnly,
-          token: token,
-          recordsChanged: refresh,
-          pendingAddition: () => _additionDone?.future,
-          pendingMutation: () =>
-              _holdQueueForReview ? _additionDone?.future : null,
-          onEvent: _downloadEvent);
+      message = await DownloadQueueRun(repository, downloader, music,
+              files: files, inspector: localInspector)
+          .execute(
+              outputDirectory: outputDirectory,
+              collectionId: collection?.id,
+              queueIds: queueIds,
+              failedOnly: failedOnly,
+              token: token,
+              recordsChanged: refresh,
+              pendingAddition: () => _additionDone?.future,
+              pendingMutation: () =>
+                  _holdQueueForReview ? _additionDone?.future : null,
+              onEvent: _downloadEvent);
     } catch (error) {
       message = operationMessage(error);
     } finally {

@@ -150,7 +150,8 @@ class _TrackInspectorState extends State<TrackInspector> {
                                   TrackStatus.failed => 'Erro',
                                 }),
                             if (t.localPath.isNotEmpty)
-                              _line('Último arquivo', t.localPath),
+                              _line('Último arquivo',
+                                  c.files.displayPath(t.localPath)),
                             if (t.hasManualSource)
                               _line('Link manual', t.manualUrl),
                           ] else ...[

@@ -33,7 +33,8 @@ class MainActivity : FlutterActivity() {
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        files = AndroidFilesChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+        files = AndroidFilesChannel(this, flutterEngine.dartExecutor.binaryMessenger,
+            (application as DdApplication).runtime.documents)
         (application as DdApplication).runtime.start(dartEntrypointArgs)
     }
 

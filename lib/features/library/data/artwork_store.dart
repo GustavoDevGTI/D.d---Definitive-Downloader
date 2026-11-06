@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/network/bounded_http.dart';
 import '../../player/data/audio_tags.dart';
+import '../../../core/platform/android_documents.dart';
 
 /// Bounded image reads/cache shared by thumbnails and inspectors. No widget IO.
 class ArtworkStore {
@@ -96,8 +97,13 @@ class ArtworkStore {
     }
   }
 
-  static Future<Uint8List?> _embeddedCover(String path) =>
-      Isolate.run(() async => (await readAudioTags(path)).cover);
+  static Future<Uint8List?> _embeddedCover(String path) async {
+    if (Platform.isAndroid) {
+      final tags = await AndroidDocuments().tags(path);
+      if (tags != null) return tags['cover'] as Uint8List?;
+    }
+    return Isolate.run(() async => (await readAudioTags(path)).cover);
+  }
 
   Future<String> importCover(String source, String supportDirectory) async {
     final file = File(source);

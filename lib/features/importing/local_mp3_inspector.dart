@@ -25,7 +25,7 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
   const MediaKitLocalAudioInspector();
   @override
   Future<LocalAudioMetadata> inspect(String path) async {
-    await validateMp3Frames(path);
+    await validateMp3Frames(path, maximumBytes: 500 * 1024 * 1024);
     final tags = await _tags(path);
     if (Platform.isAndroid) {
       final metadata = await AndroidAudioEngine.channel
@@ -90,14 +90,16 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       Isolate.run(() => readAudioTags(path));
 }
 
-Future<void> validateMp3Frames(String path) =>
-    Isolate.run(() => _validate(path));
-void _validate(String path) {
+Future<void> validateMp3Frames(String path,
+        {int maximumBytes = 200 * 1024 * 1024}) =>
+    Isolate.run(() => _validate(path, maximumBytes));
+void _validate(String path, int maximumBytes) {
   final file = File(path).openSync();
   try {
     var end = file.lengthSync();
-    if (end < 64 || end > 200 * 1024 * 1024) {
-      throw const FormatException('Use MP3 de até 200 MB.');
+    if (end < 64 || end > maximumBytes) {
+      throw FormatException(
+          'Use MP3 de até ${maximumBytes ~/ (1024 * 1024)} MB.');
     }
     var offset = 0;
     final first = file.readSync(10);

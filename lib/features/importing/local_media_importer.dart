@@ -6,12 +6,16 @@ import '../downloads/playlist_exporter.dart';
 import '../library/data/library_repository.dart';
 import 'local_media_repository.dart';
 import 'local_mp3_inspector.dart';
+import '../../core/platform/desktop_files.dart';
+import '../../core/platform/platform_services.dart';
+import '../../core/platform/media_publication.dart';
 
 class LocalMediaImporter {
   const LocalMediaImporter(this.repository,
-      {this.inspector = const MediaKitLocalAudioInspector()});
+      {this.inspector = const MediaKitLocalAudioInspector(), this.files});
   final LibraryRepository repository;
   final LocalAudioInspector inspector;
+  final DesktopFiles? files;
 
   Future<String> add(
       int collectionId, List<String> paths, String outputDirectory,
@@ -54,6 +58,7 @@ class LocalMediaImporter {
     }
     final work = await Directory(folderPath).createTemp('.dd-local-');
     final published = <File>[];
+    final destinationFiles = files ?? createPlatformFiles();
     var committed = false;
     try {
       final metadata = <LocalAudioMetadata>[];
@@ -116,13 +121,25 @@ class LocalMediaImporter {
         await destination.create(exclusive: true);
         published.add(destination);
         await File(p.join(work.path, '$i.mp3')).rename(destination.path);
+        destination = File(await destinationFiles.publishImported(
+            destination.path, folderPath, collectionId));
+        published[published.length - 1] = destination;
         copies.add(LocalMediaCopy(destination.path, originals[i], m));
       }
       cancellation.check();
       await storage.commit(collectionId, target.last, copies);
       committed = true;
+      for (final copy in copies) {
+        if (!await destinationFiles.isManagedMedia(copy.path)) continue;
+        final track = await repository.trackAtPath(copy.path);
+        if (track != null) {
+          await destinationFiles.bindImported(
+              copy.path, track.id, collectionId, mediaPublicationKey(track));
+        }
+      }
       try {
-        await PlaylistExporter(repository).export(collectionId, folderPath);
+        await PlaylistExporter(repository, files: destinationFiles)
+            .export(collectionId, folderPath);
       } catch (_) {
         return '${copies.length} MP3(s) adicionado(s). Não foi possível atualizar a M3U8.';
       }
@@ -131,8 +148,9 @@ class LocalMediaImporter {
       if (!committed) {
         for (final file in published) {
           try {
+            await destinationFiles.rollbackImported(file.path);
             if (await file.exists()) await file.delete();
-          } on FileSystemException {
+          } catch (_) {
             /* Preserve the original error/cancellation. */
           }
         }
