@@ -64,7 +64,7 @@ void main() {
               sourceUrl: r['source_url'] as String,
               explicit: r['explicit'] == null ? null : r['explicit'] == 1)))));
     }
-    final engine = WindowsMusicEngine(worker!);
+    final engine = await WindowsMusicEngine.load(worker!);
     final connection = DeezerConnectionController(NoSession(), engine);
     final controller = LibraryController(
         repository: repository,

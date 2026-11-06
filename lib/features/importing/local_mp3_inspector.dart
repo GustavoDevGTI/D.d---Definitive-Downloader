@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'package:media_kit/media_kit.dart' as mk;
 import '../player/data/audio_tags.dart';
 import '../player/domain/playback.dart';
+import '../player/data/android_audio_engine.dart';
 
 class LocalAudioMetadata {
   const LocalAudioMetadata(
@@ -26,6 +27,22 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
   Future<LocalAudioMetadata> inspect(String path) async {
     await validateMp3Frames(path);
     final tags = await _tags(path);
+    if (Platform.isAndroid) {
+      final metadata = await AndroidAudioEngine.channel
+          .invokeMapMethod<String, dynamic>('inspect', {'path': path});
+      final duration = metadata?['durationMs'] as int? ?? 0;
+      if (duration < 1 ||
+          duration > const Duration(hours: 24).inMilliseconds ||
+          !['audio/mpeg', 'audio/mp3'].contains(metadata?['mime'])) {
+        throw const FormatException(
+            'O arquivo não contém áudio MP3 utilizável.');
+      }
+      return LocalAudioMetadata(
+          durationMs: duration,
+          title: tags.title,
+          artist: tags.artist,
+          album: tags.album);
+    }
     mk.MediaKit.ensureInitialized();
     final player = mk.Player(
         configuration: const mk.PlayerConfiguration(

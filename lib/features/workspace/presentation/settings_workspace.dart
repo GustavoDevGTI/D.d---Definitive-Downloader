@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../core/app_identity.dart';
+import 'package:flutter/foundation.dart';
 import '../../library/application/library_controller.dart';
 import 'workspace_components.dart';
 
@@ -78,6 +80,10 @@ class SettingsWorkspace extends StatelessWidget {
                       () => _info(context, 'Dados locais e histórico',
                           'Coleções, fontes e histórico ficam neste dispositivo. Atualizar a interface preserva os dados e os arquivos existentes.')),
                 ])),
+        const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Text('${AppIdentity.name} · ${AppIdentity.version} · local',
+                style: TextStyle(fontSize: 11, color: AppColors.muted))),
       ]);
   Widget _row(String label, VoidCallback? onTap) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -116,7 +122,13 @@ class SettingsWorkspace extends StatelessWidget {
                         const SizedBox(height: 14),
                         const Text(
                             'Novos downloads usarão esta pasta. Arquivos existentes permanecem no local atual.',
-                            style: TextStyle(fontSize: 12, height: 1.6))
+                            style: TextStyle(fontSize: 12, height: 1.6)),
+                        if (defaultTargetPlatform == TargetPlatform.android)
+                          const Padding(
+                              padding: EdgeInsets.only(top: 12),
+                              child: Text(
+                                  'No Android, esta pasta pertence ao app. Desinstalar o app remove suas mídias. A exportação para pastas compartilhadas ainda está em adaptação.',
+                                  style: TextStyle(fontSize: 12, height: 1.6)))
                       ]))),
               actions: [
                 TextButton(

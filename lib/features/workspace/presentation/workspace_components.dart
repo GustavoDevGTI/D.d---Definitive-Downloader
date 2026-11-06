@@ -16,7 +16,12 @@ class CategoryTabs extends StatelessWidget {
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.sizeOf(context).height < 500
+                    ? 0
+                    : MediaQuery.sizeOf(context).shortestSide < 600
+                        ? 8
+                        : 16),
             child: Align(
                 alignment: Alignment.centerLeft,
                 child: Wrap(spacing: 6, runSpacing: 6, children: [
@@ -45,7 +50,12 @@ class CategoryTabs extends StatelessWidget {
                                     : FontWeight.w400))),
                 ]))),
         const Divider(height: 1),
-        SizedBox(height: bottomSpacing)
+        SizedBox(
+            height: MediaQuery.sizeOf(context).height < 500
+                ? bottomSpacing.clamp(0, 4)
+                : MediaQuery.sizeOf(context).shortestSide < 600
+                    ? bottomSpacing.clamp(0, 8)
+                    : bottomSpacing)
       ]);
 }
 

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:media_kit/media_kit.dart' as mk;
 import '../domain/playback.dart';
+import 'android_audio_engine.dart';
 
 class MediaKitEngine implements AudioEngine {
   @override
@@ -80,6 +82,7 @@ class MediaKitEngine implements AudioEngine {
 }
 
 AudioEngine createAudioEngine() {
+  if (Platform.isAndroid) return AndroidAudioEngine();
   try {
     return MediaKitEngine();
   } catch (_) {

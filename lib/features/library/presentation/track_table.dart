@@ -57,7 +57,12 @@ class _TrackTableState extends State<TrackTable> {
           child: LayoutBuilder(builder: (context, box) {
             final compact = box.maxWidth < 500;
             final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-            final extent = (compact ? 84.0 : 76.0) * scale.clamp(1, 2);
+            final extent = (MediaQuery.sizeOf(context).height < 500
+                    ? 64.0
+                    : compact
+                        ? 84.0
+                        : 76.0) *
+                scale.clamp(1, 2);
             final listingKey = (
               controller.current?.id,
               controller.collectionQuery,

@@ -7,7 +7,7 @@ void main() {
   final executable = Platform.environment['DD_SMOKE_WORKER'];
   test('packaged worker returns health and a sanitized account rejection',
       () async {
-    final engine = WindowsMusicEngine(executable!);
+    final engine = await WindowsMusicEngine.load(executable!);
     expect((await engine.call({'operation': 'health'}))['ready'], true);
     await expectLater(
         engine.call({'operation': 'deezerConnect', 'arl': 'a' * 192}),

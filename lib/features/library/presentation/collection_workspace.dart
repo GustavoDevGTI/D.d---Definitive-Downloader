@@ -17,7 +17,10 @@ class CollectionWorkspace extends StatefulWidget {
       required this.controller,
       required this.onConnections,
       required this.onDownloads,
+      this.active = true,
+      this.keyboardOpen = false,
       this.initialPlaylist = ''});
+  final bool active, keyboardOpen;
   final LibraryController controller;
   final VoidCallback? onConnections;
   final VoidCallback onDownloads;
@@ -66,29 +69,29 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     if (_detail && c.current != null) {
-      return LayoutBuilder(builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 880;
-        _wide = wide;
-        final panel =
-            Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Expanded(flex: 8, child: WorkspacePanel(child: _tracks(c, wide))),
-          if (wide) ...[
-            const SizedBox(width: 12),
-            Expanded(
-                flex: 5,
-                child: WorkspacePanel(child: TrackInspector(controller: c)))
-          ],
-        ]);
-        final drop = CollectionMp3DropTarget(
-            controller: c, collectionId: c.current!.id, child: panel);
-        if (constraints.maxHeight < 560 || constraints.maxWidth < 560) {
-          return ListView(
-              primary: false,
-              padding: EdgeInsets.zero,
-              children: [SizedBox(height: 660, child: drop)]);
-        }
-        return drop;
-      });
+      return PopScope(
+          canPop: !widget.active,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && widget.active) setState(() => _detail = false);
+          },
+          child: LayoutBuilder(builder: (context, constraints) {
+            final wide =
+                constraints.maxWidth >= 880 && constraints.maxHeight >= 360;
+            _wide = wide;
+            final panel =
+                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(flex: 8, child: WorkspacePanel(child: _tracks(c, wide))),
+              if (wide) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                    flex: 5,
+                    child: WorkspacePanel(child: TrackInspector(controller: c)))
+              ],
+            ]);
+            final drop = CollectionMp3DropTarget(
+                controller: c, collectionId: c.current!.id, child: panel);
+            return drop;
+          }));
     }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
       LinkEntryPanel(
@@ -141,24 +144,26 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
 
   Widget _tracks(LibraryController c, bool wide) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 8, 0),
-            child: Row(children: [
-              _back(),
-              Expanded(
-                  child: Text(c.current!.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        if (!widget.keyboardOpen)
+          Padding(
+              padding: EdgeInsets.fromLTRB(
+                  14, MediaQuery.sizeOf(context).height < 500 ? 0 : 10, 8, 0),
+              child: Row(children: [
+                _back(),
+                Expanded(
+                    child: Text(c.current!.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600))),
+                if (c.page.selectedCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                      '${c.page.selectedCount} ${c.page.selectedCount == 1 ? 'selecionada' : 'selecionadas'}',
                       style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600))),
-              if (c.page.selectedCount > 0) ...[
-                const SizedBox(width: 8),
-                Text(
-                    '${c.page.selectedCount} ${c.page.selectedCount == 1 ? 'selecionada' : 'selecionadas'}',
-                    style:
-                        const TextStyle(fontSize: 11, color: AppColors.muted)),
-              ],
-            ])),
+                          fontSize: 11, color: AppColors.muted)),
+                ],
+              ])),
         CollectionTrackToolbar(
             controller: c,
             query: _query,

@@ -15,7 +15,9 @@ class DownloadWorkspace extends StatefulWidget {
       {super.key,
       required this.controller,
       required this.category,
+      this.keyboardOpen = false,
       this.onCapture});
+  final bool keyboardOpen;
   final WorkspaceController controller;
   final ContentCategory category;
   final VoidCallback? onCapture;
@@ -24,6 +26,7 @@ class DownloadWorkspace extends StatefulWidget {
 }
 
 class _DownloadWorkspaceState extends State<DownloadWorkspace> {
+  final _searchKey = GlobalKey();
   late final _query =
       TextEditingController(text: widget.controller.downloadQuery);
   Timer? _searchTimer;
@@ -43,7 +46,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
           [controller, controller.library, controller.library.transferUpdates]),
       builder: (context, child) =>
           LayoutBuilder(builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 800;
+            final wide = constraints.maxWidth >= 800 ||
+                (constraints.maxHeight < 300 && constraints.maxWidth >= 700);
             final inlineFilters = constraints.maxWidth >= 1380;
             final c = controller, library = c.library;
             final enabled = category == ContentCategory.music;
@@ -63,7 +67,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                         [TrackStatus.ready, TrackStatus.failed]
                             .contains(e.track.status)));
             final canCancel = library.downloading && enabled;
-            final search = Row(children: [
+            final search = Row(key: _searchKey, children: [
               Expanded(
                   child: TextField(
                 key: ValueKey('download-search-${category.name}'),
@@ -180,7 +184,9 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
             final content = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (wide)
+                  if (widget.keyboardOpen)
+                    search
+                  else if (wide)
                     Row(children: [
                       toolbar,
                       if (inlineFilters) ...[
@@ -191,7 +197,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       Expanded(child: search)
                     ])
                   else ...[toolbar, const SizedBox(height: 8), search],
-                  if (!inlineFilters) ...[
+                  if (!widget.keyboardOpen && !inlineFilters) ...[
                     const SizedBox(height: 8),
                     filters,
                   ],

@@ -20,7 +20,8 @@ class PlayerBar extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: player,
       builder: (context, _) => LayoutBuilder(builder: (context, box) {
-            final compact = box.maxWidth < 780;
+            final compact =
+                box.maxWidth < 780 || MediaQuery.sizeOf(context).height < 500;
             final controls = PlayerTransport(player: player, compact: compact);
             return Material(
                 color: AppColors.navigation,

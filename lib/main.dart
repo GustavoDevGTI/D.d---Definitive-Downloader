@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'app/definitive_downloader_app.dart';
 import 'core/network/bounded_http.dart';
-import 'core/platform/desktop_files.dart';
+import 'core/platform/platform_services.dart';
 import 'core/platform/music_engine_diagnostic.dart';
 import 'core/platform/player_diagnostic.dart';
 import 'features/player/application/music_player_controller.dart';
@@ -31,16 +31,23 @@ import 'features/matching/music_resolver.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isAndroid) {
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark));
+  }
   if (arguments.contains('--check-player')) {
     exit(await diagnosePlayer(arguments));
   }
   if (arguments.contains('--check-music-engine')) {
     exit(await diagnoseMusicEngine(await WindowsMusicEngine.installed()));
   }
-  final files = DesktopFiles();
+  final files = createPlatformFiles();
   final database = AppDatabase(await files.databasePath());
   const http = BoundedHttp();
-  final engine = await WindowsMusicEngine.installed();
+  final engine = await createMusicEngine();
   final deezer = DeezerConnectionController(
       const SecureDeezerSessionStore(FlutterSecureStorage()), engine);
   final connections = SpotifyConnectionController(

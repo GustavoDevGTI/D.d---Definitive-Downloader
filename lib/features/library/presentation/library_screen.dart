@@ -143,10 +143,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   listenable: widget.controller,
                   builder: (context, child) =>
                       LayoutBuilder(builder: (context, constraints) {
-                        final mobile = constraints.maxWidth < 780;
+                        final short = constraints.maxHeight < 500;
+                        final mobile = constraints.maxWidth < 780 || short;
+                        final landscape =
+                            mobile && short && constraints.maxWidth >= 600;
+                        final typing =
+                            MediaQuery.viewInsetsOf(context).bottom > 0;
                         return Scaffold(
                             backgroundColor: AppColors.background,
-                            bottomNavigationBar: mobile
+                            bottomNavigationBar: mobile && !typing && !landscape
                                 ? MobileNavigation(
                                     selected: _section,
                                     onSelect: (value) => _navigate(value))
@@ -157,6 +162,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
+                                  if (landscape && !typing)
+                                    MobileLandscapeNavigation(
+                                        selected: _section,
+                                        onSelect: (value) => _navigate(value)),
                                   if (!mobile)
                                     LibrarySidebar(
                                         selected: _section,
@@ -167,22 +176,30 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                         child: Padding(
                                             padding: EdgeInsets.fromLTRB(
                                                 mobile ? 16 : 28,
-                                                mobile ? 18 : 26,
+                                                mobile
+                                                    ? (short || typing ? 8 : 18)
+                                                    : 26,
                                                 mobile ? 16 : 28,
                                                 12),
                                             child: Column(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.stretch,
                                                 children: [
-                                                  _heading(mobile),
-                                                  const SizedBox(height: 20),
+                                                  if (!(mobile &&
+                                                      (short || typing))) ...[
+                                                    _heading(mobile),
+                                                    SizedBox(
+                                                        height:
+                                                            mobile ? 12 : 20),
+                                                  ],
                                                   Expanded(child: _sections()),
                                                   LibraryOperationStatus(
                                                       controller:
                                                           widget.controller),
                                                 ]))),
                                     if (widget.player != null &&
-                                        _section == AppSection.music)
+                                        _section == AppSection.music &&
+                                        !typing)
                                       PlayerBar(player: widget.player!)
                                   ])),
                                 ])));
@@ -215,14 +232,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
             controller: _workspace,
             onNavigate: (section, tab) => _navigate(section, tab)),
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          CategoryTabs(
-              labels: const ['Coleções', 'Capturar áudio', 'Downloads'],
-              selected: _musicTab,
-              onSelect: (tab) => _navigate(AppSection.music, tab)),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0 ||
+              MediaQuery.sizeOf(context).height >= 500)
+            CategoryTabs(
+                labels: const ['Coleções', 'Capturar áudio', 'Downloads'],
+                selected: _musicTab,
+                onSelect: (tab) => _navigate(AppSection.music, tab)),
           Expanded(
               child: IndexedStack(index: _musicTab, children: [
             CollectionWorkspace(
                 controller: widget.controller,
+                active: _section == AppSection.music && _musicTab == 0,
+                keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                 initialPlaylist: widget.initialPlaylist,
                 onConnections:
                     widget.connections == null ? null : _showConnections,
@@ -230,20 +251,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
             const CaptureWorkspace(category: ContentCategory.music),
             DownloadWorkspace(
                 controller: _workspace,
+                keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                 category: ContentCategory.music,
                 onCapture: () => _navigate(AppSection.music, 1)),
           ])),
         ]),
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          CategoryTabs(
-              labels: const ['Capturar mídias', 'Downloads'],
-              selected: _mediaTab,
-              onSelect: (tab) => _navigate(AppSection.media, tab)),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0 ||
+              MediaQuery.sizeOf(context).height >= 500)
+            CategoryTabs(
+                labels: const ['Capturar mídias', 'Downloads'],
+                selected: _mediaTab,
+                onSelect: (tab) => _navigate(AppSection.media, tab)),
           Expanded(
               child: IndexedStack(index: _mediaTab, children: [
             const CaptureWorkspace(category: ContentCategory.media),
             DownloadWorkspace(
                 controller: _workspace,
+                keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                 category: ContentCategory.media,
                 onCapture: () => _navigate(AppSection.media, 0)),
           ])),

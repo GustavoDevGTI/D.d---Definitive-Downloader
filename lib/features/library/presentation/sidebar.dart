@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../app/brand.dart';
+import '../../../core/app_identity.dart';
 import '../../workspace/domain/workspace_models.dart';
 
 const appDestinations = <(AppSection, String, IconData)>[
@@ -63,7 +64,7 @@ class LibrarySidebar extends StatelessWidget {
         const Padding(
             key: ValueKey('sidebar-version'),
             padding: EdgeInsets.fromLTRB(24, 12, 16, 16),
-            child: Text('Versão 0.1.48 · local',
+            child: Text('Versão ${AppIdentity.version} · local',
                 style: TextStyle(
                     fontSize: 11, height: 1.8, color: Colors.white70))),
       ]));
@@ -86,14 +87,42 @@ class MobileNavigation extends StatelessWidget {
           unselectedFontSize: 10,
           onTap: (index) => onSelect(AppSection.values[index]),
           items: [
-            for (final (_, label, icon) in appDestinations)
+            for (final (section, label, icon) in appDestinations)
               BottomNavigationBarItem(
-                  icon: Icon(icon, size: 20),
+                  icon: Icon(icon,
+                      size: 20,
+                      key: ValueKey('mobile-destination-${section.name}')),
                   label: label == 'Vídeos e Fotos'
                       ? 'Mídias'
                       : label == 'Configurações'
                           ? 'Ajustes'
                           : label,
                   tooltip: label)
+          ]);
+}
+
+class MobileLandscapeNavigation extends StatelessWidget {
+  const MobileLandscapeNavigation(
+      {super.key, required this.selected, required this.onSelect});
+  final AppSection selected;
+  final ValueChanged<AppSection> onSelect;
+  @override
+  Widget build(BuildContext context) => NavigationRail(
+          minWidth: 64,
+          backgroundColor: Colors.white,
+          indicatorColor: AppColors.accentSoft,
+          selectedIconTheme: const IconThemeData(color: AppColors.accentActive),
+          unselectedIconTheme: const IconThemeData(color: AppColors.secondary),
+          labelType: NavigationRailLabelType.none,
+          selectedIndex: selected.index,
+          onDestinationSelected: (index) => onSelect(AppSection.values[index]),
+          destinations: [
+            for (final (section, label, icon) in appDestinations)
+              NavigationRailDestination(
+                  icon: Tooltip(
+                      message: label,
+                      child: Icon(icon,
+                          key: ValueKey('mobile-destination-${section.name}'))),
+                  label: Text(label))
           ]);
 }
