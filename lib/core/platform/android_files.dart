@@ -34,11 +34,8 @@ class AndroidFiles extends DesktopFiles {
   }
 
   @override
-  Future<void> openFolder(String path) async {
-    throw const FileSystemException(
-        'A navegação e exportação de pastas no Android ainda está em adaptação. '
-        'Os arquivos continuam disponíveis na biblioteca do app.');
-  }
+  Future<void> openFolder(String path) =>
+      channel.invokeMethod<void>('openFolder', {'path': path});
 
   @override
   Future<void> revealFile(String path) => openFolder(p.dirname(path));

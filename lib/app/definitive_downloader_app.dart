@@ -6,6 +6,8 @@ import '../features/library/presentation/library_screen.dart';
 import 'theme.dart';
 import '../features/player/application/music_player_controller.dart';
 import '../features/player/presentation/player_scope.dart';
+import '../core/platform/android_incoming.dart';
+import '../features/library/presentation/incoming_music_host.dart';
 
 class DefinitiveDownloaderApp extends StatelessWidget {
   const DefinitiveDownloaderApp(
@@ -13,11 +15,13 @@ class DefinitiveDownloaderApp extends StatelessWidget {
       required this.controller,
       this.player,
       this.connections,
+      this.incoming,
       this.initialPlaylist = '',
       this.showConnectionsOnStart = false});
   final LibraryController controller;
   final MusicPlayerController? player;
   final SpotifyConnectionController? connections;
+  final AndroidIncoming? incoming;
   final String initialPlaylist;
   final bool showConnectionsOnStart;
   @override
@@ -27,10 +31,14 @@ class DefinitiveDownloaderApp extends StatelessWidget {
       theme: appTheme(),
       builder: (context, child) =>
           PlayerScope(player: player, child: child ?? const SizedBox.shrink()),
-      home: LibraryScreen(
-          controller: controller,
-          player: player,
-          connections: connections,
-          initialPlaylist: initialPlaylist,
-          showConnectionsOnStart: showConnectionsOnStart));
+      home: incoming == null
+          ? _screen()
+          : IncomingMusicHost(
+              incoming: incoming!, library: controller, child: _screen()));
+  Widget _screen() => LibraryScreen(
+      controller: controller,
+      player: player,
+      connections: connections,
+      initialPlaylist: initialPlaylist,
+      showConnectionsOnStart: showConnectionsOnStart);
 }

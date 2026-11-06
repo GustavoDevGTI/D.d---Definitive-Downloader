@@ -15,14 +15,23 @@ Future<void> showAddMusicLinks(
         builder: (_) => AddMusicLinksDialog(controller: controller));
 
 class AddMusicLinksDialog extends StatefulWidget {
-  const AddMusicLinksDialog({super.key, required this.controller});
+  const AddMusicLinksDialog(
+      {super.key,
+      required this.controller,
+      this.initialText = '',
+      this.localFiles = const [],
+      this.received = false});
   final LibraryController controller;
+  final String initialText;
+  final List<String> localFiles;
+  final bool received;
   @override
   State<AddMusicLinksDialog> createState() => _AddMusicLinksDialogState();
 }
 
 class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
   final _links = TextEditingController();
+  final _name = TextEditingController();
   late List<Collection> _collections;
   int? _collectionId;
   int _offset = 0;
@@ -31,18 +40,22 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
   @override
   void initState() {
     super.initState();
+    _links.text = widget.initialText;
     final c = widget.controller;
     _offset = c.collectionOffset;
     _collections = [...c.collections];
     if (c.current != null && !_collections.any((e) => e.id == c.current!.id)) {
       _collections.insert(0, c.current!);
     }
-    _collectionId = c.current?.id ?? _collections.firstOrNull?.id;
+    _collectionId = c.current?.id ??
+        _collections.firstOrNull?.id ??
+        (widget.received ? -1 : null);
   }
 
   @override
   void dispose() {
     _links.dispose();
+    _name.dispose();
     super.dispose();
   }
 
@@ -77,11 +90,34 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
       _error = '';
     });
     final player = PlayerScope.of(context);
-    final saved = await widget.controller.addLinks(_collectionId!, _links.text,
-        chooseDuplicate: (conflict) async {
-      if (!mounted) return null;
-      return chooseDuplicateMusic(context, conflict);
-    }, beforeRemoval: player?.discardTracks);
+    var saved = false;
+    try {
+      if (_collectionId == -1) {
+        _collectionId = await widget.controller.createPlaylist(_name.text);
+        _collections = await widget.controller.collectionChoices(0);
+        final created =
+            await widget.controller.collectionChoice(_collectionId!);
+        if (created != null && !_collections.any((c) => c.id == created.id)) {
+          _collections.insert(0, created);
+        }
+      }
+      saved = widget.localFiles.isNotEmpty
+          ? await widget.controller
+              .addLocalFiles(_collectionId!, widget.localFiles)
+          : await widget.controller.addLinks(_collectionId!, _links.text,
+              chooseDuplicate: (conflict) async {
+              if (!mounted) return null;
+              return chooseDuplicateMusic(context, conflict);
+            }, beforeRemoval: player?.discardTracks);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error =
+            'Não foi possível criar a playlist. Confira o nome e tente novamente.';
+      });
+      return;
+    }
     if (!mounted) return;
     if (saved) {
       Navigator.pop(context);
@@ -98,7 +134,8 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
   Widget build(BuildContext context) => PopScope(
       canPop: !_saving,
       child: AlertDialog(
-        title: const Text('Adicionar links'),
+        title:
+            Text(widget.received ? 'Recebido de outro app' : 'Adicionar links'),
         content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
@@ -106,7 +143,7 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                  if (_collections.isEmpty)
+                  if (_collections.isEmpty && !widget.received)
                     const Text('Importe uma coleção primeiro.')
                   else
                     DropdownButtonFormField<int>(
@@ -115,6 +152,9 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Coleção'),
                         items: [
+                          if (widget.received)
+                            const DropdownMenuItem(
+                                value: -1, child: Text('Nova playlist')),
                           for (final c in _collections)
                             DropdownMenuItem(
                                 value: c.id,
@@ -125,6 +165,15 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                         onChanged: _saving || _loading
                             ? null
                             : (id) => setState(() => _collectionId = id)),
+                  if (_collectionId == -1) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                        controller: _name,
+                        enabled: !_saving,
+                        maxLength: 160,
+                        decoration: const InputDecoration(
+                            labelText: 'Nome da playlist')),
+                  ],
                   if (_offset > 0 || _collections.length >= 30)
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                       IconButton(
@@ -142,19 +191,23 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                           icon: const Icon(Icons.chevron_right)),
                     ]),
                   const SizedBox(height: 16),
-                  TextField(
-                      key: const ValueKey('extra-music-links'),
-                      controller: _links,
-                      enabled: !_saving,
-                      minLines: 4,
-                      maxLines: 8,
-                      maxLength: 32768,
-                      keyboardType: TextInputType.multiline,
-                      decoration: const InputDecoration(
-                          labelText: 'Links de faixas ou playlists',
-                          alignLabelWithHint: true,
-                          hintText: 'Cole um link por linha',
-                          counterText: '')),
+                  if (widget.localFiles.isNotEmpty)
+                    Text(
+                        '${widget.localFiles.length} arquivo(s) MP3. Será criada uma cópia na playlist; os originais serão preservados.')
+                  else
+                    TextField(
+                        key: const ValueKey('extra-music-links'),
+                        controller: _links,
+                        enabled: !_saving,
+                        minLines: 4,
+                        maxLines: 8,
+                        maxLength: 32768,
+                        keyboardType: TextInputType.multiline,
+                        decoration: const InputDecoration(
+                            labelText: 'Links de faixas ou playlists',
+                            alignLabelWithHint: true,
+                            hintText: 'Cole um link por linha',
+                            counterText: '')),
                   if (_saving)
                     Padding(
                         padding: const EdgeInsets.only(top: 16),

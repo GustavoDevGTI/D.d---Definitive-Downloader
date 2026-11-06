@@ -77,6 +77,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<List<Collection>> collectionChoices(int offset) =>
       repository.collections(offset: offset);
+  Future<Collection?> collectionChoice(int id) => repository.collectionById(id);
 
   Future<bool> addLinks(int collectionId, String input,
           {ChooseDuplicate? chooseDuplicate,

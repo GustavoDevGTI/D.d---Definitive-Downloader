@@ -14,6 +14,7 @@ class AndroidRuntime(app: Application) {
     val background = AndroidBackgroundChannel(app, engine.dartExecutor.binaryMessenger)
     val audio = AndroidAudioChannel(app, engine.dartExecutor.binaryMessenger, background::audioState)
     val music = AndroidMusicChannel(app, engine.dartExecutor.binaryMessenger)
+    val incoming = AndroidShareInbox(app, engine.dartExecutor.binaryMessenger)
     init { background.audio = audio }
 
     fun start(args: List<String>?) {

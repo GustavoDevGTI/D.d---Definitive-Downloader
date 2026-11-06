@@ -48,10 +48,10 @@ Orientação posterior de 06/11/2026: testes humanos no APK somente depois de im
 ## 5. Biblioteca, pastas e integração com Android
 
 - [ ] Gestão completa de playlists/grupos/capas e pastas associadas por toque, preservando mídias nas operações apropriadas.
-- [ ] Escolher pastas públicas/SD com SAF, exportar mídias/M3U8 e manter permissões persistentes/revogáveis.
-- [ ] Abrir pasta/localização e abrir/compartilhar arquivos com URI segura; não confundir pasta privada do app com pasta pública.
-- [ ] Receber links/arquivos pelo Compartilhar do Android e escolher a coleção de destino com revisão.
-- [ ] Ausência/perda de permissão, SD removido, espaço insuficiente e arquivos externos compartilhados.
+- [ ] Pastas públicas/SD — parcial: exportação explícita de cópia MP3/M3U8 via seletor SAF implementada; ensaio automático em pasta Documents pública com hashes e referências relativas. Permissão persistente durante a operação/recuperação. Destino direto de novas transferências em SAF e SD removível ainda pendentes; a cópia exportada é independente da biblioteca.
+- [ ] Abrir pasta/localização — parcial: navegador de mídia do app com subir/abrir/compartilhar por FileProvider e exportar cópia. Navegação/exportação passaram no emulador; falta exercício separado do aplicativo receptor para Abrir/Compartilhar e gerenciadores de diferentes fabricantes.
+- [x] Receber links e MP3 pelo Compartilhar: intents reais, revisão da coleção, cancelamento sem alterações e MP3 copiado/numerado sem download passaram automaticamente no Android. Caixa relacional limitada conserva recebidos; fluxos de múltiplos arquivos/restauração e duplicatas recebidas continuam com cenários nativos adicionais pendentes.
+- [ ] Ausência/perda de permissão, SD removido e espaço insuficiente — pendentes. Arquivo recebido via content URI e proteção de conteúdo público desconhecido passaram: recuperação recusou apagar antes de qualquer exclusão; após remover só a sentinela de teste, limpou os documentos exatos do diário e concluiu a cópia. Não é ensaio de interrupção real do processo/SD.
 
 ## 6. Ciclo de vida e execução em segundo plano
 
@@ -69,4 +69,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Checkpoints 0.1.49/0.1.50: base e motor Android. Bloco 0.1.51: fila HTTP/MP3, extras/ordem, reposição e substituição. Bloco 0.1.52: callback Android separado, controles/serviço/sessão, engine mantido pelo processo e segundo plano com fechamento da Activity; ver `VERSAO_LOCAL_0_1_52.md`. Próximos: armazenamento público/SD, compartilhamento recebido, configuração externa de contas, importações públicas por origem e demais cenários de fila/UI/sistema ainda abertos. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.
+Checkpoints 0.1.49/0.1.50: base e motor Android. Bloco 0.1.51: fila HTTP/MP3, extras/ordem, reposição e substituição. Bloco 0.1.52: contas e segundo plano. Bloco 0.1.53: Compartilhar recebido, navegação de mídia e exportação de cópia pública SAF; ver `VERSAO_LOCAL_0_1_53.md`. Próximos: destino direto SAF/SD, configuração externa de contas, importações públicas por origem e demais cenários de fila/UI/sistema abertos. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.

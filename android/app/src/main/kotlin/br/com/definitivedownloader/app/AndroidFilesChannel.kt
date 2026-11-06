@@ -15,6 +15,7 @@ import java.util.concurrent.Executors
 
 /** Storage stays app-owned; document URIs are never mistaken for filesystem paths. */
 class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMessenger) {
+    private val folders = AndroidMediaFolders(activity)
     private val channel = MethodChannel(messenger, "br.com.definitivedownloader/files")
     private val requestCode = 4910
     private val executor = Executors.newSingleThreadExecutor()
@@ -30,6 +31,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
                     "defaultOutput" -> result.success(outputDirectory().path)
                     "chooseOutput" -> chooseOutput(result)
                     "pickFiles" -> pick(call.argument<String>("kind") ?: "", result)
+                    "openFolder" -> folders.open(requireNotNull(call.argument<String>("path")), result)
                     "openFile" -> {
                         val file = File(requireNotNull(call.argument<String>("path")))
                         require(file.isFile) { "Arquivo indisponível." }
@@ -75,6 +77,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     }
 
     fun onActivityResult(request: Int, code: Int, data: Intent?): Boolean {
+        if (folders.onActivityResult(request, code, data)) return true
         if (request != requestCode) return false
         val result = pending ?: return true
         pending = null
@@ -86,35 +89,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
         executor.execute {
             val directory = File(activity.cacheDir, "imports/${UUID.randomUUID()}")
             try {
-                require(uris.size <= if (selectedKind == "mp3") 100 else 1)
-                check(directory.mkdirs())
-                var total = 0L
-                val paths = uris.mapIndexed { index, uri ->
-                    require(uri.scheme == "content")
-                    val original = displayName(uri).replace(Regex("[^\\p{L}\\p{N} ._()\\-]"), "_").take(180)
-                    val extension = original.substringAfterLast('.', "").lowercase()
-                    require(when (selectedKind) { "mp3" -> extension == "mp3"; "csv" -> extension == "csv"; else -> extension in listOf("png", "jpg", "jpeg", "webp") })
-                    val folder = File(directory, index.toString()).apply { check(mkdirs()) }
-                    val destination = File(folder, original)
-                    val limit = when (selectedKind) { "mp3" -> 200L * 1024 * 1024; "csv" -> 5L * 1024 * 1024; else -> 10L * 1024 * 1024 }
-                    var size = 0L
-                    activity.contentResolver.openInputStream(uri).use { input ->
-                        requireNotNull(input)
-                        destination.outputStream().use { output ->
-                            val buffer = ByteArray(65536)
-                            while (true) {
-                                check(!disposed)
-                                val read = input.read(buffer)
-                                if (read == -1) break
-                                size += read; total += read
-                                require(size <= limit && total <= 1024L * 1024 * 1024)
-                                output.write(buffer, 0, read)
-                            }
-                        }
-                    }
-                    require(size > 0)
-                    destination.path
-                }
+                val paths = AndroidDocumentCopies(activity).copy(uris, selectedKind, directory) { disposed }
                 activity.runOnUiThread { copying = false; if (!disposed) result.success(paths) }
             } catch (_: Exception) {
                 // Only this adapter-created temporary directory can be removed.
@@ -125,11 +100,9 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
         return true
     }
 
-    private fun displayName(uri: Uri): String = activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        .use { cursor -> if (cursor != null && cursor.moveToFirst()) cursor.getString(0) ?: "" else "" }
-
     fun dispose() {
         disposed = true
+        folders.dispose()
         pending?.error("cancelled", "Seleção interrompida.", null); pending = null
         executor.shutdownNow()
         channel.setMethodCallHandler(null)

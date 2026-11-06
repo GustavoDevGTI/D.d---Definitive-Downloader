@@ -44,6 +44,11 @@ void main() {
     expect(engine.call({'operation': 'download'}),
         throwsA(isA<FormatException>()));
   });
+  test('pasta Android usa navegador nativo sem converter URI em caminho', () async {
+    await AndroidFiles().openFolder('/storage/app/media');
+    expect(calls.single.method, 'openFolder');
+    expect(calls.single.arguments, {'path': '/storage/app/media'});
+  });
   test('player Android publica progresso/fim sem callbacks após descarte',
       () async {
     final binding =

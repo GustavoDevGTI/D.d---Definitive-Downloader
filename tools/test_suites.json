@@ -7,7 +7,7 @@
     "test/download_test.dart"
   ],
   "areas": {
-    "mobile": ["test/android_background_test.dart", "test/android_platform_test.dart", "test/android_music_engine_test.dart", "test/mobile_layout_test.dart", "test/collection_composition_layout_test.dart", "test/music_player_layout_test.dart", "test/capture_layout_test.dart"],
+    "mobile": ["test/android_incoming_test.dart", "test/android_background_test.dart", "test/android_platform_test.dart", "test/android_music_engine_test.dart", "test/mobile_layout_test.dart", "test/collection_composition_layout_test.dart", "test/music_player_layout_test.dart", "test/capture_layout_test.dart"],
     "collections": ["test/collection_organization_test.dart", "test/playlist_editing_test.dart", "test/track_interaction_test.dart", "test/collection_composition_test.dart", "test/collection_duplicates_test.dart"],
     "imports": ["test/csv_importer_test.dart", "test/spotify_importer_test.dart", "test/spotify_account_importer_test.dart", "test/public_playlist_import_test.dart", "test/soundcloud_import_test.dart", "test/music_link_test.dart", "test/collection_composition_test.dart"],
     "matching": ["test/music_resolver_test.dart", "test/playlist_matching_test.dart", "test/soundcloud_source_test.dart"],

@@ -7,6 +7,7 @@ import 'app/definitive_downloader_app.dart';
 import 'core/network/bounded_http.dart';
 import 'core/platform/platform_services.dart';
 import 'core/platform/android_background.dart';
+import 'core/platform/android_incoming.dart';
 import 'core/platform/music_engine_diagnostic.dart';
 import 'core/platform/player_diagnostic.dart';
 import 'features/player/application/music_player_controller.dart';
@@ -89,6 +90,7 @@ Future<void> main(List<String> arguments) async {
       controller: controller,
       player: player,
       connections: connections,
+      incoming: Platform.isAndroid ? AndroidIncoming() : null,
       initialPlaylist: initialPlaylist,
       showConnectionsOnStart: arguments.contains('--connections')));
   unawaited(connections.restore());

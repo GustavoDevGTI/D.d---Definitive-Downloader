@@ -2,6 +2,8 @@
 
 ## Produto e prioridades
 
+- Android 0.1.53 local em `docs/VERSAO_LOCAL_0_1_53.md`: Compartilhar recebido usa caixa relacional limitada e revisão antes de importar, sem confirmar/baixar automaticamente. SAF nesta etapa exporta uma cópia independente de MP3/M3U8; não é destino primário nem espelho da biblioteca. Nunca converter content URI em File. Diário nativo registra documentos exatos e recusa limpar conteúdo público desconhecido; diretórios só vazios, sem apagar por prefixo. Permissão persistente dura operação/recuperação. Destino direto SAF/SD e restante do checklist seguem pendentes; Windows instalado 0.1.48, sem release/tag e sem testes humanos antecipados.
+
 - Pedido de 06/11: testes humanos no APK somente após implementar a paridade das funções desktop operacionais. Continuar com essencial/focados e automação nativa isolada; não pedir login/desbloqueio/conferência manual em cada checkpoint. Não declarar fixtures como conta real. A fase humana fica para o conjunto completo.
 - Android 0.1.52 em `docs/VERSAO_LOCAL_0_1_52.md`: `DdApplication` possui FlutterEngine/MediaPlayer/motor; Activity só anexa janela/documentos. Fechar Activity conserva o runtime durante trabalho; não voltar a pausá-lo/liberá-lo indiscriminadamente no onPause/onDestroy. `DdWorkService` fornece FGS dataSync/mediaPlayback, sessão/controles/notificações, wake limitado e parada por timeout, sem autorestart. Músicas ainda pausa ao sair da categoria. Callback Spotify Android próprio em 43822/android/spotify/callback, separado do Windows; PKCE/cofre/refresh tiveram ensaio sintético, não cadastro/login reais. Preservar testes automatizados de ciclo de vida e o checklist ainda aberto. Windows instalado continua 0.1.48, sem release/tag.
 

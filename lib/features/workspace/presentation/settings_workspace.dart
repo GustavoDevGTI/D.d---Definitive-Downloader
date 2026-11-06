@@ -70,7 +70,9 @@ class SettingsWorkspace extends StatelessWidget {
                   _row(
                       'Notificações',
                       () => _info(context, 'Notificações',
-                          'O progresso aparece no aplicativo. Notificações do sistema ainda não estão disponíveis.')),
+                          defaultTargetPlatform == TargetPlatform.android
+                              ? 'Downloads e reprodução usam notificações com controles durante o trabalho ativo. A permissão pode ser alterada nas configurações do Android.'
+                              : 'O progresso aparece no aplicativo. Notificações do sistema ainda não estão disponíveis.')),
                   _row(
                       'Preferências de captura',
                       () => _info(context, 'Preferências de captura',
@@ -127,7 +129,7 @@ class SettingsWorkspace extends StatelessWidget {
                           const Padding(
                               padding: EdgeInsets.only(top: 12),
                               child: Text(
-                                  'No Android, esta pasta pertence ao app. Desinstalar o app remove suas mídias. A exportação para pastas compartilhadas ainda está em adaptação.',
+                                  'No Android, esta pasta pertence ao app e é removida ao desinstalar. Em Pasta principal, use Exportar cópia para guardar MP3 e M3U8 numa pasta pública ou cartão SD.',
                                   style: TextStyle(fontSize: 12, height: 1.6)))
                       ]))),
               actions: [
