@@ -9,7 +9,8 @@ class PlaylistEditor {
   final AppDatabase database;
 
   /// Reorders occurrences, including a selection spanning several pages.
-  /// IDs and metadata stay intact; only the contiguous playlist positions change.
+  /// IDs and metadata stay intact; reorder within existing slots, including gaps
+  /// left by explicit removal, without shifting already published media.
   Future<int> move(int collectionId, int trackId,
           {required int targetId,
           required bool after,
@@ -80,8 +81,9 @@ class PlaylistEditor {
           final positions = {
             for (final r in rows) r['id'] as int: r['position'] as int
           };
+          final slots = [for (final row in rows) row['position'] as int];
           final newPositions = {
-            for (var i = 0; i < order.length; i++) order[i]: i + 1
+            for (var i = 0; i < order.length; i++) order[i]: slots[i]
           };
           for (final row in rows.where(locked)) {
             if (newPositions[row['id']] != row['position']) {
@@ -110,7 +112,7 @@ class PlaylistEditor {
           }
           final changed = [
             for (var i = 0; i < order.length; i++)
-              if (positions[order[i]] != i + 1) order[i]
+              if (positions[order[i]] != slots[i]) order[i]
           ];
           final stage = db.prepare(
               'UPDATE tracks SET position=-position WHERE id=? AND collection_id=?');
@@ -125,15 +127,15 @@ class PlaylistEditor {
               'UPDATE tracks SET position=? WHERE id=? AND collection_id=?');
           try {
             for (var i = 0; i < order.length; i++) {
-              if (positions[order[i]] != i + 1) {
-                update.execute([i + 1, order[i], collectionId]);
+              if (positions[order[i]] != slots[i]) {
+                update.execute([slots[i], order[i], collectionId]);
               }
             }
           } finally {
             update.dispose();
           }
           db.execute('COMMIT');
-          return order.indexOf(trackId) + 1;
+          return newPositions[trackId]!;
         } catch (_) {
           db.execute('ROLLBACK');
           rethrow;
@@ -166,11 +168,11 @@ class PlaylistEditor {
           }
           final owner = row['collection_id'] as int,
               before = row['position'] as int;
-          final count = db.select(
-              'SELECT COUNT(*) AS n FROM tracks WHERE collection_id=?',
-              [owner]).first['n'] as int;
-          if (position < 1 || position > count) {
-            throw FormatException('Use uma posição entre 1 e $count.');
+          final last = db.select(
+              'SELECT MAX(position) AS last FROM tracks WHERE collection_id=?',
+              [owner]).first['last'] as int;
+          if (position < 1 || position > last) {
+            throw FormatException('Use uma posição entre 1 e $last.');
           }
           if (before != position) {
             // Temporary negatives avoid UNIQUE collisions in either direction.

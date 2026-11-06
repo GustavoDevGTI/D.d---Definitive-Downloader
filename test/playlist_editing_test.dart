@@ -46,6 +46,47 @@ void main() {
                 sourceKind: SourceKind.directMp3)))));
   });
   tearDown(() => temp.delete(recursive: true));
+  test('editar nome conserva número válido acima da contagem após exclusão',
+      () async {
+    final before = (await library.page(owner, limit: 100)).items;
+    await library.database.run(
+        (db) => db.execute('DELETE FROM tracks WHERE id=?', [before.first.id]));
+    await editor.edit(before.last.id, name: 'Título atualizado', position: 85);
+    final renamed = (await library.trackById(before.last.id))!;
+    expect(renamed.position, 85);
+    expect(renamed.displayTitle, 'Título atualizado');
+    expect((await library.page(owner, limit: 100)).items.map((t) => t.position),
+        List.generate(84, (i) => i + 2));
+    await expectLater(
+        editor.edit(before.last.id, name: 'Inválido', position: 86),
+        throwsFormatException);
+  });
+  test('arraste após exclusão conserva lacunas e slots de mídias concluídas',
+      () async {
+    final before = (await library.page(owner, limit: 100)).items;
+    // A replacement can remove position 1 while position 2 is already saved.
+    await library.setStatus(before[1].id, TrackStatus.completed,
+        localPath: '${temp.path}/002.mp3');
+    await library.database.run(
+        (db) => db.execute('DELETE FROM tracks WHERE id=?', [before.first.id]));
+    final moved = await editor.move(owner, before[3].id,
+        targetId: before[2].id, after: false);
+    expect(moved, 3);
+    var after = (await library.page(owner, limit: 100)).items;
+    expect(after.map((t) => t.position), List.generate(84, (i) => i + 2));
+    expect(after.take(3).map((t) => t.id),
+        [before[1].id, before[3].id, before[2].id]);
+    expect(after.first.localPath, '${temp.path}/002.mp3');
+    await queue.beginRun(
+        run: 'gapped-run', ids: after.skip(1).map((t) => t.id).toList());
+    await editor.move(owner, before[2].id,
+        targetId: before[3].id, after: false);
+    after = (await library.page(owner, limit: 100)).items;
+    expect(after.first.position, 2);
+    expect(after.first.id, before[1].id);
+    expect((await queue.claimNext(run: 'gapped-run', snapshot: true))!.id,
+        before[2].id);
+  });
   test('arraste renumera sem trocar IDs, nomes ou fontes e preserva repetições',
       () async {
     final before = (await library.page(owner, limit: 100)).items;

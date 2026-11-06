@@ -25,13 +25,13 @@ Estados: **validado** (cenário Android executado), **parcial** (parte implement
 
 ## 3. Fila completa e integridade de arquivos
 
-- [ ] Downloads de MP3 direto no Android, com bytes/tamanho/velocidade/tempo medidos.
-- [ ] Iniciar, pausar/limitar, parar e tentar novamente na UI — parcial: pausa durante recebimento e cancelamento durante processamento passaram no serviço real SoundCloud; nenhum grupo próprio restante. Falta rodada pela fila/UI e outros estados.
-- [ ] Extras entram no final durante a execução e são baixados na mesma rodada quando prontos.
-- [ ] Reordenar somente slots livres; concluídas fixas; origem/nomes protegidos conforme regras existentes.
-- [ ] Recuperar arquivo removido externamente: abrir conferência, exigir fonte e novo clique de download.
-- [ ] Duplicatas com escolher existente/recebida e Fazer para todos, exclusão apenas autorizada e diário de recuperação.
-- [ ] Publicação/histórico — parcial: duas cópias SoundCloud numeradas, duração nativa, capa/tags, conclusão SQLite e M3U8 ordenada passaram no serviço Android. Falta rodada completa da fila e cenários de recuperação.
+- [x] MP3 direto no Android: fila real com servidor HTTP local de fixture, 65.244 bytes, medições, tags e duração nativa. Não é obtenção de plataforma nem prova de todos os servidores públicos.
+- [ ] Iniciar, pausar/limitar, parar e tentar novamente na UI — parcial: fila HTTP e pausa/retomada pelo controlador passaram no Android; SoundCloud teve pausa durante recebimento/cancelamento no processamento, sem grupo próprio restante. Falta rodada dos botões de parada/retry e demais estados no aparelho.
+- [x] Extras prontos entram no final e são baixados na mesma execução: teste Android com link direto durante a primeira transferência, seguido de quatro conclusões.
+- [x] Reordenar slots livres no Android: durante transferência e após substituição com lacuna; concluída conserva bytes/posição. Falhas/pausa/proteções também têm contratos focados compartilhados; nomes/IDs continuam protegidos.
+- [x] Recuperação manual Android: arquivo do teste removido, revisão no primeiro clique, aprovação sem download e novo clique para obter. ID, posição e caminho conservados.
+- [ ] Duplicatas — parcial: popup por toque com nova versão/Fazer para todos e exclusão autorizada passou no Android; mídia não substituída ficou idêntica e diário vazio. Manter/cancelar/interrupção contam com testes compartilhados, mas ainda sem rodada nativa separada de todos esses cenários.
+- [ ] Publicação/histórico — parcial: cópias SoundCloud e fila HTTP Android tiveram duração/tags, conclusão SQLite e M3U8; reposição manual e preservação do arquivo não substituído também passaram. Falta interrupção/reconciliação de publicação no dispositivo e demais provedores/contas.
 - [ ] Busca, filtros, ordenação, seleção, colunas ajustáveis/reset e listas contínuas com grande volume no dispositivo.
 
 ## 4. Contas e importação de todas as origens presentes
@@ -67,4 +67,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Checkpoints 0.1.49 e 0.1.50 locais: base e motor Android, descritos em `ANDROID_MOTOR_COMPARTILHADO.md`. Busca nativa real passou em Deezer (2 candidatas), YouTube Music (8) e SoundCloud (8); obtenção SoundCloud passou, com pausa/cancelamento em fases reais; YouTube Music entregou MP3 completo com capa/duração verificadas. A presença do núcleo compartilhado não comprova sessão Deezer, downloads de todos os provedores nem ciclo de vida. Próximos blocos: fila/UI, contas com retornos próprios, armazenamento público e serviços, sem interromper as regras compartilhadas.
+Checkpoints 0.1.49/0.1.50: base e motor Android, descritos em `ANDROID_MOTOR_COMPARTILHADO.md`. Busca nativa real passou em Deezer (2 candidatas), YouTube Music (8) e SoundCloud (8); obtenção SoundCloud passou, com pausa/cancelamento em fases reais; YouTube Music entregou MP3 completo com capa/duração verificadas. Bloco 0.1.51: fila HTTP/MP3, extras/ordem na execução, recuperação manual e popup de substituição no Android; detalhes em `VERSAO_LOCAL_0_1_51.md`. Próximos: contas/retornos próprios, importações públicas por origem, armazenamento público, serviços e demais casos de fila/UI ainda abertos. A presença do núcleo compartilhado não comprova sessão Deezer, todos os provedores ou segundo plano.

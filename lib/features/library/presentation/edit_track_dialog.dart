@@ -110,12 +110,7 @@ class _EditTrackDialogState extends State<EditTrackDialog> {
                                     labelText: 'Posição / número'),
                                 validator: (value) {
                                   final n = int.tryParse(value ?? '');
-                                  return n == null ||
-                                          n < 1 ||
-                                          n >
-                                              (widget.controller.current
-                                                      ?.trackCount ??
-                                                  0)
+                                  return n == null || n < 1
                                       ? 'Posição fora da coleção.'
                                       : null;
                                 }),
