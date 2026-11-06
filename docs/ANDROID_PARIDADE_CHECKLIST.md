@@ -33,7 +33,7 @@ Orientação posterior de 06/11/2026: testes humanos no APK somente depois de im
 - [x] Reordenar slots livres no Android: durante transferência e após substituição com lacuna; concluída conserva bytes/posição. Falhas/pausa/proteções também têm contratos focados compartilhados; nomes/IDs continuam protegidos.
 - [x] Recuperação manual Android: arquivo do teste removido, revisão no primeiro clique, aprovação sem download e novo clique para obter. ID, posição e caminho conservados.
 - [ ] Duplicatas — parcial: popup por toque com nova versão/Fazer para todos e exclusão autorizada passou no Android; mídia não substituída ficou idêntica e diário vazio. Manter/cancelar/interrupção contam com testes compartilhados, mas ainda sem rodada nativa separada de todos esses cenários.
-- [ ] Publicação/histórico — parcial: cópias SoundCloud e fila HTTP Android tiveram duração/tags, conclusão SQLite e M3U8; reposição manual e preservação do arquivo não substituído também passaram. Falta interrupção/reconciliação de publicação no dispositivo e demais provedores/contas.
+- [ ] Publicação/histórico — parcial: cópias SoundCloud e fila HTTP Android tiveram duração/tags, conclusão SQLite e M3U8. Na 0.1.55, três force-stops reais e quatro processos com HTTP de fixture passaram: publicação anterior ao commit reconciliada sem rede; recebimento parcial retomado por comando; revisão persistida e reposição somente após escolha e novo comando. Histórico, posições, ausência de cache completo e M3U8 final conferidos. Janelas adicionais de publicação/substituição e demais provedores/contas continuam pendentes.
 - [ ] Busca, filtros, ordenação, seleção, colunas ajustáveis/reset e listas contínuas com grande volume no dispositivo.
 
 ## 4. Contas e importação de todas as origens presentes
@@ -48,10 +48,10 @@ Orientação posterior de 06/11/2026: testes humanos no APK somente depois de im
 ## 5. Biblioteca, pastas e integração com Android
 
 - [ ] Gestão completa de playlists/grupos/capas e pastas associadas por toque, preservando mídias nas operações apropriadas.
-- [ ] Pastas públicas/SD — parcial: destino direto SAF implementado na 0.1.54, além da exportação independente da 0.1.53. Seletor, publicação/hash/M3U8, retry sem nova rede, player/capa/tags pela URI e MP3 importado passaram em Documents no emulador. Persistência/revogação do acesso implementadas; revogar/reselecionar passou. SD físico, nuvem, falta de espaço e morte do processo nas janelas de publicação seguem pendentes.
+- [ ] Pastas públicas/SD — parcial: destino direto SAF implementado na 0.1.54, além da exportação independente da 0.1.53. Seletor, publicação/hash/M3U8, retry sem nova rede, player/capa/tags pela URI e MP3 importado passaram em Documents no emulador. Revogar/reselecionar passou. Na 0.1.55, force-stop antes do commit e diário preparado após renomeação real recuperaram a publicação sem nova rede/cache; recusas de limpeza de symlink/MP3 completo também passaram. SD físico, nuvem, falta de espaço e demais janelas de interrupção seguem pendentes.
 - [ ] Abrir pasta/localização — parcial: navegador de mídia do app com subir/abrir/compartilhar por FileProvider e exportar cópia. Navegação/exportação passaram no emulador; falta exercício separado do aplicativo receptor para Abrir/Compartilhar e gerenciadores de diferentes fabricantes.
 - [x] Receber links e MP3 pelo Compartilhar: intents reais, revisão da coleção, cancelamento sem alterações e MP3 copiado/numerado sem download passaram automaticamente no Android. Caixa relacional limitada conserva recebidos; fluxos de múltiplos arquivos/restauração e duplicatas recebidas continuam com cenários nativos adicionais pendentes.
-- [ ] Ausência/perda de permissão — parcial: revogar impede acesso sem marcar arquivo como apagado; selecionar a mesma pasta recupera o vínculo. Destino ausente durante publicação repetiu só escrita após voltar. Exclusão externa exigiu revisão+escolha+novo clique. SD removido e espaço insuficiente reais pendentes. Proteção de conteúdo público desconhecido da exportação e substituição exata do destino primário também passaram; não é ensaio de interrupção real do processo/SD.
+- [ ] Ausência/perda de permissão — parcial: revogar impede acesso sem marcar arquivo como apagado; selecionar a mesma pasta recupera o vínculo. Destino ausente durante publicação repetiu só escrita após voltar. Exclusão externa exigiu revisão+escolha+novo clique, inclusive após reabrir o processo na 0.1.55. SD removido e espaço insuficiente reais pendentes. Proteção de conteúdo público desconhecido da exportação e substituição exata do destino primário também passaram; interrupção da própria substituição/SD ainda sem ensaio nativo.
 
 ## 6. Ciclo de vida e execução em segundo plano
 
@@ -59,7 +59,7 @@ Orientação posterior de 06/11/2026: testes humanos no APK somente depois de im
 - [x] Serviço/sessão de mídia e player em segundo plano: MediaPlayer e motor persistem fora da Activity; avanço automático e transportes passaram com Activity encerrada/reaberta. Notificações de mídia e downloads coexistem; testes concedem permissão somente ao pacote isolado.
 - [ ] Foco de áudio/fones já têm tratamento básico nativo; validar chamadas, desconexões e competição com outro áudio em aparelho físico.
 - [ ] Ciclo de vida — parcial: encerrar/reabrir a Activity duas vezes conservou o mesmo Dart/MediaPlayer/fila e encerrou o serviço ao finalizar. Rotação/force-stop/morte do processo/fones e limites temporais do sistema ainda têm cenários próprios pendentes; não há autorestart de trabalho.
-- [ ] Persistência e reconciliação após encerramento do processo/OS; retomada respeita aprovação manual e estados anteriores.
+- [ ] Persistência após encerramento — parcial: force-stop/reabertura reais passaram para publicação SAF, recebimento parcial e revisão de reposição; sem obtenção automática, sem duplicar histórico/publicação e com limpeza do staging parcial da tentativa retomada. Morte pelo OS em todas as janelas, reinício do aparelho, timeout e serviço de mídia ainda exigem cenários próprios.
 
 ## 7. Critério de conclusão
 
@@ -69,4 +69,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Checkpoints 0.1.49/0.1.50: base/motor; 0.1.51: fila/ordem/substituição; 0.1.52: contas/segundo plano; 0.1.53: Compartilhar/exportação; 0.1.54: destino SAF direto integrado a player/biblioteca/recuperação, conforme `VERSAO_LOCAL_0_1_54.md`. Próximos: cenários de persistência/SD, configuração externa de contas, importações públicas por origem e demais casos de fila/UI/sistema abertos. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.
+Checkpoints 0.1.49/0.1.50: base/motor; 0.1.51: fila/ordem/substituição; 0.1.52: contas/segundo plano; 0.1.53: Compartilhar/exportação; 0.1.54: destino SAF direto; 0.1.55: recuperação de publicação/recebimento/revisão após force-stop, conforme `VERSAO_LOCAL_0_1_55.md`. Próximos: importações públicas por origem, demais casos de fila/UI/sistema, configuração externa de contas e cenários físicos de SD. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.

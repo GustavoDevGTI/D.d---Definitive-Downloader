@@ -5,9 +5,12 @@ import java.io.File
 import java.util.UUID
 
 internal class ManagedDocumentJobs(private val db: ManagedDocumentsDb, private val targets: ManagedDocumentTargets, private val io: ManagedDocumentIo) {
+    private val privateWork = ManagedPrivateWork(db)
+    private val recovery = ManagedPublicationRecovery(db, targets, io)
     fun reusable(directory: String, track: Long, key: String): String? {
         if (targets.target(directory) == null) return null
-        val jobs = db.rows("SELECT * FROM jobs WHERE track_id=? AND directory=? AND source_key=? AND state!='removed' ORDER BY rowid DESC LIMIT 20", track, directory, key)
+        val jobs = db.rows("SELECT * FROM jobs WHERE track_id=? AND directory=? AND source_key=? AND state!='removed' ORDER BY rowid DESC LIMIT 1001", track, directory, key)
+        require(jobs.size <= 1000)
         for (job in jobs) {
             val path = job.getValue("path")
             if (path.isNotEmpty() && File(path).isFile) return path
@@ -25,6 +28,7 @@ internal class ManagedDocumentJobs(private val db: ManagedDocumentsDb, private v
         if (targets.target(directory) == null) return directory
         require(Regex("[a-f0-9]{64}").matches(key) && track > 0 && collection > 0)
         File(directory).apply { check(isDirectory || mkdirs()) }
+        privateWork.retire(directory, track, key)
         val id = UUID.randomUUID().toString()
         val stage = File(directory, ".dd-transfer-$id")
         db.insert("jobs", mapOf("id" to id, "track_id" to track, "collection_id" to collection,
@@ -104,6 +108,12 @@ internal class ManagedDocumentJobs(private val db: ManagedDocumentsDb, private v
         require(cache.parent == it.getValue("directory") && cache.canonicalFile == cache.absoluteFile)
         if (cache.isFile) check(cache.delete()) // Public bytes remain authoritative.
         val stage = File(it.getValue("stage"))
+        val original = File(it.getValue("path"))
+        if (original.path != cache.path && original.exists()) {
+            require(stage.parent == it.getValue("directory") && stage.name == ".dd-transfer-${it.getValue("id")}")
+            require(stage.canonicalFile == stage.absoluteFile && original.parentFile == stage && original.canonicalFile == original.absoluteFile && original.isFile)
+            check(original.delete())
+        }
         if (stage.parent == it.getValue("directory") && stage.name == ".dd-transfer-${it.getValue("id")}" && stage.isDirectory && stage.listFiles()?.isEmpty() == true) check(stage.delete())
         db.updateJob(it.getValue("id"), mapOf("state" to "committed"))
     } }
@@ -153,18 +163,5 @@ internal class ManagedDocumentJobs(private val db: ManagedDocumentsDb, private v
         return if (job == null) File(path).takeIf { it.isFile }?.length()
         else if (available(path) == true) io.size(Uri.parse(job.getValue("uri"))) ?: job.getValue("size").toLong() else null
     }
-    fun pending(): List<Map<String, Any>> = db.rows("SELECT * FROM jobs WHERE (track_id>0 AND state='published' AND alias!='') OR (track_id=-1 AND state NOT IN ('committed','removed')) ORDER BY rowid LIMIT 1000").map { job ->
-        if (job.getValue("state") == "published") {
-            val parent = requireNotNull(targets.knownFolder(job.getValue("directory")))
-            val uri = Uri.parse(job.getValue("uri"))
-            check(io.present(uri, parent) && io.documentHash(uri, job.getValue("size").toLong()) == job.getValue("hash"))
-            db.bindMedia(job.getValue("alias"), job.getValue("id"))
-        }
-        buildMap<String, Any> {
-            put("trackId", job.getValue("track_id").toLong())
-            put("path", job.getValue("alias").ifEmpty { job.getValue("path") })
-            put("key", job.getValue("source_key"))
-            Regex("^(\\d+) - ").find(job.getValue("name"))?.groupValues?.get(1)?.toLongOrNull()?.let { put("position", it) }
-        }
-    }
+    fun pending(): List<Map<String, Any>> = recovery.pending()
 }
