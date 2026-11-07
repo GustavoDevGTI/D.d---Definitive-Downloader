@@ -1,0 +1,12 @@
+Native login window dependencies
+
+Flutter InAppWebView Windows 0.7.0-beta.3 (Flutter package 6.2.0-beta.3)
+Microsoft WebView2 SDK 1.0.3650.58
+Windows Implementation Library 1.0.250325.1
+Microsoft Windows C++/WinRT 2.0.250303.1
+nlohmann/json 3.12.0
+
+Licenses/notices are preserved alongside this file. Flutter package notices
+are also included by Flutter in the compiled application assets.
+The Microsoft Edge WebView2 Runtime is supplied by the operating system or
+installed separately from Microsoft; it is not included in this package.

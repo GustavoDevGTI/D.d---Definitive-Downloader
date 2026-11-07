@@ -10,6 +10,7 @@ import 'core/platform/android_background.dart';
 import 'core/platform/android_incoming.dart';
 import 'core/platform/music_engine_diagnostic.dart';
 import 'core/platform/player_diagnostic.dart';
+import 'core/platform/web_login_diagnostic.dart';
 import 'features/player/application/music_player_controller.dart';
 import 'features/player/data/media_kit_engine.dart';
 import 'features/player/data/player_library.dart';
@@ -28,12 +29,16 @@ import 'features/connections/data/spotify_transport.dart';
 import 'features/connections/data/windows_spotify_authorization.dart';
 import 'features/connections/data/android_spotify_authorization.dart';
 import 'features/connections/application/deezer_connection_controller.dart';
+import 'features/connections/application/music_account_access.dart';
 import 'features/downloads/music_download_service.dart';
 import 'features/matching/music_engine.dart';
 import 'features/matching/music_resolver.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isWindows && arguments.contains('--check-login-webview')) {
+    exit(await diagnoseWebLogin());
+  }
   if (Platform.isAndroid) {
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -67,6 +72,9 @@ Future<void> main(List<String> arguments) async {
       spotify: const SpotifyImporter(http),
       accountSpotify: SpotifyAccountImporter(
           connections.getJson, () => connections.isConnected),
+      accounts: MusicAccountAccess(
+          spotifyConnected: () => connections.isConnected,
+          deezerConnected: () => deezer.connected),
       csv: const CsvImporter(),
       catalog: const DeezerCatalog(http),
       music: MusicResolver(engine, deezer),

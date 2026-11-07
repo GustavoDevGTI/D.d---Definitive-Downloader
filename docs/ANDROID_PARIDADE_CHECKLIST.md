@@ -39,8 +39,8 @@ Orientação posterior de 06/11/2026: testes humanos no APK somente depois de im
 ## 4. Contas e importação de todas as origens presentes
 
 - [ ] Spotify — parcial: retorno Android próprio e PKCE implementados; origem/state, cofre nativo, restauração, refresh, cancelamento/timeout passaram automaticamente com respostas sintéticas no Android. Falta confirmar cadastro externo do novo redirect e autenticação/renovação reais; não reutiliza callback Windows.
-- [ ] Deezer com campo local mascarado e cofre Android; não ler nem copiar cookies/credenciais Windows.
-- [ ] Importar playlists públicas Spotify, Deezer, YouTube, YouTube Music e SoundCloud integralmente, com páginas lidas na importação.
+- [ ] Deezer — parcial: login em WebView privado com captura automática da sessão e cofre implementado na 0.1.56, sem campo ARL. Cookie HttpOnly sintético, origem permitida/impostora e limpeza passaram no Android; não é conta real nem validação de arquivo Deezer. Nenhuma credencial Windows foi lida/copiada para o Android.
+- [ ] Importar playlists Spotify autenticadas e playlists públicas Deezer, YouTube, YouTube Music e SoundCloud integralmente, com páginas lidas na importação. A 0.1.56 removeu leitura anônima/parcial do Spotify; solicita Spotify e depois Deezer no fluxo principal. Testes compartilhados de ordem/cancelamento passaram; ensaios reais por conta/origem continuam pendentes.
 - [ ] Conta Spotify: playlists privadas/colaborativas e sessão restaurada no Android.
 - [ ] Nova playlist vazia ou com link opcional; misturar listas/faixas/MP3, mantendo ordem e decisões de duplicatas.
 - [ ] Conferência automática, candidata exata antes das alternativas, destaque/filtros, usar versão, informar fonte manual e referência exata.
@@ -69,4 +69,4 @@ Transferir entre contas, backup, IA, captura de outras categorias e formatos esp
 
 ## Bloco em execução
 
-Checkpoints 0.1.49/0.1.50: base/motor; 0.1.51: fila/ordem/substituição; 0.1.52: contas/segundo plano; 0.1.53: Compartilhar/exportação; 0.1.54: destino SAF direto; 0.1.55: recuperação de publicação/recebimento/revisão após force-stop, conforme `VERSAO_LOCAL_0_1_55.md`. Próximos: importações públicas por origem, demais casos de fila/UI/sistema, configuração externa de contas e cenários físicos de SD. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.
+Checkpoints 0.1.49/0.1.50: base/motor; 0.1.51: fila/ordem/substituição; 0.1.52: contas/segundo plano; 0.1.53: Compartilhar/exportação; 0.1.54: destino SAF direto; 0.1.55: persistência após force-stop; 0.1.56: fluxo obrigatório Spotify/Deezer, login Deezer sem ARL manual e atalhos contextuais em Windows/Android, conforme `VERSAO_LOCAL_0_1_56.md`. Próximos: importações por origem, demais casos de fila/UI/sistema, configuração externa de contas e cenários físicos de SD. Testes humanos adiados até a paridade implementada; fixtures não comprovam contas ou todo catálogo.

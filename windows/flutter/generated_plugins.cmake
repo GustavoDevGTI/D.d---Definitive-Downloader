@@ -5,8 +5,10 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   file_selector_windows
+  flutter_inappwebview_windows
   flutter_secure_storage_windows
   media_kit_libs_windows_audio
+  sqlite3_flutter_libs
   url_launcher_windows
 )
 

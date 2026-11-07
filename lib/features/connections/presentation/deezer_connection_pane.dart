@@ -1,68 +1,44 @@
 import 'package:flutter/material.dart';
 import '../application/deezer_connection_controller.dart';
+import 'deezer_login_dialog.dart';
 
-class DeezerConnectionPane extends StatefulWidget {
+class DeezerConnectionPane extends StatelessWidget {
   const DeezerConnectionPane(
       {super.key, required this.controller, required this.allowChanges});
   final DeezerConnectionController controller;
   final bool allowChanges;
   @override
-  State<DeezerConnectionPane> createState() => _DeezerConnectionPaneState();
-}
-
-class _DeezerConnectionPaneState extends State<DeezerConnectionPane> {
-  final _session = TextEditingController();
-  @override
-  void dispose() {
-    _session.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) => ListenableBuilder(
-      listenable: widget.controller,
-      builder: (context, _) {
-        final c = widget.controller;
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Deezer',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          Text(c.connected
-              ? 'Conta conectada neste dispositivo'
-              : 'Conecte uma sessão da sua conta para tentar faixas completas.'),
-          const SizedBox(height: 10),
-          if (!c.connected) ...[
-            const Text(
-                'Informe o ARL somente aqui. A sessão é guardada no cofre do sistema; não envie esse valor pelo chat.',
-                style: TextStyle(fontSize: 12)),
+      listenable: controller,
+      builder: (context, _) =>
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Deezer',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Text(controller.connected
+                ? 'Conta conectada neste dispositivo'
+                : 'Fonte principal de download'),
             const SizedBox(height: 12),
-            TextField(
-                controller: _session,
-                obscureText: true,
-                autocorrect: false,
-                enableSuggestions: false,
-                enabled: !c.busy && widget.allowChanges,
-                decoration:
-                    const InputDecoration(labelText: 'Sessão Deezer (ARL)')),
-            const SizedBox(height: 12),
-            FilledButton(
-                onPressed: !c.busy && widget.allowChanges && c.engine.available
-                    ? () async {
-                        await c.connect(_session.text);
-                        if (mounted && c.connected) _session.clear();
-                      }
-                    : null,
-                child: Text(c.busy ? 'Conferindo…' : 'Conectar Deezer')),
-          ] else
-            OutlinedButton(
-                onPressed: !c.busy && widget.allowChanges ? c.disconnect : null,
-                child: const Text('Desconectar Deezer deste dispositivo')),
-          if (c.message.isNotEmpty)
-            Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(c.message, style: const TextStyle(fontSize: 12))),
-          if (!c.engine.available)
-            const Text('Motor musical ainda não disponível nesta instalação.'),
-        ]);
-      });
+            if (controller.connected)
+              OutlinedButton(
+                  onPressed: !controller.busy && allowChanges
+                      ? controller.disconnect
+                      : null,
+                  child: const Text('Desconectar Deezer'))
+            else
+              FilledButton(
+                  onPressed: !controller.busy &&
+                          allowChanges &&
+                          controller.engine.available
+                      ? () => controller.login(() => showDeezerLogin(context,
+                          verifySession: controller.verifyLoginSession))
+                      : null,
+                  child: Text(
+                      controller.busy ? 'Conectando…' : 'Entrar na Deezer')),
+            if (controller.message.isNotEmpty)
+              Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(controller.message,
+                      style: const TextStyle(fontSize: 12))),
+          ]));
 }

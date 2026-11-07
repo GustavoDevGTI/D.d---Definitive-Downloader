@@ -6,6 +6,8 @@ import '../../../app/brand.dart';
 import '../../../app/app_notice.dart';
 import '../../connections/application/spotify_connection_controller.dart';
 import '../../connections/presentation/connections_dialog.dart';
+import '../../connections/domain/music_account.dart';
+import '../../connections/presentation/account_request_dialog.dart';
 import '../application/library_controller.dart';
 import '../../workspace/application/workspace_controller.dart';
 import '../../workspace/domain/workspace_models.dart';
@@ -48,6 +50,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    widget.controller.accounts?.requestLogin = _requestAccount;
     unawaited(widget.player?.setModuleActive(_section == AppSection.music));
     _inspectorRequest = widget.controller.inspectorRequest;
     widget.controller.addListener(_requestInspector);
@@ -61,6 +64,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   void dispose() {
+    widget.controller.accounts?.requestLogin = null;
     widget.controller.removeListener(_requestInspector);
     _workspace.dispose();
     widget.player?.dispose();
@@ -91,6 +95,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
             controller: widget.connections!,
             deezer: widget.controller.music?.connection,
             allowChanges: !widget.controller.busy)));
+  }
+
+  Future<bool> _requestAccount(MusicAccount account) async {
+    final spotify = widget.connections,
+        deezer = widget.controller.music?.connection;
+    if (!mounted || spotify == null || deezer == null) return false;
+    return await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AccountRequestDialog(
+                account: account, spotify: spotify, deezer: deezer)) ==
+        true;
   }
 
   void _navigate(AppSection section, [int tab = 0]) {

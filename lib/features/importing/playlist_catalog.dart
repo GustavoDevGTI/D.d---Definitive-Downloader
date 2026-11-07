@@ -6,6 +6,7 @@ import 'soundcloud_catalog.dart';
 import 'soundcloud_link.dart';
 import 'spotify_importer.dart';
 import 'spotify_account_importer.dart';
+import '../connections/domain/music_account.dart';
 
 /// Reads a collection without creating a second collection in the library.
 class PlaylistCatalog {
@@ -62,8 +63,10 @@ class PlaylistCatalog {
               cancelled: cancelled,
               onProgress: onProgress);
     }
-    return accountSpotify?.isConnected == true
-        ? accountSpotify!.open(url)
-        : spotify.open(url);
+    spotify.playlistId(url); // Validate before asking for any account.
+    if (accountSpotify?.isConnected != true) {
+      throw const MusicAccountRequired(MusicAccount.spotify);
+    }
+    return accountSpotify!.open(url);
   }
 }

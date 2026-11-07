@@ -10,6 +10,10 @@ import 'track_inspector.dart';
 import 'track_table.dart';
 import 'collection_track_toolbar.dart';
 import 'collection_mp3_drop_target.dart';
+import '../../connections/presentation/music_connection_actions.dart';
+import '../../importing/music_link.dart';
+import '../../importing/playlist_catalog.dart';
+import '../../importing/public_playlist_link.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -34,6 +38,8 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   final _query = TextEditingController();
   final _urlFocus = FocusNode();
   Timer? _timer;
+  Timer? _loginTimer;
+  String _lastLoginInput = '';
   bool _detail = false;
   bool _wide = false;
   bool _inspectorOpen = false;
@@ -59,6 +65,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   void dispose() {
     widget.controller.removeListener(_requestInspector);
     _timer?.cancel();
+    _loginTimer?.cancel();
     _url.dispose();
     _query.dispose();
     _urlFocus.dispose();
@@ -102,11 +109,13 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
           focusNode: _urlFocus,
           inputKey: const ValueKey('playlist-url'),
           enabled: !c.busy,
+          onChanged: _offerLogin,
           onSubmitted: c.busy ? null : (value) => unawaited(_import(value)),
           actionLabel: 'Importar por link',
           actionIcon: Icons.playlist_add_rounded,
           onAction: c.busy ? null : () => unawaited(_import(_url.text)),
           secondaryActions: [
+            const MusicConnectionActions(),
             if (c.importing)
               IconButton(
                   tooltip: 'Cancelar importação',
@@ -140,6 +149,27 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     if (mounted && widget.controller.current?.id != before) {
       setState(() => _detail = true);
     }
+  }
+
+  void _offerLogin(String raw) {
+    _loginTimer?.cancel();
+    final value = raw.trim(), access = widget.controller.accounts;
+    if (access == null || value == _lastLoginInput || !widget.active) return;
+    final uri = Uri.tryParse(value);
+    final spotify = value.startsWith('spotify:') || uri?.host == 'open.spotify.com';
+    final deezer = const {'deezer.com', 'www.deezer.com'}.contains(uri?.host);
+    if (!spotify && !deezer) return;
+    try {
+      if (PlaylistCatalog.isCollection(value)) {
+        if (spotify) { widget.controller.spotify.playlistId(value); }
+        else { PublicPlaylistLink.recognize(value); }
+      } else { MusicLink.parse(value); }
+    } on FormatException { return; }
+    _lastLoginInput = value;
+    _loginTimer = Timer(const Duration(milliseconds: 600), () async {
+      if (!mounted || widget.controller.busy) return;
+      try { await access.ensure(value); } on FormatException { /* Only valid, configured account flows are offered. */ }
+    });
   }
 
   Widget _tracks(LibraryController c, bool wide) =>

@@ -37,6 +37,8 @@ import '../../importing/local_mp3_inspector.dart';
 import '../../importing/collection_duplicates.dart';
 import '../../importing/collection_link_addition.dart';
 import '../../importing/replacement_media_files.dart';
+import '../../connections/application/music_account_access.dart';
+import '../../connections/domain/music_account.dart';
 
 class LibraryController extends ChangeNotifier {
   LibraryController(
@@ -47,6 +49,7 @@ class LibraryController extends ChangeNotifier {
       required this.catalog,
       required this.downloader,
       this.accountSpotify,
+      this.accounts,
       SoundCloudCatalog? soundcloud,
       this.deezerPlaylists = const DeezerPlaylistCatalog(),
       this.youtubePlaylists = const YouTubePlaylistCatalog(),
@@ -55,7 +58,35 @@ class LibraryController extends ChangeNotifier {
       this.music})
       : soundcloud = soundcloud ?? SoundCloudCatalog();
   final SoundCloudCatalog soundcloud;
+  final MusicAccountAccess? accounts;
+
+  Future<bool> _authorize(String input) async {
+    try {
+      final allowed = await accounts?.ensure(input) ?? true;
+      if (!allowed) {
+        message = 'Conexão cancelada. A playlist não foi alterada.';
+        notifyListeners();
+      }
+      return allowed && !_disposed;
+    } catch (error) {
+      message = operationMessage(error);
+      notifyListeners();
+      return false;
+    }
+  }
+
   final DeezerPlaylistCatalog deezerPlaylists;
+  Future<bool> _authorizePrimary() async {
+    if (accounts == null) return true;
+    try {
+      return await accounts!.connect(MusicAccount.deezer) && !_disposed;
+    } catch (error) {
+      message = operationMessage(error);
+      notifyListeners();
+      return false;
+    }
+  }
+
   final YouTubePlaylistCatalog youtubePlaylists;
   DownloadCancellation? _importCancellation;
   final MusicResolver? music;
@@ -81,29 +112,31 @@ class LibraryController extends ChangeNotifier {
   Future<Collection?> collectionChoice(int id) => repository.collectionById(id);
 
   Future<bool> addLinks(int collectionId, String input,
-          {ChooseDuplicate? chooseDuplicate,
-          Future<void> Function(List<Track>)? beforeRemoval}) =>
-      _addition((token) async {
-        final owner = await repository.collectionById(collectionId);
-        if (owner == null) {
-          throw const FormatException('Playlist não encontrada.');
-        }
-        final entries = await _composer.resolve(input,
-            capacity: 10000,
-            prepare: false,
-            cancellation: token,
-            onProgress: _additionProgress);
-        token.check();
-        return CollectionLinkAddition(repository).add(owner, entries,
-            choose: chooseDuplicate,
-            prepare: (entry) =>
-                _composer.links.prepare(entry, cancellation: token),
-            cancellation: token,
-            holdQueue: () => _holdQueueForReview = true,
-            run: () => _cancellation?.cancelled == true ? null : _activeRun,
-            progress: _additionProgress,
-            beforeRemoval: beforeRemoval);
-      });
+      {ChooseDuplicate? chooseDuplicate,
+      Future<void> Function(List<Track>)? beforeRemoval}) async {
+    if (!await _authorize(input)) return false;
+    return _addition((token) async {
+      final owner = await repository.collectionById(collectionId);
+      if (owner == null) {
+        throw const FormatException('Playlist não encontrada.');
+      }
+      final entries = await _composer.resolve(input,
+          capacity: 10000,
+          prepare: false,
+          cancellation: token,
+          onProgress: _additionProgress);
+      token.check();
+      return CollectionLinkAddition(repository).add(owner, entries,
+          choose: chooseDuplicate,
+          prepare: (entry) =>
+              _composer.links.prepare(entry, cancellation: token),
+          cancellation: token,
+          holdQueue: () => _holdQueueForReview = true,
+          run: () => _cancellation?.cancelled == true ? null : _activeRun,
+          progress: _additionProgress,
+          beforeRemoval: beforeRemoval);
+    });
+  }
 
   Future<bool> addLocalFiles(int collectionId, List<String> paths) =>
       _addition((token) => LocalMediaImporter(repository,
@@ -462,6 +495,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> setManualSource(String value, ManualSourceMode mode) async {
     final track = focused;
     if (track == null || busy) return;
+    if (!await _authorize(value) || focused?.id != track.id || busy) return;
     _searchGeneration++;
     try {
       message = await _sources.setManual(track, value, mode);
@@ -528,6 +562,18 @@ class LibraryController extends ChangeNotifier {
     if (collection == null || busy || music?.available != true || isExample) {
       return;
     }
+    if (!await _authorize(collection.sourceUrl) ||
+        current?.id != collection.id ||
+        busy) {
+      return;
+    }
+    if (accounts != null &&
+        !accounts!.connected(MusicAccount.deezer) &&
+        await repository.needsSourcePreparation(collection.id) &&
+        !await _authorizePrimary()) {
+      return;
+    }
+    if (current?.id != collection.id || busy) return;
     preparing = true;
     message = 'Conferindo correspondências…';
     final token = DownloadCancellation();
@@ -601,17 +647,24 @@ class LibraryController extends ChangeNotifier {
           linkCatalog ??
               MusicLinkCatalog(spotify: accountSpotify, soundcloud: soundcloud),
           music));
-  Future<void> importPlaylist(String url) => _import(() => _playlists.read(url,
-      cancelled: () => _disposed || _importCancellation?.cancelled == true,
-      onProgress: (done, total) {
-        message = 'Lendo faixas: $done/$total';
-        notifyListeners();
-      }));
+  Future<void> importPlaylist(String url) async {
+    if (busy || !await _authorize(url)) return;
+    await _import(() => _playlists.read(url,
+        cancelled: () => _disposed || _importCancellation?.cancelled == true,
+        onProgress: (done, total) {
+          message = 'Lendo faixas: $done/$total';
+          notifyListeners();
+        }));
+  }
 
   Future<int> createPlaylist(String name,
       {int? groupId, String link = ''}) async {
     if (busy) throw const FormatException('Aguarde a operação em andamento.');
     final valid = organizationName(name);
+    if (link.trim().isNotEmpty && !await _authorize(link)) {
+      throw const FormatException('Conexão cancelada. Playlist não criada.');
+    }
+    if (busy) throw const FormatException('Aguarde a operação em andamento.');
     importing = true;
     final token = _importCancellation = DownloadCancellation();
     notifyListeners();
@@ -703,6 +756,13 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> search(String query) async {
     if (searching || focused == null) return;
+    final requestedTrack = focused!.id;
+    if (!await _authorizePrimary() ||
+        _disposed ||
+        searching ||
+        focused?.id != requestedTrack) {
+      return;
+    }
     final generation = ++_searchGeneration;
     searching = true;
     notifyListeners();
@@ -817,6 +877,16 @@ class LibraryController extends ChangeNotifier {
               ids: queueIds,
               failedOnly: failedOnly)) {
         await _openDownloadReview(result.existingId!);
+        return false;
+      }
+      if (accounts != null &&
+          !accounts!.connected(MusicAccount.deezer) &&
+          await RedownloadRepository(repository.database).hasWork(
+              collectionId: current?.id,
+              ids: queueIds,
+              failedOnly: failedOnly,
+              deezerOnly: true) &&
+          !await _authorizePrimary()) {
         return false;
       }
       return true;

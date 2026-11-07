@@ -7,7 +7,10 @@ class RedownloadRepository {
   final AppDatabase database;
 
   Future<bool> hasWork(
-          {int? collectionId, List<int>? ids, bool failedOnly = false}) =>
+          {int? collectionId,
+          List<int>? ids,
+          bool failedOnly = false,
+          bool deezerOnly = false}) =>
       database.run((db) {
         if (ids?.isEmpty == true) return false;
         if (ids != null && ids.length > 10000) {
@@ -21,7 +24,7 @@ class RedownloadRepository {
       AND source_kind!='none' AND match_status!='review' AND redownload_state!='review'
       AND (source_kind!='youtube' OR source_authorization IN ('manualLink','approvedVideo'))
       AND NOT(manual_url!='' AND manual_mode='extractAudio')
-      AND status IN ('ready','failed') ${failedOnly ? "AND status='failed'" : ''} LIMIT 1''',
+      AND status IN ('ready','failed') ${failedOnly ? "AND status='failed'" : ''} ${deezerOnly ? "AND source_kind='deezerFull'" : ''} LIMIT 1''',
             [if (ids == null) collectionId else ...ids]).isNotEmpty;
       });
 

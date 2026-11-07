@@ -17,6 +17,7 @@ class LinkEntryPanel extends StatelessWidget {
     this.focusNode,
     this.enabled = true,
     this.onSubmitted,
+    this.onChanged,
     this.secondaryActions = const [],
     this.status,
   });
@@ -31,6 +32,7 @@ class LinkEntryPanel extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onAction;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final List<Widget> secondaryActions;
 
   @override
@@ -58,6 +60,7 @@ class LinkEntryPanel extends StatelessWidget {
                           labelStyle: const TextStyle(
                               fontSize: 13, color: AppColors.muted),
                           hintText: hintText),
+                      onChanged: onChanged,
                       onSubmitted: onSubmitted),
                   const SizedBox(height: 12),
                   OutlinedButtonTheme(

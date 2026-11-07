@@ -1,7 +1,7 @@
 name: definitive_downloader
 description: Aplicativo desktop e mobile para organizar, transferir e baixar coleções musicais.
 publish_to: none
-version: 0.1.55+56
+version: 0.1.56+57
 environment:
   sdk: '>=3.5.0 <4.0.0'
 dependencies:
@@ -16,6 +16,7 @@ dependencies:
   url_launcher: ^6.3.2
   crypto: ^3.0.8
   flutter_secure_storage: ^11.2.0
+  flutter_inappwebview: 6.2.0-beta.3
   ffi: ^2.2.0
   media_kit: 1.2.6
   media_kit_libs_audio: 1.0.7

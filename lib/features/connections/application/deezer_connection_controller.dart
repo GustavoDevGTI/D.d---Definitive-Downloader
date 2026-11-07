@@ -29,6 +29,28 @@ class DeezerConnectionController extends ChangeNotifier {
   String message = '';
   String? _session;
 
+  Future<bool> verifyLoginSession(String value) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]{80,2048}$').hasMatch(value)) return false;
+    try {
+      final response =
+          await engine.call({'operation': 'deezerConnect', 'arl': value});
+      return response['connected'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> login(Future<String?> Function() authorize) async {
+    if (busy || connected) return;
+    try {
+      final session = await authorize();
+      if (session != null) await connect(session);
+    } catch (_) {
+      message = 'Não foi possível concluir o login Deezer. Tente novamente.';
+      notifyListeners();
+    }
+  }
+
   Future<void> restore() async {
     try {
       final saved = await store.read();
@@ -48,7 +70,7 @@ class DeezerConnectionController extends ChangeNotifier {
       value = value.trim();
       if (!RegExp(r'^[A-Za-z0-9_-]{80,2048}$').hasMatch(value)) {
         throw const FormatException(
-            'Sessão inválida. Informe o ARL somente neste campo local.');
+            'A sessão do login Deezer não é válida. Entre novamente.');
       }
       final response =
           await engine.call({'operation': 'deezerConnect', 'arl': value});

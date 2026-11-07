@@ -18,7 +18,7 @@ if (-not (Test-Path -LiteralPath $flutter)) {
 
 # Network workspaces cannot always host the symlinks required by Flutter plugins.
 # Build locally and copy only the final portable package back to the workspace.
-$stage = if ($env:DD_BUILD_STAGE) { [IO.Path]::GetFullPath($env:DD_BUILD_STAGE) } else { Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev\build-workspace' }
+$stage = if ($env:DD_BUILD_STAGE) { [IO.Path]::GetFullPath($env:DD_BUILD_STAGE) } else { Join-Path $env:LOCALAPPDATA 'Ddb' }
 $marker = Join-Path $stage '.dd-build-root'
 if ((Test-Path -LiteralPath $stage) -and -not (Test-Path -LiteralPath $marker)) {
     throw "Pasta local existente sem identificação do projeto: $stage"
@@ -34,7 +34,7 @@ foreach ($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml')) {
 }
 $testTools=Join-Path $stage 'tools'
 New-Item -ItemType Directory -Path $testTools -Force | Out-Null
-foreach($name in @('test_project.ps1','test_suites.json')) {
+foreach($name in @('test_project.ps1','test_suites.json','prepare_windows_webview.ps1')) {
     Copy-Item -LiteralPath (Join-Path $workspace "tools/$name") -Destination (Join-Path $testTools $name) -Force
 }
 if(-not $SkipTests -and ($TestProfile -eq 'Regression' -or 'worker' -in $TestAreas)) {
@@ -42,7 +42,10 @@ if(-not $SkipTests -and ($TestProfile -eq 'Regression' -or 'worker' -in $TestAre
     if($LASTEXITCODE -ge 8) { throw 'Falha ao preparar testes do motor.' }
 }
 Push-Location $stage
+$savedPath=$env:PATH
 try {
+    $nugetDirectory=& (Join-Path $testTools 'prepare_windows_webview.ps1')
+    $env:PATH=$nugetDirectory+[IO.Path]::PathSeparator+$savedPath
     # The copied generated registrant may describe older dependencies. Force
     # Flutter to regenerate it from the current lockfile before reading CMake.
     $pluginManifest = Join-Path $stage '.flutter-plugins-dependencies'
@@ -122,5 +125,8 @@ try {
     $audioNotices = Join-Path $destination 'licenses\audio'
     New-Item -ItemType Directory -Path $audioNotices -Force | Out-Null
     Copy-Item -Path (Join-Path $workspace 'third_party\audio\*') -Destination $audioNotices -Force
+    $webNotices=Join-Path $destination 'licenses/webview'
+    New-Item -ItemType Directory -Path $webNotices -Force | Out-Null
+    Copy-Item -Path (Join-Path $workspace 'third_party/webview/*') -Destination $webNotices -Force
     Write-Output "Aplicativo gerado: $(Join-Path $destination 'definitive_downloader.exe')"
-} finally { Pop-Location }
+} finally { $env:PATH=$savedPath; Pop-Location }

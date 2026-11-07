@@ -84,7 +84,7 @@ class ConnectionsDialog extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     const Text(
-                        'Busca de faixas musicais sem conta. Videoclipes não são aceitos. Vincular Google para transferir playlists será uma função separada.',
+                        'Alternativa à Deezer quando houver áudio disponível. Login Google ainda não está configurado.',
                         style: TextStyle(fontSize: 12, color: AppColors.muted)),
                   ],
                 ))),

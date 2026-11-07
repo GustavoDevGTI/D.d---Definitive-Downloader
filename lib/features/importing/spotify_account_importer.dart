@@ -2,6 +2,7 @@ import '../connections/domain/spotify_auth.dart';
 import '../library/domain/models.dart';
 import 'spotify_importer.dart';
 import '../../core/network/bounded_http.dart';
+import '../connections/domain/music_account.dart';
 
 typedef SpotifyJsonReader = Future<Map<String, dynamic>> Function(String path,
     {Map<String, String> query});
@@ -13,6 +14,7 @@ class SpotifyAccountImporter {
   bool get isConnected => connected();
 
   Future<ImportedCollection> open(String input) async {
+    if (!isConnected) throw const MusicAccountRequired(MusicAccount.spotify);
     final id = const SpotifyImporter(BoundedHttp()).playlistId(input);
     final initial = await read('/playlists/$id');
     final items = initial['items'] ?? initial['tracks'];

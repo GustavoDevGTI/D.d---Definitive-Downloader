@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_identity.dart';
 import '../features/connections/application/spotify_connection_controller.dart';
+import '../features/connections/presentation/music_connection_actions.dart';
 import '../features/library/application/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import 'theme.dart';
@@ -29,8 +30,10 @@ class DefinitiveDownloaderApp extends StatelessWidget {
       title: AppIdentity.name,
       debugShowCheckedModeBanner: false,
       theme: appTheme(),
-      builder: (context, child) =>
-          PlayerScope(player: player, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => ListenableBuilder(
+          listenable: Listenable.merge([connections, controller.music?.connection]),
+          builder: (context, _) => MusicConnectionsScope(access: controller.accounts,
+              child: PlayerScope(player: player, child: child ?? const SizedBox.shrink()))),
       home: incoming == null
           ? _screen()
           : IncomingMusicHost(

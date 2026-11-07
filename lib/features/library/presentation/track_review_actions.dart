@@ -7,6 +7,7 @@ import '../domain/models.dart';
 import '../../workspace/presentation/download_action_button.dart';
 import 'manual_source_input.dart';
 import '../../player/presentation/player_scope.dart';
+import '../../connections/presentation/music_connection_actions.dart';
 
 class TrackReviewActions extends StatelessWidget {
   const TrackReviewActions({super.key, required this.controller});
@@ -26,57 +27,63 @@ class TrackReviewActions extends StatelessWidget {
               message:
                   '${track.sourceKind.musicProviderName ?? track.sourceLabel}\n${track.hasManualSource ? track.manualUrl : track.mediaUrl}')));
     }
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      if (!track.hasManualSource || track.redownloadReview) ...[
-        if (candidate == null || PlayerScope.of(context) == null) ...[
+    return Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+      MusicConnectionActions(onConnected: !track.hasManualSource || track.redownloadReview ? () => c.search('${track.artist} ${track.title}') : null),
+          if (!track.hasManualSource || track.redownloadReview) ...[
+            if (candidate == null || PlayerScope.of(context) == null) ...[
+              DownloadActionButton(
+                  label: track.redownloadReview && candidate == null
+                      ? 'Usar fonte anterior'
+                      : candidate?.isVideoRecording == true
+                          ? 'Aprovar videoclipe'
+                          : 'Confirmar correspondência',
+                  icon: Icons.check_rounded,
+                  color: AppColors.success,
+                  onPressed: c.busy ||
+                          (track.redownloadReview &&
+                              candidate == null &&
+                              !track.hasDownloadableSource) ||
+                          (candidate == null &&
+                              track.sourceKind == SourceKind.none) ||
+                          (candidate != null &&
+                              c.music != null &&
+                              !c.music!.canUse(candidate))
+                      ? null
+                      : () => unawaited(_confirm(context))),
+              const SizedBox(width: 6),
+            ],
+            DownloadActionButton(
+                label: 'Marcar para revisão',
+                icon: Icons.flag_outlined,
+                color: AppColors.accent,
+                onPressed: c.busy || track.needsReview
+                    ? null
+                    : () => unawaited(c.reviewSource())),
+            const SizedBox(width: 6),
+          ],
           DownloadActionButton(
-              label: track.redownloadReview && candidate == null
-                  ? 'Usar fonte anterior'
-                  : candidate?.isVideoRecording == true
-                      ? 'Aprovar videoclipe'
-                      : 'Confirmar correspondência',
-              icon: Icons.check_rounded,
-              color: AppColors.success,
-              onPressed: c.busy ||
-                      (track.redownloadReview &&
-                          candidate == null &&
-                          !track.hasDownloadableSource) ||
-                      (candidate == null &&
-                          track.sourceKind == SourceKind.none) ||
-                      (candidate != null &&
-                          c.music != null &&
-                          !c.music!.canUse(candidate))
-                  ? null
-                  : () => unawaited(_confirm(context))),
-          const SizedBox(width: 6),
-        ],
-        DownloadActionButton(
-            label: 'Marcar para revisão',
-            icon: Icons.flag_outlined,
-            color: AppColors.accent,
-            onPressed: c.busy || track.needsReview
-                ? null
-                : () => unawaited(c.reviewSource())),
-        const SizedBox(width: 6),
-      ],
-      DownloadActionButton(
-          label: track.hasManualSource
-              ? 'Editar link manual'
-              : 'Informar link manualmente',
-          icon: track.hasManualSource
-              ? Icons.edit_outlined
-              : Icons.add_link_rounded,
-          color: AppColors.navigation,
-          onPressed: c.busy ? null : () => unawaited(_manual(context))),
-      if (track.hasManualSource) ...[
-        const SizedBox(width: 6),
-        DownloadActionButton(
-            label: 'Remover vínculo manual',
-            icon: Icons.link_off,
-            color: AppColors.accent,
-            onPressed: c.busy ? null : () => unawaited(c.removeManualSource())),
-      ],
-    ]);
+              label: track.hasManualSource
+                  ? 'Editar link manual'
+                  : 'Informar link manualmente',
+              icon: track.hasManualSource
+                  ? Icons.edit_outlined
+                  : Icons.add_link_rounded,
+              color: AppColors.navigation,
+              onPressed: c.busy ? null : () => unawaited(_manual(context))),
+          if (track.hasManualSource) ...[
+            const SizedBox(width: 6),
+            DownloadActionButton(
+                label: 'Remover vínculo manual',
+                icon: Icons.link_off,
+                color: AppColors.accent,
+                onPressed:
+                    c.busy ? null : () => unawaited(c.removeManualSource())),
+          ],
+        ]);
   }
 
   Future<void> _manual(BuildContext context) async {
