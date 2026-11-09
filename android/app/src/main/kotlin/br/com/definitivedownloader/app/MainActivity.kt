@@ -8,6 +8,7 @@ import android.os.Bundle
 
 class MainActivity : FlutterActivity() {
     private lateinit var files: AndroidFilesChannel
+    private lateinit var spotify: SpotifyAuthChannel
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) receive(intent)
@@ -35,17 +36,20 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         files = AndroidFilesChannel(this, flutterEngine.dartExecutor.binaryMessenger,
             (application as DdApplication).runtime.documents)
+        spotify = SpotifyAuthChannel(this, flutterEngine.dartExecutor.binaryMessenger)
         (application as DdApplication).runtime.start(dartEntrypointArgs)
     }
 
     override fun onDestroy() {
         if (::files.isInitialized) files.dispose()
+        if (::spotify.isInitialized) spotify.dispose()
         super.onDestroy()
     }
 
     @Deprecated("Android activity result bridge required by FlutterActivity")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        if (!files.onActivityResult(requestCode, resultCode, data)) {
+        if (!spotify.onActivityResult(requestCode, resultCode, data) &&
+            !files.onActivityResult(requestCode, resultCode, data)) {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }

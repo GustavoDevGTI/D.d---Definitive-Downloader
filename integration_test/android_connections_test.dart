@@ -11,6 +11,22 @@ import '../test/spotify_fixtures.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('Android usa o retorno do Spotify oficial antes da aba',
+      (tester) async {
+    var valid = true;
+    final flow = AndroidSpotifyAuthorization(
+        openBrowser: (_) async => fail('O Spotify oficial já respondeu.'),
+        nativeLogin: (request) async =>
+            request.redirectUri.replace(queryParameters: {
+              'state': valid ? request.state : 'errado',
+              'code': 'fixture-native',
+            }));
+    final request = SpotifyAuthorizationRequest.generate(flow.redirectUri);
+    expect(await flow.authorize(request), 'fixture-native');
+    valid = false;
+    await expectLater(
+        flow.authorize(request), throwsA(isA<SpotifyException>()));
+  });
   testWidgets(
       'Android PKCE: retorno próprio, cofre, renovação e restauração automáticos',
       (tester) async {

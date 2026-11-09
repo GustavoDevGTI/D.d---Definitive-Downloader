@@ -34,8 +34,7 @@ class ConnectionsDialog extends StatelessWidget {
                         ? 'Conectado: ${controller.displayName}'
                         : 'Conecte sua conta para importar playlists próprias ou colaborativas.'),
                     const SizedBox(height: 10),
-                    const Text(
-                        'Acesso solicitado: leitura de playlists. O login abre no navegador oficial.',
+                    const Text('Acesso solicitado: leitura de playlists.',
                         style: TextStyle(fontSize: 12, color: AppColors.muted)),
                     const SizedBox(height: 18),
                     if (controller.busy) ...[

@@ -27,7 +27,10 @@ import 'features/connections/application/spotify_connection_controller.dart';
 import 'features/connections/data/spotify_token_store.dart';
 import 'features/connections/data/spotify_transport.dart';
 import 'features/connections/data/windows_spotify_authorization.dart';
+import 'features/connections/data/windows_spotify_web_authorization.dart';
 import 'features/connections/data/android_spotify_authorization.dart';
+import 'features/connections/domain/spotify_auth.dart';
+import 'features/connections/presentation/spotify_login_dialog.dart';
 import 'features/connections/application/deezer_connection_controller.dart';
 import 'features/connections/application/music_account_access.dart';
 import 'features/downloads/music_download_service.dart';
@@ -58,13 +61,18 @@ Future<void> main(List<String> arguments) async {
   final engine = await createMusicEngine();
   final deezer = DeezerConnectionController(
       const SecureDeezerSessionStore(FlutterSecureStorage()), engine);
+  final navigator = GlobalKey<NavigatorState>();
   final connections = SpotifyConnectionController(
       store: const SecureSpotifyTokenStore(FlutterSecureStorage()),
       transport: const SpotifyHttpTransport(),
       authorization: Platform.isWindows
-          ? WindowsSpotifyAuthorization(openBrowser: files.openUrl)
+          ? WindowsSpotifyWebAuthorization((request, cancelled) async {
+              final context = navigator.currentContext;
+              if (context == null) throw const SpotifyAuthCancelled();
+              return showSpotifyLogin(context, request, cancelled);
+            })
           : Platform.isAndroid
-              ? AndroidSpotifyAuthorization(openBrowser: files.openUrl)
+              ? AndroidSpotifyAuthorization.installed()
               : UnavailableSpotifyAuthorization());
   final controller = LibraryController(
       repository: LibraryRepository(database),
@@ -95,6 +103,7 @@ Future<void> main(List<String> arguments) async {
         : 'https://open.spotify.com/playlist/${const SpotifyImporter(http).playlistId(input)}';
   }
   runApp(DefinitiveDownloaderApp(
+      navigatorKey: navigator,
       controller: controller,
       player: player,
       connections: connections,

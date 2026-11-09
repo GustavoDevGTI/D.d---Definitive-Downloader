@@ -101,10 +101,12 @@ abstract class LoopbackSpotifyAuthorization
       await Future.wait<Object?>([
         outcome,
         Future<void>.sync(() => openBrowser(request.authorizationUri))
-            .catchError((Object _) {
+            .catchError((Object error) {
           if (!pending.isCompleted) {
-            pending.completeError(
-                const SpotifyException('Não foi possível abrir o navegador.'));
+            pending.completeError(error is SpotifyException
+                ? error
+                : const SpotifyException(
+                    'Não foi possível abrir a autorização Spotify.'));
           }
         }),
       ]);

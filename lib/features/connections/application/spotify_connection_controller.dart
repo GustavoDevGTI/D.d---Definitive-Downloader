@@ -64,8 +64,7 @@ class SpotifyConnectionController extends ChangeNotifier {
     if (busy || isConnected || !authorization.supported) return;
     final generation = ++_generation;
     status = SpotifyConnectionStatus.authorizing;
-    message =
-        'Conclua a autorização no navegador. O D.d solicita leitura de playlists.';
+    message = 'Autorize a leitura de playlists na tela do Spotify.';
     _notify();
     try {
       final request =

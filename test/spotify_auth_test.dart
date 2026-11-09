@@ -2,9 +2,37 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/features/connections/domain/spotify_auth.dart';
 import 'package:definitive_downloader/features/connections/data/windows_spotify_authorization.dart';
+import 'package:definitive_downloader/features/connections/data/windows_spotify_web_authorization.dart';
 import 'package:definitive_downloader/features/connections/data/spotify_transport.dart';
 
 void main() {
+  test('janela Spotify valida o retorno e rejeita state diferente', () async {
+    var valid = true;
+    final flow = WindowsSpotifyWebAuthorization(
+        (request, _) async => request.redirectUri.replace(queryParameters: {
+              'state': valid ? request.state : 'errado',
+              'code': 'fixture',
+            }));
+    final request = SpotifyAuthorizationRequest.generate(flow.redirectUri);
+    expect(await flow.authorize(request), 'fixture');
+    valid = false;
+    await expectLater(
+        flow.authorize(request), throwsA(isA<SpotifyException>()));
+  }, skip: !Platform.isWindows);
+
+  test('cancelar a janela Spotify libera uma nova tentativa', () async {
+    final flow = WindowsSpotifyWebAuthorization((_, cancelled) async {
+      await cancelled;
+      return null;
+    });
+    final request = SpotifyAuthorizationRequest.generate(flow.redirectUri);
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final result = expectLater(
+          flow.authorize(request), throwsA(isA<SpotifyAuthCancelled>()));
+      flow.cancel();
+      await result;
+    }
+  }, skip: !Platform.isWindows);
   test('PKCE usa vetor S256 do RFC e entropia por tentativa', () {
     expect(pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
         'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');

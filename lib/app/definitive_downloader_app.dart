@@ -14,12 +14,14 @@ class DefinitiveDownloaderApp extends StatelessWidget {
   const DefinitiveDownloaderApp(
       {super.key,
       required this.controller,
+      this.navigatorKey,
       this.player,
       this.connections,
       this.incoming,
       this.initialPlaylist = '',
       this.showConnectionsOnStart = false});
   final LibraryController controller;
+  final GlobalKey<NavigatorState>? navigatorKey;
   final MusicPlayerController? player;
   final SpotifyConnectionController? connections;
   final AndroidIncoming? incoming;
@@ -27,13 +29,17 @@ class DefinitiveDownloaderApp extends StatelessWidget {
   final bool showConnectionsOnStart;
   @override
   Widget build(BuildContext context) => MaterialApp(
+      navigatorKey: navigatorKey,
       title: AppIdentity.name,
       debugShowCheckedModeBanner: false,
       theme: appTheme(),
       builder: (context, child) => ListenableBuilder(
-          listenable: Listenable.merge([connections, controller.music?.connection]),
-          builder: (context, _) => MusicConnectionsScope(access: controller.accounts,
-              child: PlayerScope(player: player, child: child ?? const SizedBox.shrink()))),
+          listenable:
+              Listenable.merge([connections, controller.music?.connection]),
+          builder: (context, _) => MusicConnectionsScope(
+              access: controller.accounts,
+              child: PlayerScope(
+                  player: player, child: child ?? const SizedBox.shrink()))),
       home: incoming == null
           ? _screen()
           : IncomingMusicHost(
