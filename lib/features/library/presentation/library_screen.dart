@@ -97,16 +97,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
             allowChanges: !widget.controller.busy)));
   }
 
-  Future<bool> _requestAccount(MusicAccount account) async {
+  Future<MusicAccountDecision> _requestAccount(MusicAccount account,
+      {required bool allowLater}) async {
     final spotify = widget.connections,
         deezer = widget.controller.music?.connection;
-    if (!mounted || spotify == null || deezer == null) return false;
-    return await showDialog<bool>(
+    if (!mounted || spotify == null || deezer == null) {
+      return MusicAccountDecision.cancelled;
+    }
+    return await showDialog<MusicAccountDecision>(
             context: context,
             barrierDismissible: false,
             builder: (_) => AccountRequestDialog(
-                account: account, spotify: spotify, deezer: deezer)) ==
-        true;
+                account: account,
+                spotify: spotify,
+                deezer: deezer,
+                allowLater: allowLater)) ??
+        MusicAccountDecision.cancelled;
   }
 
   void _navigate(AppSection section, [int tab = 0]) {

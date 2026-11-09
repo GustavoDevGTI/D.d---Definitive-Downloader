@@ -6,6 +6,8 @@ enum MusicAccount {
   final String label;
 }
 
+enum MusicAccountDecision { connected, later, cancelled }
+
 class MusicAccountRequired extends FormatException {
   const MusicAccountRequired(this.account)
       : super('Conecte sua conta para continuar.');

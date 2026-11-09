@@ -10,10 +10,12 @@ class AccountRequestDialog extends StatefulWidget {
       {super.key,
       required this.account,
       required this.spotify,
-      required this.deezer});
+      required this.deezer,
+      this.allowLater = false});
   final MusicAccount account;
   final SpotifyConnectionController spotify;
   final DeezerConnectionController deezer;
+  final bool allowLater;
   @override
   State<AccountRequestDialog> createState() => _AccountRequestDialogState();
 }
@@ -41,7 +43,9 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
     if (connected) {
       _closing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.pop(context, true);
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          Navigator.pop(context, MusicAccountDecision.connected);
+        }
       });
     }
     setState(() {});
@@ -54,8 +58,19 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
               width: 420,
               child: SingleChildScrollView(
                   child: widget.account == MusicAccount.deezer
-                      ? DeezerConnectionPane(
-                          controller: widget.deezer, allowChanges: true)
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              DeezerConnectionPane(
+                                  controller: widget.deezer,
+                                  allowChanges: true),
+                              if (widget.allowLater)
+                                const Padding(
+                                    padding: EdgeInsets.only(top: 12),
+                                    child: Text(
+                                        'Você pode importar pelo Spotify e conectar o Deezer depois.')),
+                            ])
                       : Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,11 +93,19 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
           actions: [
             TextButton(
                 onPressed: () {
-                  if (widget.account == MusicAccount.spotify && widget.spotify.busy) {
+                  if (widget.account == MusicAccount.spotify &&
+                      widget.spotify.busy) {
                     widget.spotify.cancel();
                   }
-                  Navigator.pop(context, false);
+                  Navigator.pop(context, MusicAccountDecision.cancelled);
                 },
-                child: const Text('Cancelar'))
+                child: const Text('Cancelar')),
+            if (widget.account == MusicAccount.deezer && widget.allowLater)
+              TextButton(
+                  onPressed: widget.deezer.busy || _closing
+                      ? null
+                      : () =>
+                          Navigator.pop(context, MusicAccountDecision.later),
+                  child: const Text('Fazer login depois')),
           ]);
 }

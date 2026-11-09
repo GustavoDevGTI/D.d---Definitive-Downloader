@@ -60,9 +60,11 @@ class LibraryController extends ChangeNotifier {
   final SoundCloudCatalog soundcloud;
   final MusicAccountAccess? accounts;
 
-  Future<bool> _authorize(String input) async {
+  Future<bool> _authorize(String input, {bool allowDeezerLater = true}) async {
     try {
-      final allowed = await accounts?.ensure(input) ?? true;
+      final allowed =
+          await accounts?.ensure(input, allowDeezerLater: allowDeezerLater) ??
+              true;
       if (!allowed) {
         message = 'Conexão cancelada. A playlist não foi alterada.';
         notifyListeners();
@@ -562,7 +564,8 @@ class LibraryController extends ChangeNotifier {
     if (collection == null || busy || music?.available != true || isExample) {
       return;
     }
-    if (!await _authorize(collection.sourceUrl) ||
+    if (!await _authorize(collection.sourceUrl,
+            allowDeezerLater: onlyPending) ||
         current?.id != collection.id ||
         busy) {
       return;
@@ -570,7 +573,8 @@ class LibraryController extends ChangeNotifier {
     if (accounts != null &&
         !accounts!.connected(MusicAccount.deezer) &&
         await repository.needsSourcePreparation(collection.id) &&
-        !await _authorizePrimary()) {
+        ((onlyPending && accounts!.deezerDeferred) ||
+            !await _authorizePrimary())) {
       return;
     }
     if (current?.id != collection.id || busy) return;

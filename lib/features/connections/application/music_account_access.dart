@@ -8,18 +8,32 @@ class MusicAccountAccess {
   MusicAccountAccess(
       {required this.spotifyConnected, required this.deezerConnected});
   final bool Function() spotifyConnected, deezerConnected;
-  Future<bool> Function(MusicAccount)? requestLogin;
-  Future<bool>? _pending;
+  Future<MusicAccountDecision> Function(MusicAccount,
+      {required bool allowLater})? requestLogin;
+  ({MusicAccount account, Future<MusicAccountDecision> decision})? _pending;
+  bool _deezerDeferred = false;
+
+  bool get deezerDeferred => _deezerDeferred && !deezerConnected();
+
   bool connected(MusicAccount account) =>
       account == MusicAccount.spotify ? spotifyConnected() : deezerConnected();
-  Future<bool> connect(MusicAccount account) async {
-    if (connected(account)) return true;
-    if (_pending != null) {
-      await _pending;
-      return connected(account);
+
+  Future<bool> connect(MusicAccount account) async =>
+      await _decide(account, allowLater: false) ==
+      MusicAccountDecision.connected;
+
+  Future<MusicAccountDecision> _decide(MusicAccount account,
+      {required bool allowLater}) async {
+    if (connected(account)) return MusicAccountDecision.connected;
+    final pending = _pending;
+    if (pending != null) {
+      final decision = await pending.decision;
+      if (pending.account == account) return decision;
+      return _decide(account, allowLater: allowLater);
     }
-    final operation = _request(account);
-    _pending = operation;
+    if (allowLater && deezerDeferred) return MusicAccountDecision.later;
+    final operation = _request(account, allowLater: allowLater);
+    _pending = (account: account, decision: operation);
     try {
       return await operation;
     } finally {
@@ -27,13 +41,25 @@ class MusicAccountAccess {
     }
   }
 
-  Future<bool> _request(MusicAccount account) async {
+  Future<MusicAccountDecision> _request(MusicAccount account,
+      {required bool allowLater}) async {
     final request = requestLogin;
     if (request == null) throw MusicAccountRequired(account);
-    return await request(account) && connected(account);
+    final decision = await request(account, allowLater: allowLater);
+    if (decision == MusicAccountDecision.connected && connected(account)) {
+      if (account == MusicAccount.deezer) _deezerDeferred = false;
+      return decision;
+    }
+    if (account == MusicAccount.deezer &&
+        allowLater &&
+        decision == MusicAccountDecision.later) {
+      _deezerDeferred = true;
+      return decision;
+    }
+    return MusicAccountDecision.cancelled;
   }
 
-  Future<bool> ensure(String input) async {
+  Future<bool> ensure(String input, {bool allowDeezerLater = true}) async {
     final refs = input.split(RegExp(r'[\r\n]+')).map((s) => s.trim());
     final spotify = refs.any((s) =>
         s.startsWith('spotify:') ||
@@ -52,8 +78,12 @@ class MusicAccountAccess {
     final deezer = refs.any((s) => const {'deezer.com', 'www.deezer.com'}
         .contains(Uri.tryParse(s)?.host.toLowerCase()));
     if (spotify && !await connect(MusicAccount.spotify)) return false;
-    if ((spotify || deezer) && !await connect(MusicAccount.deezer)) {
-      return false;
+    if (deezer || (spotify && !allowDeezerLater)) {
+      return connect(MusicAccount.deezer);
+    }
+    if (spotify) {
+      return await _decide(MusicAccount.deezer, allowLater: true) !=
+          MusicAccountDecision.cancelled;
     }
     return true;
   }
