@@ -8,6 +8,7 @@ import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/importing/csv_importer.dart';
+import 'package:definitive_downloader/features/importing/spotify_account_importer.dart';
 import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
@@ -17,25 +18,37 @@ import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
 
-class FixturePlaylist extends SpotifyImporter {
-  FixturePlaylist(this.tracks) : super(const BoundedHttp());
+const fixturePlaylistUrl =
+    'https://open.spotify.com/playlist/0123456789012345678901';
+
+class FixturePlaylist extends SpotifyAccountImporter {
+  FixturePlaylist(this.tracks)
+      : super((_, {query = const {}}) async => throw UnimplementedError(),
+            () => true);
   final List<TrackDraft> tracks;
+  final opened = Completer<void>();
+
   @override
-  Future<ImportedCollection> open(String input) async => ImportedCollection(
-      name: 'Playlist de teste',
-      source: 'Spotify',
-      sourceUrl: '',
-      tracks: Stream.fromIterable(tracks));
+  Future<ImportedCollection> open(String input) async {
+    opened.complete();
+    return ImportedCollection(
+        name: 'Playlist de teste',
+        source: 'Spotify · conta conectada',
+        sourceUrl: input,
+        tracks: Stream.fromIterable(tracks));
+  }
 }
 
 class FixtureMatching extends MusicResolver {
   FixtureMatching(super.engine, super.connection);
   Completer<void>? gate;
+  final started = Completer<void>();
   final calls = <int>[];
   @override
   Future<List<Candidate>> search(Track track, String query,
       {DownloadCancellation? cancellation}) async {
     calls.add(track.id);
+    if (!started.isCompleted) started.complete();
     await gate?.future;
     cancellation?.check();
     if (track.title == 'Erro') {
@@ -70,11 +83,14 @@ void main() {
   late LibraryRepository repository;
   late DeezerConnectionController connection;
   late FixtureMatching resolver;
+  late FixturePlaylist importer;
   LibraryController controller(List<TrackDraft> tracks) {
+    importer = FixturePlaylist(tracks);
     final c = LibraryController(
         repository: repository,
         files: DesktopFiles(),
-        spotify: FixturePlaylist(tracks),
+        spotify: const SpotifyImporter(BoundedHttp()),
+        accountSpotify: importer,
         csv: const CsvImporter(),
         catalog: const DeezerCatalog(BoundedHttp()),
         music: resolver,
@@ -107,7 +123,8 @@ void main() {
     final c = controller([
       const TrackDraft(title: 'Nova', artist: 'Pessoa', durationMs: 180000)
     ]);
-    final pending = c.importPlaylist('fixture');
+    final pending = c.importPlaylist(fixturePlaylistUrl);
+    await importer.opened.future;
     expect(c.importing, isTrue);
     c.cancel();
     await pending;
@@ -124,7 +141,8 @@ void main() {
       for (final name in ['Certa', 'Vazia', 'Erro', 'Vídeo'])
         TrackDraft(title: name, artist: 'Pessoa', durationMs: 180000)
     ]);
-    await c.importSpotify('fixture');
+    await c.importSpotify(fixturePlaylistUrl);
+    await resolver.started.future;
     expect(c.preparing, isTrue);
     expect(c.importing, isFalse);
     expect(c.downloading, isFalse);
@@ -158,7 +176,7 @@ void main() {
           mediaUrl: 'https://example.org/a.mp3',
           sourceKind: SourceKind.directMp3)
     ]);
-    await c.importSpotify('fixture');
+    await c.importSpotify(fixturePlaylistUrl);
     await finishMatching(c);
     expect(resolver.calls.length, 45);
     expect((await repository.page(c.current!.id, offset: 40)).items.length, 6);
@@ -181,6 +199,7 @@ void main() {
     resolver.gate = Completer<void>();
     final c = controller([]);
     await c.openCollection((await repository.collectionById(id))!);
+    await resolver.started.future;
     expect(c.preparing, isTrue);
     c.cancel();
     resolver.gate!.complete();

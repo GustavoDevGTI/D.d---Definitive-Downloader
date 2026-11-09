@@ -181,7 +181,7 @@ void main() {
       expect(entries.single.source!.kind, SourceKind.youtubeMusic);
       expect(entries.single.ready, isTrue);
       expect(entries.single.pinned, isFalse);
-      expect(entries.single.alternatives.length, 2);
+      expect(entries.single.alternatives.map((item) => item.title), ['Canção']);
     } finally {
       connection.dispose();
     }

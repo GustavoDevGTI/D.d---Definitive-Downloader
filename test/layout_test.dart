@@ -191,7 +191,9 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, 'Conexões'));
       await tester.pumpAndSettle();
       expect(find.text('Conectar Spotify'), findsOneWidget);
-      expect(find.text('Sessão Deezer (ARL)'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Entrar na Deezer'),
+          findsOneWidget);
+      expect(find.text('Sessão Deezer (ARL)'), findsNothing);
       await capture(tester, captureKey, 'music-connections-${width.toInt()}');
       await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
