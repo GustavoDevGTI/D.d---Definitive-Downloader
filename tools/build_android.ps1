@@ -2,6 +2,7 @@ param(
     [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent),
     [string]$StageRoot=(Join-Path $env:LOCALAPPDATA 'DdbAndroid'),
     [string]$FlutterPath=(Join-Path $env:LOCALAPPDATA 'DownloaderDevTools/flutter/bin/flutter.bat'),
+    [string]$SdkRoot=(Join-Path $env:LOCALAPPDATA 'Android/Sdk'),
     [string]$JavaHome='',
     [string]$PythonPath='',
     [switch]$SkipTests,
@@ -45,6 +46,7 @@ foreach($name in @('pubspec.yaml','pubspec.lock','analysis_options.yaml')) {
 }
 $savedJava=$env:JAVA_HOME
 $savedOptions=$env:JAVA_TOOL_OPTIONS
+$savedSigning=$env:DD_ANDROID_TEST_SIGNING
 if(-not $JavaHome) {
     $candidate='C:\Program Files\Android\Android Studio\jbr'
     $JavaHome=if(Test-Path -LiteralPath $candidate){$candidate}else{$env:JAVA_HOME}
@@ -69,37 +71,64 @@ try {
     if(-not $SkipTests){
         & (Join-Path $stage 'tools/test_project.ps1') -WorkspaceRoot $stage -FlutterPath $FlutterPath -Area mobile
     }
-    & $FlutterPath build apk --debug --no-pub --target lib/main.dart --target-platform android-arm64,android-x64
+    $env:DD_ANDROID_TEST_SIGNING='1'
+    # Let Flutter regenerate the release registrant without dev-only plugins.
+    & $FlutterPath build apk --release --split-per-abi --target lib/main.dart --target-platform android-arm64,android-x64
     if($LASTEXITCODE -ne 0){throw 'A compilação do APK falhou.'}
+    $buildTools=Get-ChildItem -LiteralPath (Join-Path $SdkRoot 'build-tools') -Directory |
+        Where-Object {$_.Name -match '^\d+\.\d+\.\d+$'} |
+        Sort-Object {[version]$_.Name} -Descending | Select-Object -First 1
+    if(!$buildTools){throw 'Android build-tools não encontrado.'}
+    $aapt=Join-Path $buildTools.FullName 'aapt.exe'
+    $apksigner=Join-Path $buildTools.FullName 'apksigner.bat'
+    $versionMatch=(Select-String -LiteralPath pubspec.yaml -Pattern '^version:\s*([\d.]+)\+(\d+)').Matches[0]
+    $version=$versionMatch.Groups[1].Value
+    $versionCode=$versionMatch.Groups[2].Value
+    $abis=@('arm64-v8a','x86_64')
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive=[IO.Compression.ZipFile]::OpenRead((Join-Path $stage 'build/app/outputs/flutter-apk/app-debug.apk'))
-    try {
-        $entries=@($archive.Entries.FullName)
-        $abis=@($entries | Where-Object {$_ -match '^lib/([^/]+)/'} |
-            ForEach-Object {($_ -split '/')[1]} | Sort-Object -Unique)
-        if(@($abis | Where-Object {$_ -notin @('arm64-v8a','x86_64')}).Count -gt 0){
-            throw 'APK anuncia uma ABI sem runtime Flutter completo.'
+    foreach($abi in $abis) {
+        $built=Join-Path $stage "build/app/outputs/flutter-apk/app-$abi-release.apk"
+        if((Get-Item -LiteralPath $built).Length -gt 80MB){
+            throw "O APK $abi excede 80 MiB."
         }
-        foreach($abi in @('arm64-v8a','x86_64')) {
-            foreach($library in @('libflutter.so','libsqlite3.so','libpython.so','libffmpeg.so','libqjs.so','libpython.zip.so','libffmpeg.zip.so')) {
+        $badging=& $aapt dump badging $built
+        if($LASTEXITCODE -ne 0 -or
+            !($badging -like "package: name='br.com.definitivedownloader.app' versionCode='$versionCode' versionName='$version'*") -or
+            $badging -match '^application-debuggable' -or
+            !($badging -match "^native-code: '$abi'\s*$")){
+            throw "Manifesto ou ABI inesperada no APK $abi."
+        }
+        & $apksigner verify $built
+        if($LASTEXITCODE -ne 0){throw "Assinatura inválida no APK $abi."}
+        $archive=[IO.Compression.ZipFile]::OpenRead($built)
+        try {
+            $entries=@($archive.Entries.FullName)
+            if('assets/flutter_assets/kernel_blob.bin' -in $entries -or
+                $entries -match '/libmpv\.so$'){
+                throw "Código de depuração ou áudio Windows encontrado no APK $abi."
+            }
+            foreach($library in @('libapp.so','libflutter.so','libsqlite3.so','libpython.so','libffmpeg.so','libqjs.so','libpython.zip.so','libffmpeg.zip.so')) {
                 if("lib/$abi/$library" -notin $entries){throw "Biblioteca ausente: $abi/$library"}
             }
-        }
-        foreach($asset in @('assets/dd_music_bundle.zip','assets/dd_music_bundle.sha256')) {
-            if($asset -notin $entries){throw "Módulos Android ausentes: $asset"}
-        }
-    } finally {$archive.Dispose()}
-    $version=(Select-String -LiteralPath pubspec.yaml -Pattern '^version:\s*([\d.]+)').Matches[0].Groups[1].Value
+            foreach($asset in @('assets/dd_music_bundle.zip','assets/dd_music_bundle.sha256')) {
+                if($asset -notin $entries){throw "Módulos Android ausentes: $asset"}
+            }
+        } finally {$archive.Dispose()}
+    }
     $destination=Join-Path $workspace 'dist/Android'
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    $apk=Join-Path $destination "Definitive-Downloader-$version-Android-teste.apk"
-    Copy-Item -LiteralPath 'build/app/outputs/flutter-apk/app-debug.apk' -Destination $apk -Force
-    $hash=(Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath ($apk+'.sha256') -Value "$hash  $([IO.Path]::GetFileName($apk))" -Encoding ascii
-    Write-Output "APK de teste (chave debug): $apk"
-    Write-Output "SHA-256: $hash"
+    foreach($abi in $abis) {
+        $name="Definitive-Downloader-$version-Android-$abi-teste.apk"
+        $apk=Join-Path $destination $name
+        Copy-Item -LiteralPath "build/app/outputs/flutter-apk/app-$abi-release.apk" -Destination $apk -Force
+        $hash=(Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath ($apk+'.sha256') -Value "$hash  $name" -Encoding ascii
+        Write-Output "APK de teste otimizado: $apk"
+        Write-Output "SHA-256: $hash"
+    }
 } finally {
     Pop-Location
     if($null -eq $savedJava){Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue}else{$env:JAVA_HOME=$savedJava}
     if($null -eq $savedOptions){Remove-Item Env:JAVA_TOOL_OPTIONS -ErrorAction SilentlyContinue}else{$env:JAVA_TOOL_OPTIONS=$savedOptions}
+    if($null -eq $savedSigning){Remove-Item Env:DD_ANDROID_TEST_SIGNING -ErrorAction SilentlyContinue}else{$env:DD_ANDROID_TEST_SIGNING=$savedSigning}
 }

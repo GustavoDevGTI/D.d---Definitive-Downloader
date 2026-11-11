@@ -1,6 +1,6 @@
 Definitive Downloader — local audio playback components
 
-media_kit 1.2.6 and media_kit_libs_audio 1.0.7: MIT.
+media_kit 1.2.6 and media_kit_libs_windows_audio 1.0.9: MIT.
 The MIT license for the Dart binding does not replace native-library licenses.
 https://github.com/media-kit/media-kit
 

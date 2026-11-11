@@ -6,6 +6,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val splitApk = providers.gradleProperty("split-per-abi").orNull == "true"
+val pilotSigning = providers.environmentVariable("DD_ANDROID_TEST_SIGNING").orNull == "1"
+if (pilotSigning) {
+    // Keep the same version code for both APKs and allow updates from the debug pilot.
+    extra["force-version-code-ignoring-abi"] = true
+}
+
 android {
     namespace = "br.com.definitivedownloader.app"
     compileSdk = flutter.compileSdkVersion
@@ -19,9 +26,11 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "br.com.definitivedownloader.app"
-        ndk {
-            abiFilters.clear()
-            abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+        if (!splitApk) {
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+            }
         }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -35,9 +44,11 @@ android {
         versionName = flutter.versionName
     }
 
-    // The pilot is built in debug mode. Production signing is intentionally
-    // unconfigured: a GitHub/Play release must never silently use a debug key.
     buildTypes {
+        release {
+            // Only the pilot build script opts into the existing test key.
+            if (pilotSigning) signingConfig = signingConfigs.getByName("debug")
+        }
         debug {
             val entry = project.findProperty("target")?.toString()?.replace('\\', '/') ?: "lib/main.dart"
             // Flutter may wrap an integration target in a generated listener.
