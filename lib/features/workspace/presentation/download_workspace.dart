@@ -5,6 +5,7 @@ import '../../../app/button_hover_motion.dart';
 import '../../library/domain/models.dart';
 import '../application/workspace_controller.dart';
 import '../domain/workspace_models.dart';
+import '../domain/download_columns.dart';
 import 'workspace_components.dart';
 import 'download_table.dart';
 import 'download_action_button.dart';
@@ -134,6 +135,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                             (e) => e.track.status != TrackStatus.downloading)
                     ? () => unawaited(_remove(context))
                     : null);
+            final colorSorted = c.downloadSort == DownloadSort.playlistColor;
             final filters = Wrap(spacing: 4, runSpacing: 4, children: [
               for (final filter in DownloadFilter.values)
                 TextButton(
@@ -151,7 +153,28 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       DownloadFilter.paused => 'Pausado',
                       DownloadFilter.completed => 'Concluído',
                       DownloadFilter.failed => 'Erro',
-                    }))
+                    })),
+              if (enabled)
+                Tooltip(
+                    message: 'Ordenar por cor da playlist',
+                    child: TextButton.icon(
+                        key: const ValueKey('sort-download-playlist-color'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: colorSorted
+                                ? AppColors.accentActive
+                                : AppColors.muted,
+                            backgroundColor:
+                                colorSorted ? AppColors.accentSoft : null),
+                        onPressed: () => unawaited(
+                            c.sortDownloads(DownloadSort.playlistColor)),
+                        icon: Icon(
+                            colorSorted
+                                ? (c.downloadDescending
+                                    ? Icons.arrow_downward
+                                    : Icons.arrow_upward)
+                                : Icons.palette_outlined,
+                            size: 16),
+                        label: const Text('Cor'))),
             ]);
             final footer = Row(children: [
               Expanded(

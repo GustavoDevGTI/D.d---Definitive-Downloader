@@ -31,7 +31,8 @@ class LibraryRepository {
       editingLocked: r['editing_locked'] == 1,
       groupId: r['group_id'] as int?,
       storageName: r['storage_name'] as String? ?? '',
-      coverPath: r['cover_path'] as String? ?? '');
+      coverPath: r['cover_path'] as String? ?? '',
+      themeColor: r['theme_color'] as int?);
 
   Future<int> importCollection(ImportedCollection collection) async {
     final id = await _createCollection(

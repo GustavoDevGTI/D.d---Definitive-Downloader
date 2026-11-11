@@ -42,6 +42,7 @@ class ContinuousDownloadListing {
           old?.downloadedAt == entry.downloadedAt;
       _entries[entry.track.id] = DownloadEntry(
           entry.track, entry.collectionName,
+          playlistColor: entry.playlistColor,
           downloadedAt: entry.downloadedAt,
           fileBytes: sameFile ? old?.fileBytes : null);
       if (!sameFile) _checked.remove(entry.track.id);
@@ -82,6 +83,7 @@ class ContinuousDownloadListing {
             current.fileBytes != sizes[row.track.id]) {
           _entries[row.track.id] = DownloadEntry(
               current.track, current.collectionName,
+              playlistColor: current.playlistColor,
               downloadedAt: current.downloadedAt,
               fileBytes: sizes[row.track.id]);
           changed = true;

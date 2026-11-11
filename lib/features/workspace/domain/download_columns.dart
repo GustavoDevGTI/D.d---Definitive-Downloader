@@ -31,10 +31,11 @@ enum DownloadSort {
   provider(3),
   status(4),
   downloadedAt(9),
-  destination(10);
+  destination(10),
+  playlistColor(null);
 
   const DownloadSort(this.column);
-  final int column;
+  final int? column;
   static DownloadSort? forColumn(int column) {
     for (final sort in values) {
       if (sort.column == column) return sort;

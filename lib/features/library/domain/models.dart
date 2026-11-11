@@ -54,8 +54,9 @@ class Collection {
       this.editingLocked = false,
       this.groupId,
       this.storageName = '',
-      this.coverPath = ''});
-  final int? groupId;
+      this.coverPath = '',
+      this.themeColor});
+  final int? groupId, themeColor;
   final String storageName, coverPath;
   String get outputFolderName => storageName.isEmpty ? name : storageName;
   final int id;

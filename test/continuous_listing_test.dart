@@ -10,6 +10,8 @@ import 'package:definitive_downloader/features/workspace/data/continuous_downloa
 import 'package:definitive_downloader/features/workspace/application/continuous_download_listing.dart';
 import 'package:definitive_downloader/features/workspace/data/workspace_repository.dart';
 import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
+import 'package:definitive_downloader/features/workspace/domain/download_columns.dart';
+import 'package:definitive_downloader/features/organization/data/collection_organization_repository.dart';
 import 'schema_fixtures.dart';
 import 'package:definitive_downloader/features/library/data/redownload_repository.dart';
 
@@ -115,6 +117,57 @@ void main() {
         data.sizes(List.filled(101, renamed.items.first)), throwsArgumentError);
   });
 
+  test('cores de playlists migram e agrupam Downloads sem mudar a fila',
+      () async {
+    final firstId = await import(2), secondId = await import(2);
+    final before = (await repo.page(firstId)).items.map((t) => t.id).toList();
+    await repo.select(before.first, true);
+    await repo.database.run((db) {
+      removePlaylistThemeSchema(db);
+      db.execute('PRAGMA user_version=16');
+    });
+    await repo.database.initialize();
+    final first = (await repo.collectionById(firstId))!;
+    final second = (await repo.collectionById(secondId))!;
+    expect(first.themeColor, isNotNull);
+    expect(second.themeColor, isNot(first.themeColor));
+    expect((await repo.page(firstId)).items.map((t) => t.id), before);
+    expect((await repo.page(firstId)).items.first.selected, isTrue);
+
+    final organization = CollectionOrganizationRepository(repo.database);
+    final thirdId = await organization.create('Nova');
+    expect((await repo.collectionById(thirdId))!.themeColor,
+        isNot(anyOf(isNull, first.themeColor, second.themeColor)));
+    await expectLater(
+        organization.rename(firstId, 'Alteração recusada',
+            themeColor: second.themeColor),
+        throwsFormatException);
+    expect((await repo.collectionById(firstId))!.name, first.name);
+
+    await organization.rename(secondId, 'Segunda', themeColor: 0x125500);
+    final data = ContinuousDownloadRepository(repo.database);
+    final listing = ContinuousDownloadListing(data);
+    final baseline = (await listing.load(ContentCategory.music))!;
+    final revision =
+        (await data.read(ContentCategory.music, since: -1)).revision;
+    await organization.rename(firstId, 'Primeira', themeColor: 0xBB6600);
+    final delta = await data.read(ContentCategory.music, since: revision);
+    expect(delta.changed.map((e) => e.track.id), unorderedEquals(before));
+    expect(delta.changed.every((e) => e.playlistColor == 0xBB6600), isTrue);
+    final byColor = (await listing.load(ContentCategory.music,
+        sort: DownloadSort.playlistColor))!;
+    expect(byColor.items.map((e) => e.collectionName),
+        ['Segunda', 'Segunda', 'Primeira', 'Primeira']);
+    final reversed = (await listing.load(ContentCategory.music,
+        sort: DownloadSort.playlistColor, descending: true))!;
+    expect(reversed.items.map((e) => e.track.id).take(2), before);
+    final restored = (await listing.load(ContentCategory.music))!;
+    expect(restored.items.map((e) => e.track.id),
+        baseline.items.map((e) => e.track.id));
+    await repo.database.initialize();
+    expect((await repo.collectionById(firstId))!.themeColor, 0xBB6600);
+  });
+
   test('migração v12 conserva campos e cria revisão sem trabalho nem download',
       () async {
     final id = await import(3);
@@ -139,7 +192,7 @@ void main() {
           db.select('PRAGMA quick_check').single.values.single,
           db.select('PRAGMA foreign_key_check').length
         ]);
-    expect(check, [16, 'ok', 0]);
+    expect(check, [17, 'ok', 0]);
     final data = ContinuousTrackRepository(repo.database);
     final snapshot = await data.read(id, since: -1);
     await repo.database.run((db) {

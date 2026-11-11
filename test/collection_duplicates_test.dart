@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'schema_fixtures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
@@ -362,6 +363,7 @@ void main() {
   test('migração 15 para 16 cria diário vazio sem alterar faixas', () async {
     final old = await seed([entry('a')]);
     await repo.database.run((db) {
+      removePlaylistThemeSchema(db);
       db.execute('DROP TABLE music_replacement_files');
       db.execute('PRAGMA user_version=15');
     });

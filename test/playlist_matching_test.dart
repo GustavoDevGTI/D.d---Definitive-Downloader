@@ -21,8 +21,20 @@ import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
 const fixturePlaylistUrl =
     'https://open.spotify.com/playlist/0123456789012345678901';
 
-class FixturePlaylist extends SpotifyAccountImporter {
-  FixturePlaylist(this.tracks)
+class FixturePlaylist extends SpotifyImporter {
+  FixturePlaylist(this.tracks) : super(const BoundedHttp());
+  final List<TrackDraft> tracks;
+
+  @override
+  Future<ImportedCollection> open(String input) async => ImportedCollection(
+      name: 'Playlist de teste',
+      source: 'Spotify',
+      sourceUrl: '',
+      tracks: Stream.fromIterable(tracks));
+}
+
+class _ConnectedPlaylistFixture extends SpotifyAccountImporter {
+  _ConnectedPlaylistFixture(this.tracks)
       : super((_, {query = const {}}) async => throw UnimplementedError(),
             () => true);
   final List<TrackDraft> tracks;
@@ -83,9 +95,9 @@ void main() {
   late LibraryRepository repository;
   late DeezerConnectionController connection;
   late FixtureMatching resolver;
-  late FixturePlaylist importer;
+  late _ConnectedPlaylistFixture importer;
   LibraryController controller(List<TrackDraft> tracks) {
-    importer = FixturePlaylist(tracks);
+    importer = _ConnectedPlaylistFixture(tracks);
     final c = LibraryController(
         repository: repository,
         files: DesktopFiles(),

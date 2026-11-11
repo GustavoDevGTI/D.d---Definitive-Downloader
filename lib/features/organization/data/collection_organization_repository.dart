@@ -69,13 +69,30 @@ class CollectionOrganizationRepository {
     });
   }
 
-  Future<void> rename(int id, String name) async {
+  Future<Set<int>> usedThemeColors(int exceptId) => database.run((db) => db
+      .select(
+          'SELECT theme_color FROM collections WHERE id!=? AND theme_color IS NOT NULL',
+          [exceptId])
+      .map((row) => row['theme_color'] as int)
+      .toSet());
+
+  Future<void> rename(int id, String name, {int? themeColor}) async {
     final valid = organizationName(name);
+    if (themeColor != null && (themeColor < 0 || themeColor > 0xFFFFFF)) {
+      throw const FormatException('Escolha uma cor válida.');
+    }
     await database.run((db) {
-      db.execute(
-          'UPDATE collections SET name=?,storage_name=CASE WHEN storage_name=\'\' THEN name ELSE storage_name END WHERE id=?',
-          [valid, id]);
+      db.execute('''UPDATE collections SET name=?,
+            storage_name=CASE WHEN storage_name='' THEN name ELSE storage_name END,
+            theme_color=COALESCE(?,theme_color)
+            WHERE id=? AND NOT EXISTS(
+              SELECT 1 FROM collections WHERE theme_color=? AND id!=?
+            )''', [valid, themeColor, id, themeColor, id]);
       if (db.updatedRows != 1) {
+        if (db
+            .select('SELECT 1 FROM collections WHERE id=?', [id]).isNotEmpty) {
+          throw const FormatException('Outra playlist já usa essa cor.');
+        }
         throw const FormatException('Playlist não encontrada.');
       }
     });

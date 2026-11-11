@@ -10,29 +10,32 @@ import 'package:definitive_downloader/features/workspace/domain/download_columns
 import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
 import 'package:definitive_downloader/features/workspace/presentation/download_table.dart';
 
-DownloadEntry entry(int i, {DateTime? downloadedAt}) => DownloadEntry(
-    Track(
-        id: i,
-        collectionId: 1,
-        position: i,
-        title: 'Faixa de nome longo número $i',
-        artist: 'Pessoa',
-        album: '',
-        durationMs: 180000,
-        isrc: '',
-        coverUrl: '',
-        sourceUrl: '',
-        mediaUrl: 'https://example.org/$i.mp3',
-        sourceKind: SourceKind.directMp3,
-        status:
-            downloadedAt == null ? TrackStatus.ready : TrackStatus.completed,
-        selected: false,
-        localPath: '',
-        error: '',
-        resolvedTitle: '',
-        resolvedArtist: ''),
-    'Fixture',
-    downloadedAt: downloadedAt);
+DownloadEntry entry(int i, {DateTime? downloadedAt, int? playlistColor}) =>
+    DownloadEntry(
+        Track(
+            id: i,
+            collectionId: 1,
+            position: i,
+            title: 'Faixa de nome longo número $i',
+            artist: 'Pessoa',
+            album: '',
+            durationMs: 180000,
+            isrc: '',
+            coverUrl: '',
+            sourceUrl: '',
+            mediaUrl: 'https://example.org/$i.mp3',
+            sourceKind: SourceKind.directMp3,
+            status: downloadedAt == null
+                ? TrackStatus.ready
+                : TrackStatus.completed,
+            selected: false,
+            localPath: '',
+            error: '',
+            resolvedTitle: '',
+            resolvedArtist: ''),
+        'Fixture',
+        downloadedAt: downloadedAt,
+        playlistColor: playlistColor);
 
 Future<void> expectHandleBackground(
     WidgetTester tester, GlobalKey key, Finder handle) async {
@@ -102,7 +105,10 @@ void main() {
               theme: appTheme(),
               home: Scaffold(
                   body: DownloadTable(
-                      entries: List.generate(40, (i) => entry(i + 1)),
+                      entries: List.generate(
+                          40,
+                          (i) => entry(i + 1,
+                              playlistColor: i < 3 ? 0x287DAB : 0x40864D)),
                       widths: widths,
                       onResize: (_) {},
                       onResizeEnd: () {},
@@ -147,7 +153,14 @@ void main() {
       });
       await capture(tester, captureKey, 'table-top-${width.toInt()}');
       if (width > 600) expect(before.width, closeTo(width - 12, .01));
-      expect(find.byKey(const ValueKey('download-row-1')), findsOneWidget);
+      final firstRow = find.byKey(const ValueKey('download-row-1'));
+      expect(find.descendant(of: firstRow, matching: find.text('Fixture')),
+          findsOneWidget);
+      final rowSurface = tester.widget<Container>(find
+          .descendant(of: firstRow, matching: find.byType(Container))
+          .first);
+      expect((rowSurface.decoration! as BoxDecoration).color,
+          Color.alphaBlend(const Color(0x12287DAB), Colors.white));
       await tester.drag(
           find.byKey(const ValueKey('download-rows')), const Offset(0, -900));
       await tester.pumpAndSettle();

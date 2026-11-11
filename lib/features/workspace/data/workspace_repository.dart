@@ -43,13 +43,14 @@ class WorkspaceRepository {
             .select('SELECT COUNT(*) AS n $from WHERE $where', args)
             .single['n'] as int;
         final rows = db.select(
-            'SELECT t.*,c.name AS collection_name,h.created_at AS downloaded_at $from WHERE $where '
+            'SELECT t.*,c.name AS collection_name,c.theme_color,h.created_at AS downloaded_at $from WHERE $where '
             'ORDER BY $order LIMIT 40 OFFSET ?',
             [...args, offset]);
         return DownloadPage(
             rows
                 .map((r) => DownloadEntry(LibraryRepository.readTrack(r),
                     r['collection_name'] as String,
+                    playlistColor: r['theme_color'] as int?,
                     downloadedAt:
                         _readCompletionDate(r['downloaded_at'] as String?)))
                 .toList(),
@@ -66,7 +67,9 @@ class WorkspaceRepository {
             } catch (_) {/* Unavailable public volume. */}
           }
           return DownloadEntry(track, entry.collectionName,
-              downloadedAt: entry.downloadedAt, fileBytes: size);
+              playlistColor: entry.playlistColor,
+              downloadedAt: entry.downloadedAt,
+              fileBytes: size);
         }));
         return DownloadPage(entries, page.total);
       });

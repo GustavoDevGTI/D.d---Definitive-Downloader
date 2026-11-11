@@ -100,6 +100,17 @@ void main() {
       await tester.tap(find.text('Salvar'));
       await ioUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
       await tester.tap(find.byKey(ValueKey('collection-rename-$originalId')));
+      await ioUntil(
+          tester, () => find.text('Cor da playlist').evaluate().isNotEmpty);
+      await tester.tap(find.text('Cor da playlist'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('playlist-color-wheel')));
+      await tester.pumpAndSettle();
+      final hex = find.byKey(const ValueKey('playlist-color-hex'));
+      expect(tester.widget<TextField>(hex).controller!.text, 'FFFFFF');
+      await tester.enterText(hex, '4374A9');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Usar cor'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('organization-name')),
           'Estrada e companhia');
@@ -146,6 +157,7 @@ void main() {
       }
       await tester.runAsync(() async {
         final owner = (await library.repository.collectionById(originalId))!;
+        expect(owner.themeColor, 0x4374A9);
         expect(owner.name, 'Estrada e companhia');
         expect(owner.outputFolderName, 'Para ouvir no caminho');
         expect(owner.groupId, (await repository.groups()).single.id);

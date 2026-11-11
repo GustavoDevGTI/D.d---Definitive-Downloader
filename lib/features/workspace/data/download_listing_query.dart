@@ -53,6 +53,7 @@ class DownloadListingQuery {
         DownloadSort.downloadedAt => 'julianday(h.created_at)',
         DownloadSort.destination =>
           'download_folder(t.local_path) COLLATE download_text',
+        DownloadSort.playlistColor => 'c.theme_color',
       };
       final direction = descending ? 'DESC' : 'ASC';
       order = sort == DownloadSort.downloadedAt

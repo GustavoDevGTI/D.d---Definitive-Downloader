@@ -306,14 +306,13 @@ class _DownloadTableState extends State<DownloadTable> {
                                                                           output),
                                                                   widths:
                                                                       widths,
+                                                                  playlistColor: e
+                                                                      .playlistColor,
                                                                   index: index,
                                                                   hovered:
                                                                       _hovered ==
                                                                           t.id,
-                                                                  selected: selection
-                                                                          .contains(
-                                                                              t.id) ||
-                                                                      t.id == activeId));
+                                                                  selected: selection.contains(t.id) || t.id == activeId));
                                                         })))))))),
                         const SizedBox(height: _rail),
                       ])),
@@ -324,7 +323,14 @@ class _DownloadTableState extends State<DownloadTable> {
       bool header = false,
       bool selected = false,
       bool hovered = false,
+      int? playlistColor,
       int index = 0}) {
+    final playlistTint = playlistColor == null
+        ? null
+        : Color.alphaBlend(
+            Color(0xFF000000 | playlistColor)
+                .withAlpha(hovered ? 42 : (index.isOdd ? 29 : 18)),
+            Colors.white);
     return Container(
         key: header ? const ValueKey('download-table-header') : null,
         constraints: const BoxConstraints(minHeight: 56),
@@ -333,13 +339,14 @@ class _DownloadTableState extends State<DownloadTable> {
                 ? AppColors.navigation
                 : selected
                     ? AppColors.accentSoft
-                    : hovered
-                        ? AppColors.accentSoft.withAlpha(190)
-                        : index.isOdd
-                            ? Color.alphaBlend(
-                                AppColors.accentSoft.withAlpha(100),
-                                Colors.white)
-                            : Colors.white,
+                    : playlistTint ??
+                        (hovered
+                            ? AppColors.accentSoft.withAlpha(190)
+                            : index.isOdd
+                                ? Color.alphaBlend(
+                                    AppColors.accentSoft.withAlpha(100),
+                                    Colors.white)
+                                : Colors.white),
             border: const Border(bottom: BorderSide(color: AppColors.line))),
         child: Row(children: [
           for (var i = 0; i < cells.length; i++)

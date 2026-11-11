@@ -180,7 +180,7 @@ void main() {
     expect(
         await library.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        16);
+        17);
     expect(
         await library.database
             .run((db) => db.select('PRAGMA foreign_key_check').length),

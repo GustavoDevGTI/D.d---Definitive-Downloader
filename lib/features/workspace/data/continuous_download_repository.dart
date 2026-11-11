@@ -68,12 +68,13 @@ class ContinuousDownloadRepository {
               ? <DownloadEntry>[]
               : db
                   .select(
-                      'SELECT t.*,c.name AS collection_name,h.created_at AS downloaded_at ${listing.from} WHERE $eligible AND t.list_revision>? LIMIT 100001',
+                      'SELECT t.*,c.name AS collection_name,c.theme_color,h.created_at AS downloaded_at ${listing.from} WHERE $eligible AND t.list_revision>? LIMIT 100001',
                       [
                         since
                       ])
                   .map((r) => DownloadEntry(LibraryRepository.readTrack(r),
                       r['collection_name'] as String,
+                      playlistColor: r['theme_color'] as int?,
                       downloadedAt:
                           readDownloadDate(r['downloaded_at'] as String?)))
                   .toList();

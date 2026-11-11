@@ -66,14 +66,27 @@ class WorkspaceNavigationButton extends StatelessWidget {
       required this.subtitle,
       required this.icon,
       required this.onPressed,
-      this.leading});
+      this.leading,
+      this.accent});
   final String title, subtitle;
   final IconData icon;
   final Widget? leading;
+  final Color? accent;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final color = accent ?? AppColors.accent;
+    final surface = accent == null
+        ? AppColors.accentSoft
+        : Color.alphaBlend(color.withAlpha(30), Colors.white);
+    final active = accent == null
+        ? AppColors.accentActive
+        : Color.alphaBlend(color.withAlpha(64), Colors.white);
+    final activeInk = accent == null ? Colors.white : AppColors.ink;
+    final iconInk = accent == null ? color : AppColors.ink;
+    final border =
+        accent == null ? color : Color.alphaBlend(Colors.black26, color);
     bool highlighted(Set<WidgetState> states) => states.any((state) => const {
           WidgetState.hovered,
           WidgetState.focused,
@@ -88,15 +101,14 @@ class WorkspaceNavigationButton extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)))
             .copyWith(
-                backgroundColor: WidgetStateProperty.resolveWith((states) => highlighted(states)
-                    ? AppColors.accentActive
-                    : AppColors.accentSoft),
+                backgroundColor: WidgetStateProperty.resolveWith(
+                    (states) => highlighted(states) ? active : surface),
                 foregroundColor: WidgetStateProperty.resolveWith((states) =>
-                    highlighted(states) ? Colors.white : AppColors.ink),
-                iconColor: WidgetStateProperty.resolveWith((states) =>
-                    highlighted(states) ? Colors.white : AppColors.accent),
-                side: WidgetStateProperty.resolveWith(
-                    (states) => BorderSide(color: highlighted(states) ? AppColors.accentActive : AppColors.accent)),
+                    highlighted(states) ? activeInk : AppColors.ink),
+                iconColor: WidgetStateProperty.resolveWith(
+                    (states) => highlighted(states) ? activeInk : iconInk),
+                side: WidgetStateProperty.resolveWith((states) =>
+                    BorderSide(color: highlighted(states) && accent == null ? active : border)),
                 overlayColor: const WidgetStatePropertyAll(Colors.transparent)),
         onPressed: onPressed,
         child: Row(children: [

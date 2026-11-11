@@ -39,6 +39,26 @@ List<Widget> downloadRowCells(
                     overflow: TextOverflow.ellipsis,
                     style:
                         const TextStyle(fontSize: 11, color: AppColors.muted)),
+              Row(children: [
+                if (e.playlistColor case final rgb?) ...[
+                  Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF000000 | rgb),
+                          border: Border.all(color: Colors.black26))),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                    child: Text(e.collectionName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w600))),
+              ]),
             ])),
     _metric(
         e.fileBytes != null

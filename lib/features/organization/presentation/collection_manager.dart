@@ -153,6 +153,9 @@ class _CollectionManagerState extends State<CollectionManager> {
                                   size: 44,
                                   icon: Icons.library_music_outlined),
                               icon: Icons.library_music_outlined,
+                              accent: item.themeColor == null
+                                  ? null
+                                  : Color(0xFF000000 | item.themeColor!),
                               onPressed: () => widget.onOpen(item)));
                       final actions =
                           Row(mainAxisSize: MainAxisSize.min, children: [
@@ -165,7 +168,7 @@ class _CollectionManagerState extends State<CollectionManager> {
                             item.id,
                             'new-group'),
                         _action(
-                            'Renomear playlist',
+                            'Editar playlist',
                             Icons.edit_outlined,
                             enabled
                                 ? () => unawaited(_editPlaylist(item))
@@ -285,12 +288,18 @@ class _CollectionManagerState extends State<CollectionManager> {
   }
 
   Future<void> _editPlaylist([Collection? item]) async {
+    final usedColors = item == null
+        ? const <int>{}
+        : await _controller.repository.usedThemeColors(item.id);
+    if (!mounted) return;
     int? createdId;
     final saved = await showDialog<bool>(
         context: context,
         builder: (_) => OrganizationNameDialog(
-            title: item == null ? 'Nova playlist' : 'Renomear playlist',
+            title: item == null ? 'Nova playlist' : 'Editar playlist',
             name: item?.name ?? '',
+            playlistColor: item?.themeColor,
+            usedPlaylistColors: usedColors,
             groups: item == null ? _controller.groups : null,
             groupId: _controller.groupId == 0 ? null : _controller.groupId,
             onSaveWithLink: item != null
@@ -311,7 +320,7 @@ class _CollectionManagerState extends State<CollectionManager> {
                             style: const TextStyle(fontSize: 12)),
                       ]
                     ])),
-            onSave: (name, groupId) => _controller.mutate(() async {
+            onSave: (name, groupId, color) => _controller.mutate(() async {
                   if (widget.library.busy) {
                     throw const FormatException(
                         'Aguarde a operação em andamento.');
@@ -320,7 +329,8 @@ class _CollectionManagerState extends State<CollectionManager> {
                     createdId = await _controller.repository
                         .create(name, groupId: groupId);
                   } else {
-                    await _controller.repository.rename(item.id, name);
+                    await _controller.repository
+                        .rename(item.id, name, themeColor: color);
                   }
                   await widget.library.refresh();
                 })));
@@ -338,7 +348,7 @@ class _CollectionManagerState extends State<CollectionManager> {
             title: group == null ? 'Novo grupo' : 'Renomear grupo',
             name: group?.name ?? '',
             maxLength: 80,
-            onSave: (name, _) => _controller.mutate(() async {
+            onSave: (name, _, __) => _controller.mutate(() async {
                   if (widget.library.busy) {
                     throw const FormatException(
                         'Aguarde a operação em andamento.');
@@ -383,7 +393,7 @@ class _CollectionManagerState extends State<CollectionManager> {
             groups: _controller.groups,
             groupId: item.groupId,
             nameEditable: false,
-            onSave: (_, groupId) => _controller.mutate(() async {
+            onSave: (_, groupId, __) => _controller.mutate(() async {
                   if (widget.library.busy) {
                     throw const FormatException(
                         'Aguarde a operação em andamento.');

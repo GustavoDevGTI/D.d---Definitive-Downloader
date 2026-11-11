@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../domain/collection_organization.dart';
+import 'playlist_color_dialog.dart';
 
 class OrganizationNameDialog extends StatefulWidget {
   const OrganizationNameDialog(
@@ -11,6 +12,8 @@ class OrganizationNameDialog extends StatefulWidget {
       required this.onSave,
       this.groups,
       this.groupId,
+      this.playlistColor,
+      this.usedPlaylistColors = const {},
       this.maxLength = 160,
       this.onSaveWithLink,
       this.onCancel,
@@ -21,7 +24,9 @@ class OrganizationNameDialog extends StatefulWidget {
   final bool nameEditable;
   final List<CollectionGroup>? groups;
   final int? groupId;
-  final Future<String?> Function(String, int?) onSave;
+  final int? playlistColor;
+  final Set<int> usedPlaylistColors;
+  final Future<String?> Function(String, int?, int?) onSave;
   final Future<String?> Function(String, int?, String)? onSaveWithLink;
   final VoidCallback? onCancel;
   final Widget? progress;
@@ -33,6 +38,7 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
   late final _name = TextEditingController(text: widget.name);
   final _link = TextEditingController();
   late int? _groupId = widget.groupId;
+  late int? _playlistColor = widget.playlistColor;
   String? _error;
   bool _saving = false;
   @override
@@ -49,7 +55,7 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
       _error = null;
     });
     final error = widget.onSaveWithLink == null
-        ? await widget.onSave(_name.text, _groupId)
+        ? await widget.onSave(_name.text, _groupId, _playlistColor)
         : await widget.onSaveWithLink!(_name.text, _groupId, _link.text);
     if (!mounted) return;
     if (error == null) {
@@ -60,6 +66,19 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
         _error = error;
       });
     }
+  }
+
+  Future<void> _pickColor() async {
+    final color = await showDialog<int>(
+        context: context,
+        builder: (_) => PlaylistColorDialog(
+            initialColor: _playlistColor!,
+            usedColors: widget.usedPlaylistColors));
+    if (!mounted || color == null) return;
+    setState(() {
+      _playlistColor = color;
+      _error = null;
+    });
   }
 
   @override
@@ -98,6 +117,13 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
                               counterText: ''),
                           onSubmitted: (_) => unawaited(_save())),
                     ],
+                    if (_playlistColor != null)
+                      ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: PlaylistColorSwatch(rgb: _playlistColor),
+                          title: const Text('Cor da playlist'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: _saving ? null : _pickColor),
                     if (widget.groups != null) ...[
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int>(

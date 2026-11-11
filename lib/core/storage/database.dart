@@ -31,7 +31,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 16) {
+      if (version > 17) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -374,10 +374,71 @@ class AppDatabase {
           rethrow;
         }
       }
+      if (version <= 16) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          db.execute('''ALTER TABLE collections ADD COLUMN theme_color INTEGER
+            CHECK(theme_color BETWEEN 0 AND 16777215)''');
+          db.execute(
+              'CREATE UNIQUE INDEX collections_theme_color ON collections(theme_color)');
+          db.execute(
+              'UPDATE collections SET theme_color=${_availablePlaylistColor('collections.id')}');
+          db.execute(
+              '''CREATE TRIGGER collections_assign_color AFTER INSERT ON collections
+            WHEN NEW.theme_color IS NULL BEGIN
+              UPDATE collections SET theme_color=${_availablePlaylistColor('NEW.id')} WHERE id=NEW.id;
+            END''');
+          db.execute('DROP TRIGGER collection_list_name');
+          db.execute(
+              '''CREATE TRIGGER collection_list_name AFTER UPDATE OF name,theme_color ON collections
+            WHEN NEW.name IS NOT OLD.name OR NEW.theme_color IS NOT OLD.theme_color BEGIN
+              UPDATE library_revision SET revision=revision+1 WHERE id=1;
+              UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE collection_id=NEW.id;
+            END''');
+          db.execute('PRAGMA user_version=17');
+          db.execute('COMMIT');
+        } catch (_) {
+          db.execute('ROLLBACK');
+          rethrow;
+        }
+      }
       // Stale run membership is not work: the occurrences themselves stay queued.
       db.execute('DELETE FROM download_run_additions');
       db.execute(
           "UPDATE tracks SET status='ready', error='Transferência interrompida; pronta para reiniciar.' WHERE status='downloading'");
     });
   }
+}
+
+// Start with separated hues. If one is taken, the odd step visits the full
+// RGB space without repeats. The index makes each collision check cheap.
+String _availablePlaylistColor(String id) {
+  const defaults = [
+    0xC9345B,
+    0x287DAB,
+    0x40864D,
+    0xA65C25,
+    0x7653A8,
+    0x007F78,
+    0xAF452F,
+    0x565FA9,
+    0x727D28,
+    0xA04583,
+    0x407F98,
+    0x876127,
+  ];
+  final branches = [
+    for (var i = 0; i < defaults.length; i++)
+      'WHEN ${i + 1} THEN ${defaults[i]}'
+  ].join(' ');
+  return '''(
+    WITH RECURSIVE candidates(step,rgb) AS (
+      SELECT 0, CASE $id $branches ELSE (($id&0xFFFFFF)*0x9E3779)&0xFFFFFF END
+      UNION ALL
+      SELECT step+1,(rgb+0x9E3779)&0xFFFFFF FROM candidates
+      WHERE step<0xFFFFFF AND EXISTS(SELECT 1 FROM collections WHERE theme_color=rgb)
+    )
+    SELECT rgb FROM candidates
+    WHERE NOT EXISTS(SELECT 1 FROM collections WHERE theme_color=rgb) LIMIT 1
+  )''';
 }
