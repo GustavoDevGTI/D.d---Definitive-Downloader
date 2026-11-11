@@ -14,6 +14,8 @@ O build confere o manifesto, a assinatura e a presença das bibliotecas necessá
 
 A análise estática e 44 testes essenciais e de Android passaram. O APK x86-64 atualizou a instalação 0.1.59 com `install -r` no emulador dedicado. A tela Conexões habilitou a ação Deezer após a verificação local do motor, que executa o codec MP3 e o vetor de criptografia. O APK ARM64 passou na inspeção do manifesto, das bibliotecas e da assinatura. A execução em um celular ARM64 fica para a validação em dispositivo físico.
 
+No APK x86-64 instalado, a faixa sintética Abertura da coleção de exemplo foi salva como MP3 e tocou no aplicativo. O Android confirmou a reprodução pelo MediaPlayer a 44,1 kHz. A coleção sintética ficou no emulador dedicado.
+
 ## Artefatos locais
 
 | Pacote | SHA-256 |
