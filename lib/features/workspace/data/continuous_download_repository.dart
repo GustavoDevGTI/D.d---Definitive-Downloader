@@ -8,11 +8,12 @@ import 'download_listing_query.dart';
 
 class DownloadListingSnapshot {
   const DownloadListingSnapshot(
-      this.revision, this.ids, this.existing, this.changed);
+      this.revision, this.ids, this.existing, this.changed, this.colors);
   final int revision;
   final List<int> ids;
   final Set<int> existing;
   final List<DownloadEntry> changed;
+  final List<DownloadPlaylistColor> colors;
 }
 
 class ContinuousDownloadRepository {
@@ -25,6 +26,7 @@ class ContinuousDownloadRepository {
           bool pauseMode = false,
           DownloadSort? sort,
           bool descending = false,
+          int? playlistId,
           String outputDirectory = ''}) =>
       database.run((db) {
         if (query.length > 200 || since < -1) {
@@ -41,6 +43,7 @@ class ContinuousDownloadRepository {
               pauseMode: pauseMode,
               sort: sort,
               descending: descending,
+              playlistId: playlistId,
               outputDirectory: outputDirectory);
           final ids = category == ContentCategory.media ||
                   (filter == DownloadFilter.paused && !pauseMode)
@@ -53,6 +56,21 @@ class ContinuousDownloadRepository {
                   .toList();
           const eligible =
               "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)";
+          final colors = category == ContentCategory.media
+              ? <DownloadPlaylistColor>[]
+              : db
+                  .select('''
+                SELECT c.id,c.name,c.theme_color FROM collections c
+                WHERE c.theme_color IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM tracks t WHERE t.collection_id=c.id AND $eligible
+                ) ORDER BY c.name COLLATE NOCASE,c.id
+                ''')
+                  .map((row) => (
+                        collectionId: row['id'] as int,
+                        name: row['name'] as String,
+                        rgb: row['theme_color'] as int,
+                      ))
+                  .toList();
           final existing = category == ContentCategory.media
               ? <int>{}
               : db
@@ -79,7 +97,8 @@ class ContinuousDownloadRepository {
                           readDownloadDate(r['downloaded_at'] as String?)))
                   .toList();
           db.execute('COMMIT');
-          return DownloadListingSnapshot(revision, ids, existing, changed);
+          return DownloadListingSnapshot(
+              revision, ids, existing, changed, colors);
         } catch (_) {
           db.execute('ROLLBACK');
           rethrow;

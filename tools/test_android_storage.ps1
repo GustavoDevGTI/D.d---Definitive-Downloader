@@ -6,6 +6,9 @@ param(
 )
 $ErrorActionPreference='Stop'
 $adb=Join-Path $env:LOCALAPPDATA 'Android/Sdk/platform-tools/adb.exe'
+if($Device -eq 'emulator-5560') {
+    & (Join-Path $PSScriptRoot 'start-test-emulator.ps1') -Project Downloader | Out-Host
+}
 if($Device -notmatch '^emulator-\d+$' -or ((& $adb -s $Device emu avd name) -join "`n") -notmatch '^Definitive_API_36') {
     throw 'Use somente o emulador dedicado, sem contas ou biblioteca pessoal.'
 }

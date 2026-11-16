@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-dd-playlist'; form-action 'none'; base-uri 'none'">
+  <title>Transcrever playlist</title>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: #fafafc; color: #1e293b; font: 15px/1.5 "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 45rem; margin: auto; padding: clamp(1rem, 4vw, 2.5rem); }
+    h1 { font-size: clamp(1.65rem, 6vw, 2.4rem); line-height: 1.15; letter-spacing: -.035em; margin: 0 0 1.1rem; }
+    h2 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+    label { font-weight: 600; display: block; margin-bottom: .35rem; }
+    .entry { display: flex; gap: .65rem; flex-wrap: wrap; }
+    input { flex: 1 1 14rem; min-width: 0; width: 100%; border: 1px solid #8793a4; border-radius: .6rem; background: #fff; color: inherit; padding: .65rem .75rem; }
+    button, input { font: inherit; min-height: 44px; }
+    button { border: 0; border-radius: .6rem; padding: .65rem 1rem; background: #a01f45; color: white; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: default; }
+    :focus-visible { outline: 2px solid #a01f45; outline-offset: 3px; }
+    p { margin: .55rem 0 0; color: #5b6b85; }
+    #status:empty { margin: 0; }
+    #status.error { color: #a01f45; }
+    section { border-top: 2px solid #a01f45; margin-top: 1.5rem; padding-top: .85rem; }
+    ol { margin: .9rem 0; padding-left: 2rem; border: 1px solid #e5e7eb; background: #fff; }
+    li { padding: .45rem .65rem .45rem .15rem; overflow-wrap: anywhere; }
+    li + li { border-top: 1px solid #e5e7eb; }
+    li::marker, .artist { color: #5b6b85; }
+    .artist { display: block; font-size: .875rem; }
+    footer { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .8rem; }
+    footer p { margin: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Transcrever playlist</h1>
+  <form id="lookup">
+    <label for="link">Link da playlist</label>
+    <div class="entry">
+      <input id="link" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" required>
+      <button id="read" type="submit" disabled>Ler playlist</button>
+    </div>
+  </form>
+  <p id="status" role="status" aria-live="polite">Abrindo a página…</p>
+  <section id="preview" aria-labelledby="name" hidden>
+    <h2 id="name"></h2>
+    <p id="source"></p>
+    <footer>
+      <button id="save" type="button">Enviar para Coleções</button>
+      <p id="remaining"></p>
+    </footer>
+    <ol id="tracks" aria-label="Primeiras faixas"></ol>
+  </section>
+</main>
+<script nonce="dd-playlist">
+  const get = id => document.getElementById(id);
+  const link = get('link');
+  const read = get('read');
+  const save = get('save');
+  const preview = get('preview');
+  let ready = false;
+  const bridge = (...args) => window.flutter_inappwebview.callHandler('ddPlaylist', ...args);
+
+  function status(message, error = false) {
+    get('status').textContent = message;
+    get('status').classList.toggle('error', error);
+  }
+
+  async function initialize() {
+    if (ready) return;
+    ready = true;
+    try {
+      link.value = await bridge('initial');
+      status('');
+      read.disabled = false;
+      if (link.value) get('lookup').requestSubmit();
+    } catch {
+      ready = false;
+      status('Feche e abra a página novamente.', true);
+    }
+  }
+
+  get('lookup').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (read.disabled) return;
+    read.disabled = link.disabled = true;
+    preview.hidden = true;
+    status('Lendo a playlist…');
+    try {
+      const list = await bridge('read', link.value);
+      if (list.error) {
+        status(list.error, true);
+        return;
+      }
+      get('name').textContent = list.name;
+      get('source').textContent = list.source + ' · ' + list.total + (list.total === 1 ? ' faixa' : ' faixas');
+      const rows = list.tracks.map(track => {
+        const item = document.createElement('li');
+        const artist = document.createElement('span');
+        artist.className = 'artist';
+        artist.textContent = track.artist;
+        item.append(track.title, artist);
+        return item;
+      });
+      get('tracks').replaceChildren(...rows);
+      const extra = list.total - rows.length;
+      get('remaining').textContent = extra ? 'A lista completa será enviada.' : '';
+      preview.hidden = false;
+      status('');
+    } catch {
+      status('Falha ao ler a playlist. Tente novamente.', true);
+    } finally {
+      read.disabled = link.disabled = false;
+    }
+  });
+
+  link.addEventListener('input', () => { preview.hidden = true; status(''); });
+  save.addEventListener('click', async () => {
+    if (preview.hidden) return;
+    save.disabled = true;
+    try {
+      const accepted = await bridge('confirm', link.value);
+      if (!accepted) status('Leia a playlist novamente antes de enviar.', true);
+    } catch {
+      status('Falha ao enviar. Tente novamente.', true);
+    } finally {
+      save.disabled = false;
+    }
+  });
+  window.addEventListener('flutterInAppWebViewPlatformReady', initialize, { once: true });
+</script>
+</body>
+</html>

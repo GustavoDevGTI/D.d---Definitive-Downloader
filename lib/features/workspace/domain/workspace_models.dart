@@ -6,6 +6,8 @@ enum ContentCategory { music, media }
 
 enum DownloadFilter { all, downloading, queued, paused, completed, failed }
 
+typedef DownloadPlaylistColor = ({int collectionId, String name, int rgb});
+
 class DownloadEntry {
   const DownloadEntry(this.track, this.collectionName,
       {this.downloadedAt, this.fileBytes, this.playlistColor});

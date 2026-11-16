@@ -71,8 +71,8 @@ class MusicResolver {
               final c =
                   parseMusicCandidate(Map<String, dynamic>.from(row as Map));
               if (c.isFullRecording &&
-                  !candidates.any(
-                      (old) => old.kind == c.kind && old.pageUrl == c.pageUrl)) {
+                  !candidates.any((old) =>
+                      old.kind == c.kind && old.pageUrl == c.pageUrl)) {
                 candidates.add(c);
               }
             }
@@ -90,8 +90,11 @@ class MusicResolver {
         ..clear()
         ..addAll(exact);
     }
-    if (!candidates
-        .any((c) => canUse(c) && !matcher.assess(track, c).needsReview)) {
+    final exactAudioForUnknownDuration =
+        track.durationMs == null && exact.any(canUse);
+    if (!exactAudioForUnknownDuration &&
+        !candidates
+            .any((c) => canUse(c) && !matcher.assess(track, c).needsReview)) {
       try {
         candidates.addAll(
             await searchVideos(track, query, cancellation: cancellation));

@@ -1,0 +1,49 @@
+services:
+  trackhop:
+    image: ${DD_TRACKHOP_IMAGE:-ghcr.io/xlollx/trackhop:latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SONGPORT_URL: http://127.0.0.1:8080
+      SONGPORT_PASSWORD: ${DD_TRACKHOP_ADMIN_PASSWORD:?Configure a senha do Trackhop}
+    volumes:
+      - trackhop:/data
+    networks: [upstream]
+
+  gateway:
+    image: node:22-alpine
+    restart: unless-stopped
+    user: node
+    read_only: true
+    command: ["node", "/app/server.mjs"]
+    environment:
+      HOST: 0.0.0.0
+      DD_TRACKHOP_ORIGIN: http://trackhop:8080
+      DD_TRACKHOP_TOKEN: ${DD_TRACKHOP_TOKEN:-}
+      DD_TRACKHOP_SERVICE: ${DD_TRACKHOP_SERVICE:-spotify_bridge}
+      DD_TRUST_PROXY: "1"
+    volumes:
+      - ./server.mjs:/app/server.mjs:ro
+    networks: [upstream, edge]
+
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DD_PLAYLIST_DOMAIN: ${DD_PLAYLIST_DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    networks: [edge]
+
+networks:
+  upstream:
+  edge:
+
+volumes:
+  trackhop:
+  caddy:

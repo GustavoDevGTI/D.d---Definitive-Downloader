@@ -79,7 +79,6 @@ flutter {
 }
 
 dependencies {
-    implementation("com.spotify.android:auth:5.0.0")
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
 }

@@ -1,0 +1,14 @@
+{
+  "name": "dd-playlists",
+  "main": "rapidapi-worker.mjs",
+  "compatibility_date": "2026-11-12",
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [{"name": "BUDGET", "class_name": "RapidApiBudget"}]
+  },
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["RapidApiBudget"]}],
+  "ratelimits": [
+    {"name": "IMPORTS", "namespace_id": "11067", "simple": {"limit": 6, "period": 60}}
+  ]
+}

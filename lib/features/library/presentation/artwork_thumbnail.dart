@@ -10,10 +10,14 @@ class ArtworkThumbnail extends StatefulWidget {
       this.audioPath = '',
       this.size = 44,
       this.store,
+      this.borderColor,
+      this.placeholderColor = AppColors.accentSoft,
       this.icon = Icons.music_note_rounded});
   final String reference, audioPath;
   final double size;
   final IconData icon;
+  final Color? borderColor;
+  final Color placeholderColor;
   final ArtworkStore? store;
   @override
   State<ArtworkThumbnail> createState() => _ArtworkThumbnailState();
@@ -52,27 +56,37 @@ class _ArtworkThumbnailState extends State<ArtworkThumbnail> {
   }
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-      borderRadius: BorderRadius.circular(5),
-      child: SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: FutureBuilder<Uint8List?>(
-              key: ValueKey((widget.reference, widget.audioPath)),
-              future: _image,
-              initialData: _data,
-              builder: (context, snapshot) {
-                final data = snapshot.data;
-                return data == null
-                    ? ColoredBox(
-                        color: AppColors.accentSoft,
-                        child: Icon(widget.icon,
-                            color: AppColors.accentActive,
-                            size: widget.size * .46))
-                    : Image.memory(data,
-                        key: ValueKey((widget.reference, widget.audioPath)),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: false,
-                        excludeFromSemantics: true);
-              })));
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(5);
+    final borderColor = widget.borderColor;
+    final thumbnail = ClipRRect(
+        borderRadius: radius,
+        child: SizedBox(
+            width: widget.size,
+            height: widget.size,
+            child: FutureBuilder<Uint8List?>(
+                key: ValueKey((widget.reference, widget.audioPath)),
+                future: _image,
+                initialData: _data,
+                builder: (context, snapshot) {
+                  final data = snapshot.data;
+                  return data == null
+                      ? ColoredBox(
+                          color: widget.placeholderColor,
+                          child: Icon(widget.icon,
+                              color: AppColors.accentActive,
+                              size: widget.size * .46))
+                      : Image.memory(data,
+                          key: ValueKey((widget.reference, widget.audioPath)),
+                          fit: BoxFit.cover,
+                          gaplessPlayback: false,
+                          excludeFromSemantics: true);
+                })));
+    if (borderColor == null) return thumbnail;
+    return DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+            borderRadius: radius, border: Border.all(color: borderColor)),
+        child: thumbnail);
+  }
 }

@@ -5,6 +5,9 @@ param(
 $ErrorActionPreference='Stop'
 if($Device -notmatch '^emulator-\d+$'){throw 'Esta automação de ciclo de vida usa somente emulador dedicado.'}
 $adb=Join-Path $env:LOCALAPPDATA 'Android/Sdk/platform-tools/adb.exe'
+if($Device -eq 'emulator-5560') {
+    & (Join-Path $PSScriptRoot 'start-test-emulator.ps1') -Project Downloader | Out-Host
+}
 $avd=(& $adb -s $Device emu avd name) -join "`n"
 if($avd -notmatch '^Definitive_API_36'){throw 'Use o emulador dedicado do D.d, sem contas ou biblioteca pessoal.'}
 $log=Join-Path $env:LOCALAPPDATA ('DefinitiveDownloaderDev/android-bg-'+[guid]::NewGuid().ToString('N')+'.log')

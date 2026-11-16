@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_identity.dart';
-import '../features/connections/application/spotify_connection_controller.dart';
+import '../features/connections/application/trackhop_connection.dart';
 import '../features/connections/presentation/music_connection_actions.dart';
 import '../features/library/application/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -23,7 +23,7 @@ class DefinitiveDownloaderApp extends StatelessWidget {
   final LibraryController controller;
   final GlobalKey<NavigatorState>? navigatorKey;
   final MusicPlayerController? player;
-  final SpotifyConnectionController? connections;
+  final TrackhopConnection? connections;
   final AndroidIncoming? incoming;
   final String initialPlaylist;
   final bool showConnectionsOnStart;

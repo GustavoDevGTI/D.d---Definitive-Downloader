@@ -13,8 +13,10 @@ import 'package:definitive_downloader/features/library/application/library_contr
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/library/presentation/track_table.dart';
+import 'package:definitive_downloader/features/library/presentation/collection_workspace.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/player/application/music_player_controller.dart';
+import 'package:definitive_downloader/features/workspace/presentation/download_action_button.dart';
 import 'player_fixtures.dart';
 import 'widget_io.dart';
 
@@ -71,6 +73,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('mobile-destination-music')));
       await tester.pumpAndSettle();
+      final collectionsScroll = find
+          .descendant(
+              of: find.byType(CollectionWorkspace),
+              matching: find.byType(Scrollable))
+          .first;
+      if (find.text('Lista móvel').evaluate().isEmpty) {
+        await tester.drag(collectionsScroll, const Offset(0, -180));
+        await tester.pumpAndSettle();
+      }
       await ioUntil(
           tester, () => find.text('Lista móvel').evaluate().isNotEmpty);
       await tester.ensureVisible(find.text('Lista móvel'));
@@ -92,6 +103,31 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Downloads'));
       await tester.pumpAndSettle();
+      final toolbar = find.byKey(const ValueKey('download-mobile-actions'));
+      final filters = find.byKey(const ValueKey('download-mobile-filters'));
+      final search = find.byKey(const ValueKey('download-search-music'));
+      final actions = find.descendant(
+          of: toolbar, matching: find.byType(DownloadActionButton));
+      expect(actions, findsNWidgets(8));
+      final buttons = [
+        for (var i = 0; i < 8; i++) tester.getRect(actions.at(i)),
+      ];
+      expect(
+          buttons.every((button) => button.top == buttons.first.top), isTrue);
+      expect(buttons.first.left, greaterThanOrEqualTo(0));
+      expect(buttons.last.right, lessThanOrEqualTo(size.width));
+      expect(buttons.first.top,
+          greaterThanOrEqualTo(tester.getRect(search).bottom));
+      expect(tester.widget<SingleChildScrollView>(filters).scrollDirection,
+          Axis.horizontal);
+      expect(tester.getRect(filters).top,
+          greaterThanOrEqualTo(buttons.first.bottom));
+      final header = tester
+          .getRect(find.byKey(const ValueKey('download-horizontal-header')));
+      final body =
+          tester.getRect(find.byKey(const ValueKey('download-scroll-body')));
+      expect(header.right, body.right);
+      expect(header.bottom, body.top);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const ValueKey('download-search-music')));
       await tester.pumpAndSettle();

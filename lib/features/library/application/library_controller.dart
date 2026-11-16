@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import '../../../core/platform/desktop_files.dart';
 import '../../downloads/download_service.dart';
 import '../../importing/csv_importer.dart';
@@ -9,11 +10,16 @@ import '../../importing/music_link_repository.dart';
 import '../../importing/demo_collection.dart';
 import '../../importing/spotify_importer.dart';
 import '../../importing/soundcloud_catalog.dart';
+import '../../importing/soundcloud_link.dart';
 import '../../importing/playlist_catalog.dart';
+import '../../importing/playlist_transcription.dart';
+import '../../importing/public_playlist_link.dart';
 import '../../importing/collection_link_composer.dart';
 import '../../importing/deezer_playlist_catalog.dart';
 import '../../importing/youtube_playlist_catalog.dart';
-import '../../importing/spotify_account_importer.dart';
+import '../../importing/trackhop_client.dart';
+import '../../importing/managed_spotify_playlists.dart';
+import '../../importing/spotify_playlist_export.dart';
 import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
 import '../data/library_repository.dart';
@@ -48,7 +54,8 @@ class LibraryController extends ChangeNotifier {
       required this.csv,
       required this.catalog,
       required this.downloader,
-      this.accountSpotify,
+      this.trackhopClient,
+      this.managedSpotify,
       this.accounts,
       SoundCloudCatalog? soundcloud,
       this.deezerPlaylists = const DeezerPlaylistCatalog(),
@@ -59,12 +66,18 @@ class LibraryController extends ChangeNotifier {
       : soundcloud = soundcloud ?? SoundCloudCatalog();
   final SoundCloudCatalog soundcloud;
   final MusicAccountAccess? accounts;
+  final ManagedSpotifyPlaylists? managedSpotify;
 
-  Future<bool> _authorize(String input, {bool allowDeezerLater = true}) async {
+  Future<bool> _authorize(String input) async {
     try {
-      final allowed =
-          await accounts?.ensure(input, allowDeezerLater: allowDeezerLater) ??
-              true;
+      final requiringAccounts = managedSpotify == null
+          ? input
+          : input.split(RegExp(r'[\r\n]+')).where((ref) {
+              if (!SpotifyImporter.recognizesPlaylist(ref)) return true;
+              spotify.playlistId(ref);
+              return false;
+            }).join('\n');
+      final allowed = await accounts?.ensure(requiringAccounts) ?? true;
       if (!allowed) {
         message = 'Conexão cancelada. A playlist não foi alterada.';
         notifyListeners();
@@ -261,7 +274,8 @@ class LibraryController extends ChangeNotifier {
         replacement = (await MusicLinkService(
                     linkCatalog ??
                         MusicLinkCatalog(
-                            spotify: accountSpotify, soundcloud: soundcloud),
+                            spotify: trackhopClient?.call(),
+                            soundcloud: soundcloud),
                     music)
                 .resolve(link.url))
             .single;
@@ -288,7 +302,7 @@ class LibraryController extends ChangeNotifier {
   final LibraryRepository repository;
   final DesktopFiles files;
   final SpotifyImporter spotify;
-  final SpotifyAccountImporter? accountSpotify;
+  final TrackhopClient? Function()? trackhopClient;
   final CsvImporter csv;
   final DeezerCatalog catalog;
   final DownloadService downloader;
@@ -424,6 +438,7 @@ class LibraryController extends ChangeNotifier {
     message = '';
     await refresh();
     if (!busy &&
+        collection.source != SpotifyPlaylistExport.source &&
         music?.available == true &&
         !isExample &&
         await repository.needsSourcePreparation(collection.id,
@@ -492,7 +507,8 @@ class LibraryController extends ChangeNotifier {
   LibraryMusicSources get _sources => LibraryMusicSources(
       repository,
       linkCatalog ??
-          MusicLinkCatalog(spotify: accountSpotify, soundcloud: soundcloud),
+          MusicLinkCatalog(
+              spotify: trackhopClient?.call(), soundcloud: soundcloud),
       music);
   Future<void> setManualSource(String value, ManualSourceMode mode) async {
     final track = focused;
@@ -552,25 +568,23 @@ class LibraryController extends ChangeNotifier {
   Future<void>? _preparation;
   Future<void> get preparationDone => _preparation ?? Future<void>.value();
 
-  Future<void> prepareMusic({bool onlyPending = false}) {
+  Future<void> prepareMusic(
+      {bool onlyPending = false, String importNotice = ''}) {
     if (busy || current == null || music?.available != true || isExample) {
       return preparationDone;
     }
-    return _preparation = _prepareMusic(onlyPending: onlyPending);
+    return _preparation =
+        _prepareMusic(onlyPending: onlyPending, importNotice: importNotice);
   }
 
-  Future<void> _prepareMusic({required bool onlyPending}) async {
+  Future<void> _prepareMusic(
+      {required bool onlyPending, required String importNotice}) async {
     final collection = current;
     if (collection == null || busy || music?.available != true || isExample) {
       return;
     }
-    if (!await _authorize(collection.sourceUrl,
-            allowDeezerLater: onlyPending) ||
-        current?.id != collection.id ||
-        busy) {
-      return;
-    }
     if (accounts != null &&
+        !(onlyPending && collection.source == ManagedSpotifyPlaylists.source) &&
         !accounts!.connected(MusicAccount.deezer) &&
         await repository.needsSourcePreparation(collection.id) &&
         ((onlyPending && accounts!.deezerDeferred) ||
@@ -602,6 +616,7 @@ class LibraryController extends ChangeNotifier {
     } catch (error) {
       message = operationMessage(error);
     } finally {
+      if (importNotice.isNotEmpty) message += '\n$importNotice';
       preparing = false;
       activeTitle = '';
       _cancellation = null;
@@ -639,7 +654,8 @@ class LibraryController extends ChangeNotifier {
   Future<void> importSpotify(String url) => importPlaylist(url);
   PlaylistCatalog get _playlists => PlaylistCatalog(
       spotify: spotify,
-      accountSpotify: accountSpotify,
+      trackhop: trackhopClient?.call(),
+      managedSpotify: managedSpotify,
       soundcloud: soundcloud,
       deezer: deezerPlaylists,
       youtube: youtubePlaylists,
@@ -649,17 +665,81 @@ class LibraryController extends ChangeNotifier {
       _playlists,
       MusicLinkService(
           linkCatalog ??
-              MusicLinkCatalog(spotify: accountSpotify, soundcloud: soundcloud),
+              MusicLinkCatalog(
+                  spotify: trackhopClient?.call(), soundcloud: soundcloud),
           music));
-  Future<void> importPlaylist(String url) async {
+  Future<void> importPlaylist(String url,
+      {VoidCallback? onPublicSpotifyRequired}) async {
     if (busy || !await _authorize(url)) return;
-    await _import(() => _playlists.read(url,
-        cancelled: () => _disposed || _importCancellation?.cancelled == true,
-        onProgress: (done, total) {
-          message = 'Lendo faixas: $done/$total';
-          notifyListeners();
-        }));
+    final before = current?.id;
+    await _import(
+        () => _playlists.read(url,
+            cancelled: () =>
+                _disposed || _importCancellation?.cancelled == true,
+            onProgress: (done, total) {
+              message = 'Lendo faixas: $done/$total';
+              notifyListeners();
+            }),
+        onPublicSpotifyRequired: onPublicSpotifyRequired);
+    if (!_disposed &&
+        current != null &&
+        current!.id != before &&
+        (current!.source == 'Spotify · Trackhop' ||
+            current!.source == ManagedSpotifyPlaylists.source)) {
+      _openImportedPlaylist();
+    }
   }
+
+  Future<bool> importSpotifyExport(String path) async {
+    if (busy || _disposed) return false;
+    if (p.extension(path).toLowerCase() != '.csv') {
+      message = 'Escolha um arquivo CSV de playlist.';
+      notifyListeners();
+      return false;
+    }
+    if (!await _authorizePrimary() || _disposed || busy) return false;
+    final before = current?.id;
+    await _import(() async => csv.open(path, spotifyExport: true),
+        prepareAfterImport: false, announceSuccess: false);
+    if (_disposed || current == null || current!.id == before) return false;
+    _openImportedPlaylist();
+    if (music?.available == true) unawaited(prepareMusic(onlyPending: true));
+    return true;
+  }
+
+  void _openImportedPlaylist() {
+    final first = page.items.firstOrNull;
+    if (first != null) focus(first);
+    inspectorRequest++;
+    notifyListeners();
+  }
+
+  Future<PlaylistTranscription> transcribePlaylist(
+      String input, DownloadCancellation cancellation) async {
+    final url = input.trim();
+    if (url.length > 4096 || url.isEmpty) {
+      throw const FormatException('Cole um link de playlist válido.');
+    }
+    if (busy || _disposed) {
+      throw const FormatException('Aguarde a operação em andamento.');
+    }
+    if (PublicPlaylistLink.recognize(url) == null &&
+        !SoundCloudLink.recognizes(url)) {
+      spotify.playlistId(url);
+      if (managedSpotify == null &&
+          accounts != null &&
+          !await accounts!.connect(MusicAccount.spotify)) {
+        throw const FormatException('Conexão Spotify cancelada.');
+      }
+    }
+    cancellation.check();
+    final collection =
+        await _playlists.read(url, cancelled: () => cancellation.cancelled);
+    return PlaylistTranscription.read(collection, cancellation);
+  }
+
+  Future<void> saveTranscription(PlaylistTranscription transcription) =>
+      _import(() async => transcription.open(), prepareAfterImport: false);
 
   Future<int> createPlaylist(String name,
       {int? groupId, String link = ''}) async {
@@ -701,23 +781,63 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
-  Future<void> importCsv() async {
-    if (busy) return;
-    final path = await files.chooseCsv();
-    if (path != null) await _import(() async => csv.open(path));
+  bool _choosingPlaylistFile = false;
+
+  Future<void> importPlaylistFile(
+      Future<SpotifyPlaylistExport?> Function(List<SpotifyPlaylistExport>)
+          choosePlaylist) async {
+    if (busy || _choosingPlaylistFile) return;
+    _choosingPlaylistFile = true;
+    String? path;
+    try {
+      path = await files.choosePlaylistFile();
+      final selectedPath = path;
+      if (selectedPath == null || _disposed) return;
+      await _import(() async {
+        if (p.extension(selectedPath).toLowerCase() == '.csv') {
+          return csv.open(selectedPath);
+        }
+        final playlists = await SpotifyPlaylistExport.read(selectedPath);
+        _importCancellation?.check();
+        if (_disposed) return null;
+        final playlist = playlists.length == 1
+            ? playlists.single
+            : await choosePlaylist(playlists);
+        return playlist?.open();
+      });
+    } catch (error) {
+      if (!_disposed) {
+        message = operationMessage(error);
+        notifyListeners();
+      }
+    } finally {
+      try {
+        if (path != null) await files.releasePlaylistFile(path);
+      } finally {
+        _choosingPlaylistFile = false;
+      }
+    }
   }
 
-  Future<void> _import(Future<ImportedCollection> Function() source) async {
+  Future<void> _import(Future<ImportedCollection?> Function() source,
+      {bool prepareAfterImport = true,
+      bool announceSuccess = true,
+      VoidCallback? onPublicSpotifyRequired}) async {
     if (busy) return;
     _searchGeneration++;
     importing = true;
     final token = _importCancellation = DownloadCancellation();
     message = 'Lendo a coleção…';
-    var importedSuccessfully = false;
+    var autoPrepare = false;
+    var importNotice = '';
     notifyListeners();
     try {
       final imported = await source();
       token.check();
+      if (imported == null || _disposed) {
+        message = '';
+        return;
+      }
       final id = await repository.importCollection(ImportedCollection(
           name: imported.name,
           source: imported.source,
@@ -737,22 +857,33 @@ class LibraryController extends ChangeNotifier {
       view = 'collections';
       trackSort = TrackSort.position;
       trackDescending = false;
-      message = imported.isPartial
-          ? 'Leitura pública parcial. O Spotify pode limitar a lista; confira o total ou importe um CSV completo.'
-          : imported.source == 'Exemplo local'
-              ? 'Exemplo local: trechos sintéticos de 4 segundos. Nenhuma música comercial foi baixada.'
-              : 'Coleção importada. A ordem e as repetições foram preservadas.';
+      message = !announceSuccess
+          ? ''
+          : imported.isPartial
+              ? 'Leitura parcial. Confira o total ou importe um CSV completo.'
+              : imported.source == 'Exemplo local'
+                  ? 'Exemplo local: trechos sintéticos de 4 segundos. Nenhuma música comercial foi baixada.'
+                  : 'Coleção importada. A ordem e as repetições foram preservadas.';
+      if (imported.skippedCount > 0) {
+        importNotice =
+            '${imported.skippedCount} item(ns) local(is), indisponível(is) ou sem metadados musicais ficaram de fora.';
+        message = '$message\n$importNotice'.trim();
+      }
       await refresh();
-      importedSuccessfully = true;
+      autoPrepare =
+          prepareAfterImport && imported.source != SpotifyPlaylistExport.source;
     } on DownloadCancelled {
       message = 'Importação cancelada.';
+    } on PublicSpotifyPlaylistRequired catch (error) {
+      message = onPublicSpotifyRequired == null ? error.message : '';
+      onPublicSpotifyRequired?.call();
     } catch (error) {
       message = operationMessage(error);
     } finally {
       importing = false;
       _importCancellation = null;
-      if (importedSuccessfully && !isExample && music?.available == true) {
-        unawaited(prepareMusic(onlyPending: true));
+      if (autoPrepare && !isExample && music?.available == true) {
+        unawaited(prepareMusic(onlyPending: true, importNotice: importNotice));
       }
       notifyListeners();
     }

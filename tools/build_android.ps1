@@ -5,10 +5,13 @@ param(
     [string]$SdkRoot=(Join-Path $env:LOCALAPPDATA 'Android/Sdk'),
     [string]$JavaHome='',
     [string]$PythonPath='',
+    [ValidatePattern('^$|^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?/?$')][string]$PlaylistGateway=$env:DD_PLAYLIST_GATEWAY,
     [switch]$SkipTests,
     [switch]$SkipAnalysis
 )
 $ErrorActionPreference='Stop'
+# Android build/test caches live in the existing profile-quota exclusion.
+if ($IsWindows) { $env:GRADLE_USER_HOME = Join-Path $env:LOCALAPPDATA 'Gradle' }
 if(-not $PythonPath) {
     $candidates=@((Join-Path $env:LOCALAPPDATA 'DefinitiveDownloaderDev/music-engine-venv/Scripts/python.exe'))
     # The desktop runtime may be updated and remove a venv's original base.
@@ -73,7 +76,9 @@ try {
     }
     $env:DD_ANDROID_TEST_SIGNING='1'
     # Let Flutter regenerate the release registrant without dev-only plugins.
-    & $FlutterPath build apk --release --split-per-abi --target lib/main.dart --target-platform android-arm64,android-x64
+    $playlistDefines = @()
+    if ($PlaylistGateway) { $playlistDefines += "--dart-define=DD_PLAYLIST_GATEWAY=$PlaylistGateway" }
+    & $FlutterPath build apk --release --split-per-abi --target lib/main.dart --target-platform android-arm64,android-x64 @playlistDefines
     if($LASTEXITCODE -ne 0){throw 'A compilação do APK falhou.'}
     $buildTools=Get-ChildItem -LiteralPath (Join-Path $SdkRoot 'build-tools') -Directory |
         Where-Object {$_.Name -match '^\d+\.\d+\.\d+$'} |

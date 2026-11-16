@@ -153,6 +153,16 @@ void main() {
         ]),
         isNull);
   });
+  test('áudio exato sem duração fica para revisão antes de videoclipes',
+      () async {
+    final engine = SearchPolicyEngine(true);
+    final own = MusicResolver(engine, connection);
+    final track = testTrack(duration: null);
+    final found = await own.search(track, '${track.artist} ${track.title}');
+    expect(engine.providers, ['deezerFull', 'youtubeMusic', 'soundcloud']);
+    expect(found.single.kind, SourceKind.youtubeMusic);
+    expect(own.automaticChoice(track, found), isNull);
+  });
   test(
       'videoclipes só são buscados quando não há correspondência de áudio e nunca são escolhidos automaticamente',
       () async {

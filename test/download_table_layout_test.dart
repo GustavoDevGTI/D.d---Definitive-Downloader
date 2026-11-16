@@ -112,7 +112,7 @@ void main() {
                       widths: widths,
                       onResize: (_) {},
                       onResizeEnd: () {},
-                      selection: const {},
+                      selection: const {1},
                       onSelect: (_, value) {},
                       onSelectPage: (_) {},
                       output: 'C:/Fixture')))));
@@ -154,13 +154,26 @@ void main() {
       await capture(tester, captureKey, 'table-top-${width.toInt()}');
       if (width > 600) expect(before.width, closeTo(width - 12, .01));
       final firstRow = find.byKey(const ValueKey('download-row-1'));
+      final selectedRow = tester.widget<Container>(find.descendant(
+          of: firstRow,
+          matching: find.byWidgetPredicate((widget) =>
+              widget is Container && widget.foregroundDecoration != null)));
+      const playlistAccent = Color(0xFF287DAB);
+      expect((selectedRow.decoration as BoxDecoration).color,
+          Color.alphaBlend(playlistAccent.withAlpha(64), Colors.white));
+      expect(
+          ((selectedRow.foregroundDecoration as BoxDecoration).border as Border)
+              .left
+              .color,
+          playlistAccent);
       expect(find.descendant(of: firstRow, matching: find.text('Fixture')),
           findsOneWidget);
-      final rowSurface = tester.widget<Container>(find
-          .descendant(of: firstRow, matching: find.byType(Container))
-          .first);
-      expect((rowSurface.decoration! as BoxDecoration).color,
-          Color.alphaBlend(const Color(0x12287DAB), Colors.white));
+      final otherPlaylistRow = tester.widget<Container>(find.descendant(
+          of: find.byKey(const ValueKey('download-row-4')),
+          matching: find.byWidgetPredicate((widget) =>
+              widget is Container && widget.foregroundDecoration != null)));
+      expect((otherPlaylistRow.decoration as BoxDecoration).color,
+          Color.alphaBlend(const Color(0x2340864D), Colors.white));
       await tester.drag(
           find.byKey(const ValueKey('download-rows')), const Offset(0, -900));
       await tester.pumpAndSettle();

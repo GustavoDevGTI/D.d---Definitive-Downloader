@@ -1,8 +1,10 @@
 # Definitive Downloader
 
-**D.d** é a abreviação oficial de **Definitive Downloader**, nome escolhido pelo usuário. O produto é desktop e mobile, feito em Flutter/Dart, com foco inicial em playlists e arquivos musicais. A entrega atual é um piloto Windows. Visual claro, tabelas e conferência de fontes, com identidade distinta de C2 e JDownloader.
+**D.d** é a abreviação oficial de **Definitive Downloader**, um aplicativo em Flutter/Dart para Windows e Android com foco inicial em playlists e arquivos musicais.
 
-Código e versões: [repositório do produto](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader) · [release v0.1.25](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.25). Releases publicadas conservam commit, tag, notas e artefatos próprios. No ciclo atual de feedback, releases estão suspensas por pedido do usuário; as entregas têm versão e commit locais. A revisão estrutural **0.1.35** está documentada em [Revisão da estrutura](docs/REVISAO_ESTRUTURA_0_1_35.md); o player local foi introduzido na [0.1.34](docs/VERSAO_LOCAL_0_1_34.md).
+A [pré-release 0.1.74](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.74) reúne o instalador Windows x64 e os APKs Android de teste para ARM64 e x86-64. Confira as [notas da versão](docs/RELEASE_0_1_74.md).
+
+## Histórico da interface
 
 ![Tabela de Downloads do D.d — captura de layout com dados isolados](docs/images/table-0124-desktop.png)
 
@@ -64,9 +66,7 @@ O [escopo das ferramentas de playlists](docs/FERRAMENTAS_DE_PLAYLISTS.md) inclui
 
 O [escopo de formatos e plataformas](docs/FORMATOS_E_MULTIPLATAFORMA.md) exige também `.dlc`, `.ccf`, `.rsdf`, `.metalink`, `.meta4`, `.nzb` e `.sfdl`, além dos formatos tradicionais, tanto no desktop quanto no mobile. Esses sete formatos ainda não estão implementados ou validados.
 
-Para preparar o primeiro piloto com contas reais: [cadastro Spotify e Google](docs/CONFIGURACAO_DAS_CONTAS_DE_TESTE.md).
-
-A conexão Spotify por PKCE permite importar a playlist de teste com 10 faixas. A integração musical pesquisa Deezer e YouTube Music dentro do D.d, com revisão de correspondências e exclusão de videoclipes. O teste nativo Windows concluiu dez MP3s: sete da Deezer com conta própria informada como gratuita e três do YouTube Music, todos com capa, duração conferida, decodificação completa e M3U8 ordenada. A conexão Deezer também foi restaurada após reiniciar. Resultados em [DOWNLOAD_MUSICAL_INTEGRADO.md](docs/DOWNLOAD_MUSICAL_INTEGRADO.md).
+Para importar uma playlist pública do Spotify, cole o link em **Músicas → Coleções → Importar por link**. O serviço do projeto usa CheckLeaked via RapidAPI e abre a Conferência após ler a lista. Se a playlist estiver privada, o D.d orienta como torná-la pública no Spotify. As opções de conexão pessoal Trackhop e importação por CSV também estão disponíveis. [Serviço de importação](docs/VERSAO_LOCAL_0_1_67.md) · [Conexão pessoal](docs/VERSAO_LOCAL_0_1_65.md)
 
 ## Executar
 
@@ -88,8 +88,7 @@ O motor musical tem build próprio: `tools/build_music_engine.ps1 -Python <pytho
 
 - Coleções persistidas em SQLite, listagem paginada e seleção por faixa.
 - Importação de CSV em stream, preservando ordem e ocorrências repetidas.
-- Tentativa de leitura pública de playlists Spotify, sempre identificada como parcial. Essa leitura depende do conteúdo disponibilizado pelo site e não substitui autenticação oficial.
-- Conexão Spotify em módulo próprio, com sessão no cofre do sistema e importação autenticada paginada. Login real, importação de uma playlist de 10 faixas e restauração da conexão após reinício foram confirmados no Windows; veja `docs/evidencias/spotify-conta-real.md`.
+- Importação de playlists públicas do Spotify pelo serviço do D.d, com ordem e ocorrências repetidas preservadas.
 - Busca integrada em Deezer e YouTube Music, comparando artista, título, duração, versão e álbum. Candidatos ambíguos exigem revisão.
 - Busca automática prioriza faixas Deezer e YouTube Music ATV. Videoclipes OMV só são oferecidos em último caso, com aprovação da versão específica. Links YouTube inseridos manualmente dispensam matching/aprovação; ID, disponibilidade, duração e áudio continuam sendo validados. Não há corte de duração para ajustar outra versão.
 - Conexão Deezer por sessão própria informada somente no app, guardada no cofre do sistema. Autenticação, restauração após reinício e sete arquivos completos foram confirmados neste piloto; isso não comprova todo o catálogo ou outras contas/regiões.
@@ -100,11 +99,9 @@ O motor musical tem build próprio: `tools/build_music_engine.ps1 -Python <pytho
 
 ## Limites explícitos
 
-O login Spotify foi acrescentado ao piloto Windows; Google OAuth para escrever playlists e o retorno de login mobile ainda não foram configurados. A busca/download de áudio do YouTube Music usa um adaptador próprio sem conta. Não há áudio direto do Spotify validado. A disponibilidade Deezer continua sendo conferida faixa por faixa. Uma prévia permanece identificada como prévia no arquivo e na interface.
+O serviço de importação fornece os metadados da playlist. A disponibilidade do áudio é conferida faixa por faixa nas fontes de música. Uma prévia permanece identificada como prévia no arquivo e na interface.
 
-Uma falha TLS anterior no servidor de login Spotify foi resolvida utilizando também as raízes públicas já confiadas pelo Windows, sem desativar validação de certificados.
-
-A base de UI e regras usa Dart compartilhável. O alvo compilado nesta entrega é Windows. A navegação e as telas compactas foram verificadas em testes de widgets; os pacotes e as integrações nativas mobile ainda não foram implementados ou validados.
+Windows e Android compartilham a interface e as regras em Dart. O Android tem integrações nativas para áudio, transferências e armazenamento. A versão de teste é distribuída em APKs por arquitetura, com Android 7.0 ou superior. O ensaio de instalação desta versão no Android foi feito no emulador x86-64.
 
 Os ensaios antigos com spotDL, librespot e Zotify estão em [TESTES_AUDIO_SPOTIFY.md](docs/TESTES_AUDIO_SPOTIFY.md). Esses motores não foram incorporados. A nova integração usa módulos próprios e exclui o fallback antigo para vídeos. Um ensaio anterior pelo runner Flutter gerou dez faixas YouTube Music em banco separado; a rodada posterior pela interface nativa concluiu a coleção de produção combinando Deezer e YouTube Music. As evidências distinguem as duas execuções.
 

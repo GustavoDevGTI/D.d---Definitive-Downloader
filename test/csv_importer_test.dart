@@ -36,4 +36,24 @@ void main() {
       await dir.delete(recursive: true);
     }
   });
+  test('lê o CSV do Trackhop com duração em milissegundos', () async {
+    final dir = await Directory.systemTemp.createTemp('dd-trackhop-csv-');
+    try {
+      final file = File('${dir.path}/Playlist.csv');
+      await file.writeAsString('title,artist,album,duration_ms,isrc\n'
+          '"Faixa, parte 1","A, B",Álbum,123456,BRABC2612345\n'
+          'Segunda,C,,4000,\n'
+          '"Faixa, parte 1","A, B",Álbum,123456,BRABC2612345\n');
+      final rows =
+          await importer.open(file.path, spotifyExport: true).tracks.toList();
+      expect(rows.map((row) => row.title),
+          ['Faixa, parte 1', 'Segunda', 'Faixa, parte 1']);
+      expect(rows.first.artist, 'A, B');
+      expect(rows.first.album, 'Álbum');
+      expect(rows.first.durationMs, 123456);
+      expect(rows.first.isrc, 'BRABC2612345');
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
 }

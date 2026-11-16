@@ -7,56 +7,64 @@ class CategoryTabs extends StatelessWidget {
       required this.labels,
       required this.selected,
       required this.onSelect,
+      this.accent,
       this.bottomSpacing = 20});
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelect;
   final double bottomSpacing;
+  final Color? accent;
   @override
-  Widget build(BuildContext context) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-            padding: EdgeInsets.only(
-                bottom: MediaQuery.sizeOf(context).height < 500
-                    ? 0
-                    : MediaQuery.sizeOf(context).shortestSide < 600
-                        ? 8
-                        : 16),
-            child: Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (var i = 0; i < labels.length; i++)
-                    OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                            backgroundColor: i == selected
-                                ? AppColors.accentSoft
-                                : Colors.white,
-                            side: BorderSide(
-                                color: i == selected
-                                    ? AppColors.accentSoft
-                                    : Colors.transparent),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            foregroundColor: i == selected
-                                ? AppColors.accentActive
-                                : AppColors.muted,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10)),
-                        onPressed: () => onSelect(i),
-                        child: Text(labels[i],
-                            style: TextStyle(
-                                fontWeight: i == selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400))),
-                ]))),
-        const Divider(height: 1),
-        SizedBox(
-            height: MediaQuery.sizeOf(context).height < 500
-                ? bottomSpacing.clamp(0, 4)
-                : MediaQuery.sizeOf(context).shortestSide < 600
-                    ? bottomSpacing.clamp(0, 8)
-                    : bottomSpacing)
-      ]);
+  Widget build(BuildContext context) {
+    final color = accent;
+    final selectedSurface = color == null
+        ? AppColors.accentSoft
+        : Color.alphaBlend(color.withAlpha(40), Colors.white);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.sizeOf(context).height < 500
+                  ? 0
+                  : MediaQuery.sizeOf(context).shortestSide < 600
+                      ? 8
+                      : 16),
+          child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 6, runSpacing: 6, children: [
+                for (var i = 0; i < labels.length; i++)
+                  OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                          backgroundColor:
+                              i == selected ? selectedSurface : Colors.white,
+                          side: BorderSide(
+                              color: i == selected
+                                  ? color ?? selectedSurface
+                                  : Colors.transparent),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          foregroundColor: i == selected
+                              ? color == null
+                                  ? AppColors.accentActive
+                                  : AppColors.ink
+                              : AppColors.muted,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10)),
+                      onPressed: () => onSelect(i),
+                      child: Text(labels[i],
+                          style: TextStyle(
+                              fontWeight: i == selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400))),
+              ]))),
+      const Divider(height: 1),
+      SizedBox(
+          height: MediaQuery.sizeOf(context).height < 500
+              ? bottomSpacing.clamp(0, 4)
+              : MediaQuery.sizeOf(context).shortestSide < 600
+                  ? bottomSpacing.clamp(0, 8)
+                  : bottomSpacing)
+    ]);
+  }
 }
 
 class WorkspaceNavigationButton extends StatelessWidget {
@@ -138,15 +146,20 @@ class WorkspaceNavigationButton extends StatelessWidget {
 
 class WorkspacePanel extends StatelessWidget {
   const WorkspacePanel(
-      {super.key, required this.child, this.padding = EdgeInsets.zero});
+      {super.key,
+      required this.child,
+      this.padding = EdgeInsets.zero,
+      this.borderColor = AppColors.line,
+      this.color = AppColors.surface});
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final Color borderColor, color;
   @override
   Widget build(BuildContext context) => Material(
       clipBehavior: Clip.antiAlias,
-      color: AppColors.surface,
+      color: color,
       shape: RoundedRectangleBorder(
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: borderColor),
           borderRadius: BorderRadius.circular(12)),
       child: Padding(padding: padding, child: child));
 }

@@ -15,24 +15,35 @@ class TrackRow extends StatelessWidget {
       required this.selectionEnabled,
       required this.onTap,
       required this.onContextMenu,
-      required this.onSelect});
+      required this.onSelect,
+      this.accent});
   final Track track;
   final bool focused, compact, selectionEnabled;
   final VoidCallback onTap;
   final ValueChanged<Offset> onContextMenu;
   final ValueChanged<bool> onSelect;
+  final Color? accent;
   @override
   Widget build(BuildContext context) {
     final t = track;
+    final playlistColor = accent;
     return Material(
         key: ValueKey('track-row-${t.id}'),
-        color: focused
-            ? Color.lerp(AppColors.accentSoft, AppColors.accent, .12)
-            : t.selected
-                ? AppColors.accentSoft
-                : t.needsReview
+        color: playlistColor != null && !t.needsReview
+            ? Color.alphaBlend(
+                playlistColor.withAlpha(focused
+                    ? 54
+                    : t.selected
+                        ? 35
+                        : 12),
+                Colors.white)
+            : focused
+                ? Color.lerp(AppColors.accentSoft, AppColors.accent, .12)
+                : t.selected
                     ? AppColors.accentSoft
-                    : Colors.white,
+                    : t.needsReview
+                        ? AppColors.accentSoft
+                        : Colors.white,
         child: InkWell(
             onTap: onTap,
             onSecondaryTapUp: (details) =>
@@ -63,6 +74,7 @@ class TrackRow extends StatelessWidget {
                               ? t.coverUrl
                               : t.resolvedCoverUrl,
                           audioPath: t.localPath,
+                          borderColor: playlistColor,
                           size: compact ? 36 : 44)),
                   Expanded(
                       child: Padding(

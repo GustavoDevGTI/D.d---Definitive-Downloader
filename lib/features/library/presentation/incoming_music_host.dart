@@ -49,6 +49,26 @@ class _IncomingMusicHostState extends State<IncomingMusicHost> {
       if (!mounted || item == null) return;
       if (item.error.isNotEmpty) {
         await showAppNotice(context, message: item.error);
+      } else if (item.files.length == 1 &&
+          item.files.single.toLowerCase().endsWith('.csv')) {
+        final accepted = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+                  title: const Text('Buscar músicas da playlist?'),
+                  content: const Text(
+                      'O D.d vai conferir as faixas pelo título e pelo artista.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('Cancelar')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('Conferir faixas')),
+                  ],
+                ));
+        if (accepted == true && mounted) {
+          await widget.library.importSpotifyExport(item.files.single);
+        }
       } else {
         await showDialog<void>(
             context: context,

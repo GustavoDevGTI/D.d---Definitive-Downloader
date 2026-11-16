@@ -9,6 +9,8 @@ param(
     [switch]$GrantNotifications
 )
 $ErrorActionPreference='Stop'
+# Android build/test caches live in the existing profile-quota exclusion.
+if ($IsWindows) { $env:GRADLE_USER_HOME = Join-Path $env:LOCALAPPDATA 'Gradle' }
 $workspace=[IO.Path]::GetFullPath($WorkspaceRoot)
 if($workspace.StartsWith('\\') -or -not (Test-Path -LiteralPath (Join-Path $workspace '.dd-android-build-root'))) {
     throw 'Use o estágio Android local identificado, preparado por build_android.ps1.'
@@ -18,6 +20,9 @@ if($TestFile -notmatch '^integration_test/[a-z_]+_test\.dart$' -or
     throw 'Teste nativo inválido ou ausente.'
 }
 if($Device -notmatch '^[a-zA-Z0-9_.:\-]+$'){throw 'Identificador de dispositivo inválido.'}
+if($Device -eq 'emulator-5560') {
+    & (Join-Path $PSScriptRoot 'start-test-emulator.ps1') -Project Downloader -SdkRoot $SdkRoot | Out-Host
+}
 $aapt=Get-ChildItem -LiteralPath (Join-Path $SdkRoot 'build-tools') -Directory |
     Where-Object {$_.Name -match '^\d+\.\d+\.\d+$'} |
     Sort-Object {[version]$_.Name} -Descending |

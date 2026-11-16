@@ -4,6 +4,7 @@
     [ValidateSet('Local','Essential','Regression')][string]$TestProfile='Local',
     [string[]]$TestAreas=@(),
     [string[]]$TestFiles=@(),
+    [ValidatePattern('^$|^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?/?$')][string]$PlaylistGateway=$env:DD_PLAYLIST_GATEWAY,
     [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent)
 )
 $ErrorActionPreference = 'Stop'
@@ -112,7 +113,9 @@ try {
     if (-not $SkipTests) {
         & (Join-Path $testTools 'test_project.ps1') -WorkspaceRoot $stage -FlutterPath $flutter -Profile $TestProfile -Area $TestAreas -TestFiles $TestFiles
     }
-    & $flutter build windows --release --no-pub
+    $playlistDefines = @()
+    if ($PlaylistGateway) { $playlistDefines += "--dart-define=DD_PLAYLIST_GATEWAY=$PlaylistGateway" }
+    & $flutter build windows --release --no-pub @playlistDefines
     if ($LASTEXITCODE -ne 0) { throw 'A compilação Windows falhou.' }
     $destination = Join-Path $workspace 'dist\DefinitiveDownloader'
     New-Item -ItemType Directory -Path $destination -Force | Out-Null

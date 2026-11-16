@@ -12,13 +12,10 @@ import 'package:definitive_downloader/core/platform/android_files.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
 import 'package:definitive_downloader/features/connections/application/music_account_access.dart';
-import 'package:definitive_downloader/features/connections/application/spotify_connection_controller.dart';
-import 'package:definitive_downloader/features/connections/data/android_spotify_authorization.dart';
-import 'package:definitive_downloader/features/connections/data/spotify_token_store.dart';
+import 'package:definitive_downloader/features/connections/application/trackhop_connection.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/downloads/music_download_service.dart';
 import 'package:definitive_downloader/features/importing/csv_importer.dart';
-import 'package:definitive_downloader/features/importing/spotify_account_importer.dart';
 import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
@@ -29,7 +26,7 @@ import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'package:definitive_downloader/features/player/data/android_audio_engine.dart';
 import 'package:definitive_downloader/features/player/data/player_library.dart';
 
-import '../test/spotify_fixtures.dart';
+import '../test/trackhop_fixture.dart';
 
 const _playlistId = '1234567890123456789012';
 const _artist = 'Artista de teste';
@@ -43,64 +40,16 @@ void main() {
     expect(Platform.isAndroid, isTrue);
     final temp = await (await getTemporaryDirectory()).createTemp('dd-flow-');
     const storage = FlutterSecureStorage();
-    const spotifyStore = SecureSpotifyTokenStore(storage);
     const deezerStore = SecureDeezerSessionStore(storage);
     final worker = _FixtureWorker();
     final deezer = DeezerConnectionController(deezerStore, worker);
     var playlistReads = 0;
-    final spotify = SpotifyConnectionController(
-        store: spotifyStore,
-        authorization: AndroidSpotifyAuthorization(openBrowser: (uri) async {
-          expect(uri.host, 'accounts.spotify.com');
-          expect(uri.queryParameters['code_challenge_method'], 'S256');
-          final callback = Uri.parse(uri.queryParameters['redirect_uri']!);
-          expect(callback.port, 43822);
-          final client = HttpClient();
-          try {
-            final response =
-                await (await client.getUrl(callback.replace(queryParameters: {
-              'code': 'fixture-code',
-              'state': uri.queryParameters['state']!,
-            })))
-                    .close();
-            expect(response.statusCode, 200);
-            await response.drain<void>();
-          } finally {
-            client.close(force: true);
-          }
-        }),
-        transport: FixtureSpotifyTransport((uri, method, headers, form) async {
-          if (uri.path == '/api/token') {
-            expect(form?['code'], 'fixture-code');
-            return fixtureToken();
-          }
-          expect(headers['Authorization'], 'Bearer fixture-access');
-          if (uri.path == '/v1/me') return {'display_name': 'Fixture Android'};
-          playlistReads++;
-          if (uri.path == '/v1/playlists/$_playlistId') {
-            return {
-              'name': 'Coleção de teste Android',
-              'items': {'total': 2}
-            };
-          }
-          expect(uri.path, '/v1/playlists/$_playlistId/items');
-          return {
-            'total': 2,
-            'offset': 0,
-            'items': [
-              for (final title in _titles)
-                {
-                  'item': {
-                    'name': title,
-                    'duration_ms': 4000,
-                    'artists': [
-                      {'name': _artist}
-                    ]
-                  }
-                }
-            ],
-          };
-        }));
+    final spotify = TrackhopConnection(storage, localDesktop: false)
+      ..client = FixtureTrackhop(
+          titles: _titles,
+          artist: _artist,
+          durationMs: 4000,
+          onRead: () => playlistReads++);
     final repository = LibraryRepository(AppDatabase('${temp.path}/flow.db'));
     final files = AndroidFiles();
     const http = BoundedHttp();
@@ -108,8 +57,7 @@ void main() {
         repository: repository,
         files: files,
         spotify: const SpotifyImporter(http),
-        accountSpotify:
-            SpotifyAccountImporter(spotify.getJson, () => spotify.isConnected),
+        trackhopClient: () => spotify.client,
         accounts: MusicAccountAccess(
             spotifyConnected: () => spotify.isConnected,
             deezerConnected: () => deezer.connected),
@@ -143,9 +91,10 @@ void main() {
           controller: controller,
           connections: spotify,
           initialPlaylist: 'https://open.spotify.com/playlist/$_playlistId'));
-      await tap(find.text('Importar por link'));
-      await tap(find.text('Entrar no Spotify'));
+      final importing = controller
+          .importSpotify('https://open.spotify.com/playlist/$_playlistId');
       await tap(find.text('Fazer login depois'));
+      await importing;
       await _until(tester, () => controller.current != null && !controller.busy,
           'importação com Deezer adiado');
       await controller.preparationDone;
@@ -154,15 +103,18 @@ void main() {
       expect(imported.map((t) => t.title), _titles);
       expect(imported.map((t) => t.position), [1, 2]);
       expect(imported.every((t) => t.status == TrackStatus.pending), isTrue);
-      expect(playlistReads, 2);
-      expect((await spotifyStore.read())?.accessToken, 'fixture-access');
+      expect(playlistReads, 1);
       expect(await deezerStore.read(), isNull);
       expect(find.text('Conectar Deezer'), findsNothing);
       expect(worker.searches, 0);
       expect(worker.downloaded, isEmpty);
-      debugPrint('DD_FLOW: Spotify fixture importado com Deezer adiado');
+      debugPrint('DD_FLOW: Trackhop fixture importado com Deezer adiado');
 
       await acknowledgeNotice();
+      if (find.byType(BottomSheet).evaluate().isNotEmpty) {
+        tester.state<NavigatorState>(find.byType(Navigator)).pop();
+        await tester.pumpAndSettle();
+      }
       await tap(find.byTooltip('Rever correspondências'));
       await _until(
           tester,

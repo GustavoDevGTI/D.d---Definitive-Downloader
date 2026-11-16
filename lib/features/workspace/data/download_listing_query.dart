@@ -10,7 +10,8 @@ class DownloadListingQuery {
       required bool pauseMode,
       required DownloadSort? sort,
       required bool descending,
-      required String outputDirectory}) {
+      required String outputDirectory,
+      int? playlistId}) {
     final status = switch (filter) {
       DownloadFilter.downloading =>
         pauseMode ? ' AND 0' : " AND t.status='downloading'",
@@ -25,8 +26,12 @@ class DownloadListingQuery {
         "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)$status"
         " AND (?='' OR instr(lower(t.title),lower(?))>0 OR instr(lower(t.artist),lower(?))>0"
         " OR instr(lower(t.custom_title),lower(?))>0 OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
-        " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)";
-    args = List<Object?>.filled(8, search);
+        " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)"
+        "${playlistId == null ? '' : ' AND t.collection_id=?'}";
+    args = [
+      ...List<Object?>.filled(8, search),
+      if (playlistId != null) playlistId
+    ];
     from = "FROM tracks t JOIN collections c ON c.id=t.collection_id "
         "LEFT JOIN download_history h ON h.local_path=t.local_path AND h.track_id=t.id "
         "AND h.category='music' AND t.status='completed'";

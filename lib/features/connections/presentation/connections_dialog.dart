@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
-import '../application/spotify_connection_controller.dart';
+import '../application/trackhop_connection.dart';
 import '../application/deezer_connection_controller.dart';
 import 'deezer_connection_pane.dart';
+import 'trackhop_connection_pane.dart';
 
 class ConnectionsDialog extends StatelessWidget {
   const ConnectionsDialog(
@@ -12,7 +12,7 @@ class ConnectionsDialog extends StatelessWidget {
       this.allowChanges = true,
       this.deezer});
   final DeezerConnectionController? deezer;
-  final SpotifyConnectionController controller;
+  final TrackhopConnection controller;
   final bool allowChanges;
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -26,48 +26,8 @@ class ConnectionsDialog extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Spotify',
-                        style: TextStyle(
-                            fontSize: 17, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 10),
-                    Text(controller.isConnected
-                        ? 'Conectado: ${controller.displayName}'
-                        : 'Conecte sua conta para importar playlists próprias ou colaborativas.'),
-                    const SizedBox(height: 10),
-                    const Text('Acesso solicitado: leitura de playlists.',
-                        style: TextStyle(fontSize: 12, color: AppColors.muted)),
-                    const SizedBox(height: 18),
-                    if (controller.busy) ...[
-                      const LinearProgressIndicator(minHeight: 2),
-                      const SizedBox(height: 12),
-                      if (controller.status ==
-                          SpotifyConnectionStatus.authorizing)
-                        TextButton(
-                            onPressed: controller.cancel,
-                            child: const Text('Cancelar conexão')),
-                    ] else if (controller.isConnected)
-                      OutlinedButton(
-                          onPressed: allowChanges
-                              ? () => unawaited(controller.disconnect())
-                              : null,
-                          child: const Text('Desconectar deste dispositivo'))
-                    else
-                      FilledButton(
-                          onPressed:
-                              allowChanges && controller.authorization.supported
-                                  ? () => unawaited(controller.connect())
-                                  : null,
-                          child: const Text('Conectar Spotify')),
-                    if (!controller.authorization.supported) ...[
-                      const SizedBox(height: 10),
-                      const Text(
-                          'O login ainda não foi configurado nesta plataforma.'),
-                    ],
-                    if (controller.message.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      SelectableText(controller.message,
-                          style: const TextStyle(fontSize: 12)),
-                    ],
+                    TrackhopConnectionPane(
+                        connection: controller, allowChanges: allowChanges),
                     const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 12),

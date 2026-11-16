@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
 import '../../../app/brand.dart';
 import '../../../app/app_notice.dart';
-import '../../connections/application/spotify_connection_controller.dart';
+import '../../connections/application/trackhop_connection.dart';
 import '../../connections/presentation/connections_dialog.dart';
 import '../../connections/domain/music_account.dart';
 import '../../connections/presentation/account_request_dialog.dart';
@@ -18,6 +18,7 @@ import '../../workspace/presentation/home_workspace.dart';
 import '../../workspace/presentation/settings_workspace.dart';
 import '../../workspace/presentation/workspace_components.dart';
 import 'collection_workspace.dart';
+import 'playlist_file_action.dart';
 import 'sidebar.dart';
 import 'library_operation_status.dart';
 import '../../player/application/music_player_controller.dart';
@@ -34,7 +35,7 @@ class LibraryScreen extends StatefulWidget {
       this.showConnectionsOnStart = false});
   final LibraryController controller;
   final MusicPlayerController? player;
-  final SpotifyConnectionController? connections;
+  final TrackhopConnection? connections;
   final String initialPlaylist;
   final bool showConnectionsOnStart;
   @override
@@ -109,7 +110,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             barrierDismissible: false,
             builder: (_) => AccountRequestDialog(
                 account: account,
-                spotify: spotify,
+                trackhop: spotify,
                 deezer: deezer,
                 allowLater: allowLater)) ??
         MusicAccountDecision.cancelled;
@@ -151,7 +152,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           child: CallbackShortcuts(
               bindings: {
                 const SingleActivator(LogicalKeyboardKey.keyO, control: true):
-                    () => unawaited(widget.controller.importCsv()),
+                    () => unawaited(
+                        importPlaylistFile(context, widget.controller)),
                 if (widget.player != null && _section == AppSection.music) ...{
                   const SingleActivator(LogicalKeyboardKey.mediaPlayPause):
                       () => unawaited(widget.player!.toggle()),

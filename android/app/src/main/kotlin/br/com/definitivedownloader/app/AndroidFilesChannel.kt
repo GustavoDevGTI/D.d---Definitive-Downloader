@@ -19,6 +19,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     private var pending: MethodChannel.Result? = null
     private var copying = false
     private var kind = ""
+    private val playlistCopies = mutableSetOf<String>()
     @Volatile private var disposed = false
 
     init {
@@ -28,6 +29,11 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
                     "defaultOutput" -> result.success(outputDirectory().path)
                     "chooseOutput" -> chooseOutput(result)
                     "pickFiles" -> pick(call.argument<String>("kind") ?: "", result)
+                    "releasePlaylistFile" -> {
+                        val path = call.argument<String>("path")
+                        if (path != null && playlistCopies.remove(path)) deletePlaylistCopy(path)
+                        result.success(null)
+                    }
                     "openFolder" -> documents.openFolder(activity, requireNotNull(call.argument<String>("path")), result) { path -> folders.open(path, result) }
                     "openFile" -> {
                         documents.openFile(activity, requireNotNull(call.argument<String>("path")), result)
@@ -57,7 +63,7 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     }
 
     private fun pick(value: String, result: MethodChannel.Result) {
-        require(value in listOf("mp3", "csv", "cover"))
+        require(value in listOf("mp3", "playlist", "cover"))
         if (pending != null || copying) { result.error("busy", "Aguarde a seleção anterior.", null); return }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
             .setType(when (value) { "mp3" -> "audio/*"; "cover" -> "image/*"; else -> "*/*" })
@@ -83,7 +89,15 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
             val directory = File(activity.cacheDir, "imports/${UUID.randomUUID()}")
             try {
                 val paths = AndroidDocumentCopies(activity).copy(uris, selectedKind, directory) { disposed }
-                activity.runOnUiThread { copying = false; if (!disposed) result.success(paths) }
+                activity.runOnUiThread {
+                    copying = false
+                    if (disposed) {
+                        if (selectedKind == "playlist") paths.forEach(::deletePlaylistCopy)
+                    } else {
+                        if (selectedKind == "playlist") playlistCopies.addAll(paths)
+                        result.success(paths)
+                    }
+                }
             } catch (_: Exception) {
                 // Only this adapter-created temporary directory can be removed.
                 directory.deleteRecursively()
@@ -93,11 +107,23 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
         return true
     }
 
+    // Only paths returned by this channel's own picker reach this function.
+    private fun deletePlaylistCopy(path: String) {
+        val file = File(path)
+        file.delete()
+        file.parentFile?.let { folder ->
+            folder.delete()
+            folder.parentFile?.delete()
+        }
+    }
+
     fun dispose() {
         disposed = true
         folders.dispose()
         destinationPicker.dispose()
         pending?.error("cancelled", "Seleção interrompida.", null); pending = null
+        playlistCopies.forEach(::deletePlaylistCopy)
+        playlistCopies.clear()
         executor.shutdownNow()
         channel.setMethodCallHandler(null)
     }

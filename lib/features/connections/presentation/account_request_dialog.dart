@@ -1,19 +1,19 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import '../application/spotify_connection_controller.dart';
+import '../application/trackhop_connection.dart';
 import '../application/deezer_connection_controller.dart';
 import '../domain/music_account.dart';
 import 'deezer_connection_pane.dart';
+import 'trackhop_connection_pane.dart';
 
 class AccountRequestDialog extends StatefulWidget {
   const AccountRequestDialog(
       {super.key,
       required this.account,
-      required this.spotify,
+      required this.trackhop,
       required this.deezer,
       this.allowLater = false});
   final MusicAccount account;
-  final SpotifyConnectionController spotify;
+  final TrackhopConnection trackhop;
   final DeezerConnectionController deezer;
   final bool allowLater;
   @override
@@ -21,7 +21,7 @@ class AccountRequestDialog extends StatefulWidget {
 }
 
 class _AccountRequestDialogState extends State<AccountRequestDialog> {
-  late final _changes = Listenable.merge([widget.spotify, widget.deezer]);
+  late final _changes = Listenable.merge([widget.trackhop, widget.deezer]);
   bool _closing = false;
   @override
   void initState() {
@@ -38,7 +38,7 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
   void _changed() {
     if (!mounted || _closing) return;
     final connected = widget.account == MusicAccount.spotify
-        ? widget.spotify.isConnected
+        ? widget.trackhop.isConnected
         : widget.deezer.connected;
     if (connected) {
       _closing = true;
@@ -53,7 +53,9 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-          title: Text('Conectar ${widget.account.label}'),
+          title: Text(widget.account == MusicAccount.spotify
+              ? 'Conectar Trackhop'
+              : 'Conectar ${widget.account.label}'),
           content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -71,34 +73,11 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
                                     child: Text(
                                         'Você pode importar pelo Spotify e conectar o Deezer depois.')),
                             ])
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                              const Text('Entre para importar sua playlist.'),
-                              const SizedBox(height: 16),
-                              FilledButton(
-                                  onPressed: widget.spotify.busy
-                                      ? null
-                                      : () =>
-                                          unawaited(widget.spotify.connect()),
-                                  child: Text(widget.spotify.busy
-                                      ? 'Aguardando Spotify…'
-                                      : 'Entrar no Spotify')),
-                              if (widget.spotify.message.isNotEmpty)
-                                Padding(
-                                    padding: const EdgeInsets.only(top: 12),
-                                    child: Text(widget.spotify.message)),
-                            ]))),
+                      : TrackhopConnectionPane(connection: widget.trackhop))),
           actions: [
             TextButton(
-                onPressed: () {
-                  if (widget.account == MusicAccount.spotify &&
-                      widget.spotify.busy) {
-                    widget.spotify.cancel();
-                  }
-                  Navigator.pop(context, MusicAccountDecision.cancelled);
-                },
+                onPressed: () =>
+                    Navigator.pop(context, MusicAccountDecision.cancelled),
                 child: const Text('Cancelar')),
             if (widget.account == MusicAccount.deezer && widget.allowLater)
               TextButton(

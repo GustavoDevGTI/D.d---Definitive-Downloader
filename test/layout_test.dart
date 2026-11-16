@@ -22,8 +22,8 @@ import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
-import 'package:definitive_downloader/features/connections/application/spotify_connection_controller.dart';
-import 'spotify_fixtures.dart';
+import 'package:definitive_downloader/features/connections/application/trackhop_connection.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
@@ -119,11 +119,8 @@ void main() {
         await controller.refresh();
         controller.clearMessage();
       });
-      final connections = SpotifyConnectionController(
-          store: MemorySpotifyStore(),
-          authorization: FakeSpotifyFlow(),
-          transport: FixtureSpotifyTransport(
-              (uri, method, headers, form) async => {}));
+      final connections =
+          TrackhopConnection(const FlutterSecureStorage(), localDesktop: true);
       await tester.pumpWidget(RepaintBoundary(
           key: captureKey,
           child: DefinitiveDownloaderApp(
@@ -190,7 +187,7 @@ void main() {
       }
       await tester.tap(find.widgetWithText(OutlinedButton, 'Conexões'));
       await tester.pumpAndSettle();
-      expect(find.text('Conectar Spotify'), findsOneWidget);
+      expect(find.text('Conectar Trackhop'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Entrar na Deezer'),
           findsOneWidget);
       expect(find.text('Sessão Deezer (ARL)'), findsNothing);
@@ -745,6 +742,8 @@ void main() {
       connections.dispose();
       deezer.dispose();
       await tester.runAsync(() => directory.delete(recursive: true));
-    });
+    },
+        variant: TargetPlatformVariant(
+            {width < 780 ? TargetPlatform.android : TargetPlatform.windows}));
   }
 }

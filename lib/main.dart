@@ -17,20 +17,13 @@ import 'features/player/data/player_library.dart';
 import 'core/storage/database.dart';
 import 'features/downloads/download_service.dart';
 import 'features/importing/csv_importer.dart';
+import 'features/importing/managed_spotify_playlists.dart';
 import 'features/importing/spotify_importer.dart';
 import 'features/importing/soundcloud_link.dart';
 import 'features/library/application/library_controller.dart';
 import 'features/library/data/library_repository.dart';
 import 'features/matching/deezer_catalog.dart';
-import 'features/importing/spotify_account_importer.dart';
-import 'features/connections/application/spotify_connection_controller.dart';
-import 'features/connections/data/spotify_token_store.dart';
-import 'features/connections/data/spotify_transport.dart';
-import 'features/connections/data/windows_spotify_authorization.dart';
-import 'features/connections/data/windows_spotify_web_authorization.dart';
-import 'features/connections/data/android_spotify_authorization.dart';
-import 'features/connections/domain/spotify_auth.dart';
-import 'features/connections/presentation/spotify_login_dialog.dart';
+import 'features/connections/application/trackhop_connection.dart';
 import 'features/connections/application/deezer_connection_controller.dart';
 import 'features/connections/application/music_account_access.dart';
 import 'features/downloads/music_download_service.dart';
@@ -62,24 +55,18 @@ Future<void> main(List<String> arguments) async {
   final deezer = DeezerConnectionController(
       const SecureDeezerSessionStore(FlutterSecureStorage()), engine);
   final navigator = GlobalKey<NavigatorState>();
-  final connections = SpotifyConnectionController(
-      store: const SecureSpotifyTokenStore(FlutterSecureStorage()),
-      transport: const SpotifyHttpTransport(),
-      authorization: Platform.isWindows
-          ? WindowsSpotifyWebAuthorization((request, cancelled) async {
-              final context = navigator.currentContext;
-              if (context == null) throw const SpotifyAuthCancelled();
-              return showSpotifyLogin(context, request, cancelled);
-            })
-          : Platform.isAndroid
-              ? AndroidSpotifyAuthorization.installed()
-              : UnavailableSpotifyAuthorization());
+  final connections = TrackhopConnection(const FlutterSecureStorage(),
+      localDesktop: !Platform.isAndroid);
+  const playlistGateway = String.fromEnvironment('DD_PLAYLIST_GATEWAY',
+      defaultValue: 'https://dd-playlists.dd-playlist-worker.workers.dev');
   final controller = LibraryController(
       repository: LibraryRepository(database),
       files: files,
       spotify: const SpotifyImporter(http),
-      accountSpotify: SpotifyAccountImporter(
-          connections.getJson, () => connections.isConnected),
+      trackhopClient: () => connections.client,
+      managedSpotify: playlistGateway.isEmpty
+          ? null
+          : ManagedSpotifyPlaylists(playlistGateway),
       accounts: MusicAccountAccess(
           spotifyConnected: () => connections.isConnected,
           deezerConnected: () => deezer.connected),

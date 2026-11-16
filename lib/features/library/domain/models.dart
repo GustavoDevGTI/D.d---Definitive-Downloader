@@ -276,11 +276,13 @@ class ImportedCollection {
       required this.source,
       required this.sourceUrl,
       required this.tracks,
+      this.skippedCount = 0,
       this.isPartial = false});
   final String name;
   final String source;
   final String sourceUrl;
   final Stream<TrackDraft> tracks;
+  final int skippedCount;
   final bool isPartial;
 }
 

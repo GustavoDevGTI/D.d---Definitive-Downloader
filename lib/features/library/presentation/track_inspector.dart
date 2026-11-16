@@ -31,6 +31,8 @@ class _TrackInspectorState extends State<TrackInspector> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller, t = c.focused;
+    final rgb = c.current?.themeColor;
+    final accent = rgb == null ? null : Color(0xFF000000 | rgb);
     if (_trackId != t?.id ||
         _revision != c.inspectorRevision ||
         (_status != t?.status && t?.status == TrackStatus.completed)) {
@@ -44,19 +46,28 @@ class _TrackInspectorState extends State<TrackInspector> {
         color: Colors.white,
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
-              child: Row(children: [
-                const Expanded(
-                    child: Text('Conferência',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600))),
-                if (Navigator.of(context).canPop())
-                  IconButton(
-                      tooltip: 'Fechar conferência',
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, size: 20)),
-              ])),
+          DecoratedBox(
+              decoration: BoxDecoration(
+                  color: accent == null
+                      ? Colors.white
+                      : Color.alphaBlend(accent.withAlpha(24), Colors.white),
+                  border: Border(
+                      top: BorderSide(
+                          width: 3, color: accent ?? Colors.transparent))),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 8, 8),
+                child: Row(children: [
+                  const Expanded(
+                      child: Text('Conferência',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600))),
+                  if (Navigator.of(context).canPop())
+                    IconButton(
+                        tooltip: 'Fechar conferência',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, size: 20)),
+                ]),
+              )),
           if (t == null)
             const Expanded(child: Center(child: Text('Selecione uma faixa')))
           else ...[
@@ -65,6 +76,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                 child: CategoryTabs(
                     labels: const ['Correspondência', 'Informações'],
                     selected: _tab,
+                    accent: accent,
                     bottomSpacing: 0,
                     onSelect: (v) => setState(() => _tab = v))),
             Expanded(
@@ -73,7 +85,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TrackIdentity(track: t),
+                          TrackIdentity(track: t, accent: accent),
                           const SizedBox(height: 16),
                           _line(
                               'Duração esperada', formatDuration(t.durationMs)),

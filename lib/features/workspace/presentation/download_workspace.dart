@@ -49,7 +49,11 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
           LayoutBuilder(builder: (context, constraints) {
             final wide = constraints.maxWidth >= 800 ||
                 (constraints.maxHeight < 300 && constraints.maxWidth >= 700);
-            final inlineFilters = constraints.maxWidth >= 1380;
+            final platform = Theme.of(context).platform;
+            final compact = constraints.maxWidth < 600 ||
+                platform == TargetPlatform.android ||
+                platform == TargetPlatform.iOS;
+            final inlineFilters = !compact && constraints.maxWidth >= 1380;
             final c = controller, library = c.library;
             final enabled = category == ContentCategory.music;
             final page = enabled && c.category == category
@@ -99,6 +103,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
               )),
             ]);
             final toolbar = DownloadToolbar(
+                compact: compact,
                 onAdd: enabled &&
                         !library.addingLinks &&
                         !library.importing &&
@@ -135,12 +140,14 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                             (e) => e.track.status != TrackStatus.downloading)
                     ? () => unawaited(_remove(context))
                     : null);
-            final colorSorted = c.downloadSort == DownloadSort.playlistColor;
-            final filters = Wrap(spacing: 4, runSpacing: 4, children: [
+            final filterButtons = <Widget>[
               for (final filter in DownloadFilter.values)
                 TextButton(
                     style: TextButton.styleFrom(
                         shape: const StadiumBorder(),
+                        padding: compact
+                            ? const EdgeInsets.symmetric(horizontal: 8)
+                            : null,
                         foregroundColor: AppColors.muted,
                         backgroundColor: c.filter == filter
                             ? AppColors.accentSoft
@@ -154,28 +161,15 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       DownloadFilter.completed => 'Concluído',
                       DownloadFilter.failed => 'Erro',
                     })),
-              if (enabled)
-                Tooltip(
-                    message: 'Ordenar por cor da playlist',
-                    child: TextButton.icon(
-                        key: const ValueKey('sort-download-playlist-color'),
-                        style: TextButton.styleFrom(
-                            foregroundColor: colorSorted
-                                ? AppColors.accentActive
-                                : AppColors.muted,
-                            backgroundColor:
-                                colorSorted ? AppColors.accentSoft : null),
-                        onPressed: () => unawaited(
-                            c.sortDownloads(DownloadSort.playlistColor)),
-                        icon: Icon(
-                            colorSorted
-                                ? (c.downloadDescending
-                                    ? Icons.arrow_downward
-                                    : Icons.arrow_upward)
-                                : Icons.palette_outlined,
-                            size: 16),
-                        label: const Text('Cor'))),
-            ]);
+              if (enabled) _playlistColorMenu(c),
+            ];
+            final filters = compact
+                ? SingleChildScrollView(
+                    key: const ValueKey('download-mobile-filters'),
+                    scrollDirection: Axis.horizontal,
+                    primary: false,
+                    child: Row(children: filterButtons))
+                : Wrap(spacing: 4, runSpacing: 4, children: filterButtons);
             final footer = Row(children: [
               Expanded(
                   child: Wrap(
@@ -186,7 +180,16 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                     Text('${c.selection.length} selecionados',
                         style: const TextStyle(
                             fontSize: 11, color: AppColors.muted)),
-                    if (!enabled)
+                    if (!enabled && compact)
+                      SizedBox(
+                          width: 44,
+                          child: DownloadActionButton(
+                              icon: Icons.add,
+                              label: 'Capturar novo link',
+                              color: DownloadActionColors.add,
+                              compact: true,
+                              onPressed: onCapture))
+                    else if (!enabled)
                       ButtonHoverMotion(
                           builder: (states) => OutlinedButton.icon(
                               statesController: states,
@@ -209,7 +212,11 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                 children: [
                   if (widget.keyboardOpen)
                     search
-                  else if (wide)
+                  else if (compact) ...[
+                    search,
+                    const SizedBox(height: 6),
+                    toolbar,
+                  ] else if (wide)
                     Row(children: [
                       toolbar,
                       if (inlineFilters) ...[
@@ -219,9 +226,13 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                       const SizedBox(width: 12),
                       Expanded(child: search)
                     ])
-                  else ...[toolbar, const SizedBox(height: 8), search],
-                  if (!widget.keyboardOpen && !inlineFilters) ...[
+                  else ...[
+                    toolbar,
                     const SizedBox(height: 8),
+                    search
+                  ],
+                  if (!widget.keyboardOpen && !inlineFilters) ...[
+                    SizedBox(height: compact ? 2 : 8),
                     filters,
                   ],
                   const SizedBox(height: 8),
@@ -235,6 +246,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                               : DownloadTable(
                                   key: ValueKey(
                                       'download-table-${c.tableRevision}'),
+                                  compact: compact,
                                   entries: page.items,
                                   sort: c.downloadSort,
                                   descending: c.downloadDescending,
@@ -253,6 +265,7 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                                   viewKey: (
                                     c.category,
                                     c.filter,
+                                    c.downloadPlaylistId,
                                     c.downloadQuery,
                                     c.downloadSort,
                                     c.downloadDescending
@@ -265,16 +278,89 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                   const SizedBox(height: 8),
                   footer,
                 ]);
-            final minimumHeight = constraints.maxWidth < 600
-                ? (MediaQuery.textScalerOf(context).scale(12) > 14
-                    ? 820.0
-                    : 700.0)
+            final minimumHeight = compact
+                ? (widget.keyboardOpen ? 170.0 : 270.0) *
+                    (MediaQuery.textScalerOf(context).scale(12) / 12)
+                        .clamp(1, 2)
                 : 540.0;
             return constraints.maxHeight < minimumHeight
                 ? SingleChildScrollView(
                     child: SizedBox(height: minimumHeight, child: content))
                 : content;
           }));
+  Widget _playlistColorMenu(WorkspaceController c) {
+    final selectedId = c.downloadPlaylistId;
+    final active = selectedId != null;
+    final selected = c.downloadColors
+        .where((option) => option.collectionId == selectedId)
+        .firstOrNull;
+    final sorted = c.downloadSort == DownloadSort.playlistColor;
+    return PopupMenuButton<({int? playlistId})>(
+        key: const ValueKey('download-playlist-color-filter'),
+        tooltip: selected == null
+            ? 'Filtrar pela cor da playlist'
+            : 'Cor da playlist: ${selected.name}',
+        position: PopupMenuPosition.under,
+        enabled: active || c.downloadColors.isNotEmpty,
+        onSelected: (option) =>
+            unawaited(c.filterDownloadsByPlaylist(option.playlistId)),
+        itemBuilder: (_) => [
+              CheckedPopupMenuItem(
+                  value: (playlistId: null),
+                  checked: !active,
+                  child: const Text('Todas as cores')),
+              for (final option in c.downloadColors)
+                CheckedPopupMenuItem(
+                    key: ValueKey('download-color-${option.collectionId}'),
+                    value: (playlistId: option.collectionId),
+                    checked: selectedId == option.collectionId,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      _colorDot(option.rgb),
+                      const SizedBox(width: 8),
+                      Flexible(
+                          child: Text(option.name,
+                              maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    ])),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                  onTap: () =>
+                      unawaited(c.sortDownloads(DownloadSort.playlistColor)),
+                  child: Text(sorted
+                      ? 'Ordenar por cor ${c.downloadDescending ? '↓' : '↑'}'
+                      : 'Ordenar por cor')),
+            ],
+        child: DecoratedBox(
+            decoration: BoxDecoration(
+                color: active ? AppColors.accentSoft : Colors.transparent,
+                borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                    height: 36,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (selected == null)
+                        const Icon(Icons.palette_outlined,
+                            size: 16, color: AppColors.muted)
+                      else
+                        _colorDot(selected.rgb),
+                      const SizedBox(width: 6),
+                      Text('Cor',
+                          style: TextStyle(
+                              color: active
+                                  ? AppColors.accentActive
+                                  : AppColors.muted)),
+                      const Icon(Icons.arrow_drop_down, size: 18),
+                    ])))));
+  }
+
+  Widget _colorDot(int rgb) => Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF000000 | rgb),
+          border: Border.all(color: Colors.black26)));
+
   Future<void> _remove(BuildContext context) async {
     final accepted = await showDialog<bool>(
         context: context,
@@ -305,6 +391,7 @@ class DownloadToolbar extends StatelessWidget {
       this.onOpen,
       this.onRetry,
       this.onRemove,
+      this.compact = false,
       this.paused = false});
   final VoidCallback? onAdd,
       onStart,
@@ -314,73 +401,82 @@ class DownloadToolbar extends StatelessWidget {
       onOpen,
       onRetry,
       onRemove;
-  final bool paused;
+  final bool paused, compact;
   @override
-  Widget build(BuildContext context) => Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: AppColors.line),
-              borderRadius: BorderRadius.circular(14)),
-          child: SingleChildScrollView(
-              key: const ValueKey('download-toolbar-scroll'),
-              scrollDirection: Axis.horizontal,
-              primary: false,
-              child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                  child: Row(children: [
-                    _button(
-                        Icons.download_rounded,
-                        paused ? 'Continuar fila' : 'Iniciar selecionados',
-                        'Arquivos incompletos reiniciam do começo.',
-                        onStart,
-                        color: DownloadActionColors.start,
-                        primary: true),
-                    const SizedBox(width: 6),
-                    _button(
-                        paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                        paused ? 'Retomar' : 'Pausar fila',
-                        'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
-                        onPause,
-                        color: DownloadActionColors.pause,
-                        active: paused),
-                    const SizedBox(width: 6),
-                    _button(
-                        Icons.stop_rounded,
-                        'Parar fila',
-                        'Interromper a operação ativa e preservar os arquivos concluídos.',
-                        onCancel,
-                        color: DownloadActionColors.stop),
-                    _separator(),
-                    _button(Icons.folder_open_rounded, 'Abrir pasta',
-                        'Abrir a pasta do arquivo selecionado.', onOpen),
-                    const SizedBox(width: 6),
-                    _button(
-                        Icons.refresh_rounded,
-                        'Tentar novamente',
-                        'Reiniciar somente os selecionados que falharam.',
-                        onRetry),
-                    const SizedBox(width: 6),
-                    _button(
-                        Icons.delete_outline_rounded,
-                        'Remover da fila',
-                        'Preservar a coleção, os arquivos e o histórico.',
-                        onRemove,
-                        color: DownloadActionColors.stop),
-                    const SizedBox(width: 6),
-                    _button(
-                        Icons.settings_backup_restore_rounded,
-                        'Resetar tabela',
-                        'Restaurar larguras, busca, filtros e ordenação.',
-                        onReset),
-                    _separator(),
-                    _button(Icons.add_link_rounded, 'Adicionar links',
-                        'Acrescentar faixas ao final da coleção.', onAdd,
-                        color: DownloadActionColors.add),
-                  ])))));
+  Widget build(BuildContext context) {
+    final buttons = _buttons();
+    if (compact) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Row(
+            key: const ValueKey('download-mobile-actions'),
+            spacing: 4,
+            children: [for (final button in buttons) Expanded(child: button)],
+          ),
+        ),
+      );
+    }
+    return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.line),
+                borderRadius: BorderRadius.circular(14)),
+            child: SingleChildScrollView(
+                key: const ValueKey('download-toolbar-scroll'),
+                scrollDirection: Axis.horizontal,
+                primary: false,
+                child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    child: Row(children: buttons)))));
+  }
+
+  List<Widget> _buttons() => [
+        _button(
+            Icons.download_rounded,
+            paused ? 'Continuar fila' : 'Iniciar selecionados',
+            'Arquivos incompletos reiniciam do começo.',
+            onStart,
+            color: DownloadActionColors.start,
+            primary: true),
+        if (!compact) const SizedBox(width: 6),
+        _button(
+            paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            paused ? 'Retomar' : 'Pausar fila',
+            'Limitar a transferência atual a 10 KiB/s e não iniciar outras.',
+            onPause,
+            color: DownloadActionColors.pause,
+            active: paused),
+        if (!compact) const SizedBox(width: 6),
+        _button(
+            Icons.stop_rounded,
+            'Parar fila',
+            'Interromper a operação ativa e preservar os arquivos concluídos.',
+            onCancel,
+            color: DownloadActionColors.stop),
+        if (!compact) _separator(),
+        _button(Icons.folder_open_rounded, 'Abrir pasta',
+            'Abrir a pasta do arquivo selecionado.', onOpen),
+        if (!compact) const SizedBox(width: 6),
+        _button(Icons.refresh_rounded, 'Tentar novamente',
+            'Reiniciar somente os selecionados que falharam.', onRetry),
+        if (!compact) const SizedBox(width: 6),
+        _button(Icons.delete_outline_rounded, 'Remover da fila',
+            'Preservar a coleção, os arquivos e o histórico.', onRemove,
+            color: DownloadActionColors.stop),
+        if (!compact) const SizedBox(width: 6),
+        _button(Icons.settings_backup_restore_rounded, 'Resetar tabela',
+            'Restaurar larguras, busca, filtros e ordenação.', onReset),
+        if (!compact) _separator(),
+        _button(Icons.add_link_rounded, 'Adicionar links',
+            'Acrescentar faixas ao final da coleção.', onAdd,
+            color: DownloadActionColors.add),
+      ];
 
   Widget _separator() => const SizedBox(
       height: 22, width: 20, child: VerticalDivider(width: 20, thickness: 1));
@@ -396,6 +492,7 @@ class DownloadToolbar extends StatelessWidget {
           description: description,
           onPressed: action,
           color: color,
+          compact: compact,
           primary: primary,
           active: active);
 }

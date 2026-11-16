@@ -54,12 +54,13 @@ class DownloadActionButton extends StatelessWidget {
       this.description = '',
       this.color = DownloadActionColors.utility,
       this.primary = false,
-      this.active = false});
+      this.active = false,
+      this.compact = false});
   final IconData icon;
   final String label, description;
   final VoidCallback? onPressed;
   final Color color;
-  final bool primary, active;
+  final bool primary, active, compact;
   @override
   Widget build(BuildContext context) => ButtonHoverMotion(
       builder: (states) => Semantics(
@@ -72,9 +73,15 @@ class DownloadActionButton extends StatelessWidget {
               style: downloadActionStyle(color,
                       primary: primary, active: active)
                   .copyWith(
-                      minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+                      minimumSize: WidgetStatePropertyAll(
+                          compact ? const Size(0, 44) : const Size(48, 48)),
+                      padding: compact
+                          ? const WidgetStatePropertyAll(EdgeInsets.zero)
+                          : null,
+                      tapTargetSize:
+                          compact ? MaterialTapTargetSize.shrinkWrap : null,
                       visualDensity: VisualDensity.standard,
                       shape: WidgetStatePropertyAll(RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)))),
-              icon: Icon(icon, size: 22))));
+              icon: Icon(icon, size: compact ? 18 : 22))));
 }

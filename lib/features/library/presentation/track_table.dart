@@ -15,9 +15,13 @@ import '../../player/presentation/player_scope.dart';
 
 class TrackTable extends StatefulWidget {
   const TrackTable(
-      {super.key, required this.controller, required this.onFocus});
+      {super.key,
+      required this.controller,
+      required this.onFocus,
+      this.accent});
   final LibraryController controller;
   final ValueChanged<Track> onFocus;
+  final Color? accent;
   @override
   State<TrackTable> createState() => _TrackTableState();
 }
@@ -56,6 +60,7 @@ class _TrackTableState extends State<TrackTable> {
           },
           child: LayoutBuilder(builder: (context, box) {
             final compact = box.maxWidth < 500;
+            final accent = widget.accent;
             final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
             final extent = (MediaQuery.sizeOf(context).height < 500
                     ? 64.0
@@ -96,11 +101,14 @@ class _TrackTableState extends State<TrackTable> {
             return Column(children: [
               Container(
                   key: const ValueKey('track-table-header'),
-                  decoration: const BoxDecoration(
-                      color: AppColors.surface,
+                  decoration: BoxDecoration(
+                      color: accent == null
+                          ? AppColors.surface
+                          : Color.alphaBlend(
+                              accent.withAlpha(15), Colors.white),
                       border: Border(
-                          top: BorderSide(color: AppColors.line),
-                          bottom: BorderSide(color: AppColors.line))),
+                          top: BorderSide(color: accent ?? AppColors.line),
+                          bottom: const BorderSide(color: AppColors.line))),
                   padding: const EdgeInsets.fromLTRB(9, 0, 18, 0),
                   child: Row(children: [
                     SizedBox(
@@ -213,6 +221,7 @@ class _TrackTableState extends State<TrackTable> {
                                                         width: box.maxWidth,
                                                         child: TrackRow(
                                                             track: t,
+                                                            accent: accent,
                                                             focused: focused,
                                                             compact: compact,
                                                             selectionEnabled:

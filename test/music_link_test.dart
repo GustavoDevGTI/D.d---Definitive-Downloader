@@ -12,7 +12,7 @@ import 'package:definitive_downloader/features/importing/music_link_catalog.dart
 import 'package:definitive_downloader/features/importing/music_catalog_transport.dart';
 import 'package:definitive_downloader/features/importing/music_link_repository.dart';
 import 'package:definitive_downloader/features/importing/music_link_service.dart';
-import 'package:definitive_downloader/features/importing/spotify_account_importer.dart';
+import 'trackhop_fixture.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/workspace/data/workspace_repository.dart';
@@ -132,18 +132,7 @@ void main() {
     expect(manual.source!.kind, SourceKind.deezerFull);
     expect(manual.ready, isFalse);
     expect(manual.pinned, isTrue);
-    final spotify = SpotifyAccountImporter(
-        (path, {query = const {}}) async => {
-              'id': '0123456789012345678901',
-              'type': 'track',
-              'name': 'Canção',
-              'duration_ms': 180000,
-              'artists': [
-                {'name': 'Pessoa'}
-              ],
-              'album': {'name': 'Álbum'},
-            },
-        () => true);
+    final spotify = FixtureTrackhop();
     final requested =
         (await MusicLinkService(MusicLinkCatalog(spotify: spotify), null)
                 .resolve('spotify:track:0123456789012345678901'))
@@ -161,18 +150,7 @@ void main() {
     final engine = LinkSearchEngine();
     final connection = DeezerConnectionController(EmptySession(), engine);
     try {
-      final spotify = SpotifyAccountImporter(
-          (path, {query = const {}}) async => {
-                'id': '0123456789012345678901',
-                'type': 'track',
-                'name': 'Canção',
-                'duration_ms': 180000,
-                'artists': [
-                  {'name': 'Pessoa'}
-                ],
-                'album': {'name': 'Álbum'},
-              },
-          () => true);
+      final spotify = FixtureTrackhop();
       final entries = await MusicLinkService(MusicLinkCatalog(spotify: spotify),
               MusicResolver(engine, connection))
           .resolve('spotify:track:0123456789012345678901');

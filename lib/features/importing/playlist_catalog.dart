@@ -5,7 +5,8 @@ import 'public_playlist_link.dart';
 import 'soundcloud_catalog.dart';
 import 'soundcloud_link.dart';
 import 'spotify_importer.dart';
-import 'spotify_account_importer.dart';
+import 'trackhop_client.dart';
+import 'managed_spotify_playlists.dart';
 import '../connections/domain/music_account.dart';
 
 /// Reads a collection without creating a second collection in the library.
@@ -13,13 +14,15 @@ class PlaylistCatalog {
   const PlaylistCatalog(
       {required this.spotify,
       required this.soundcloud,
-      this.accountSpotify,
+      this.trackhop,
+      this.managedSpotify,
       this.deezer = const DeezerPlaylistCatalog(),
       this.youtube = const YouTubePlaylistCatalog(),
       this.available = false,
       this.deezerConnected = false});
   final SpotifyImporter spotify;
-  final SpotifyAccountImporter? accountSpotify;
+  final TrackhopClient? trackhop;
+  final ManagedSpotifyPlaylists? managedSpotify;
   final SoundCloudCatalog soundcloud;
   final DeezerPlaylistCatalog deezer;
   final YouTubePlaylistCatalog youtube;
@@ -44,7 +47,7 @@ class PlaylistCatalog {
   }
 
   Future<ImportedCollection> read(String url,
-      {bool Function()? cancelled, void Function(int, int)? onProgress}) {
+      {bool Function()? cancelled, void Function(int, int)? onProgress}) async {
     if (SoundCloudLink.recognizes(url)) {
       return soundcloud.open(url,
           downloadAvailable: available,
@@ -64,9 +67,19 @@ class PlaylistCatalog {
               onProgress: onProgress);
     }
     spotify.playlistId(url); // Validate before asking for any account.
-    if (accountSpotify?.isConnected != true) {
+    final managed = managedSpotify;
+    if (managed != null) {
+      try {
+        return await managed.open(url,
+            cancelled: cancelled, onProgress: onProgress);
+      } on PublicSpotifyPlaylistRequired {
+        if (trackhop == null) rethrow;
+      }
+    }
+    if (trackhop == null) {
       throw const MusicAccountRequired(MusicAccount.spotify);
     }
-    return accountSpotify!.open(url);
+    return trackhop!
+        .playlist(url, cancelled: cancelled, onProgress: onProgress);
   }
 }

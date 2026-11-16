@@ -78,7 +78,17 @@ class AndroidFiles extends DesktopFiles {
       await channel.invokeListMethod<String>('pickFiles', {'kind': kind}) ?? [];
 
   @override
-  Future<String?> chooseCsv() async => (await _pick('csv')).firstOrNull;
+  Future<String?> choosePlaylistFile() async =>
+      (await _pick('playlist')).firstOrNull;
+  @override
+  Future<void> releasePlaylistFile(String path) async {
+    try {
+      await channel.invokeMethod<void>('releasePlaylistFile', {'path': path});
+    } on MissingPluginException {
+      // The Activity may have closed; its channel also cleans up on disposal.
+    }
+  }
+
   @override
   Future<String?> chooseCover() async => (await _pick('cover')).firstOrNull;
   @override

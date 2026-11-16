@@ -8,7 +8,7 @@ import java.io.File
 /** The same bounded, read-only document import serves the picker and Sharesheet. */
 class AndroidDocumentCopies(private val context: Context) {
     fun copy(uris: List<Uri>, kind: String, directory: File, maxTotal: Long = 1024L * 1024 * 1024, cancelled: () -> Boolean): List<String> {
-        require(kind in listOf("mp3", "csv", "cover"))
+        require(kind in listOf("mp3", "playlist", "csv", "cover"))
         require(uris.isNotEmpty() && uris.size <= if (kind == "mp3") 100 else 1)
         check(directory.mkdirs())
         var total = 0L
@@ -18,10 +18,10 @@ class AndroidDocumentCopies(private val context: Context) {
                 .use { cursor -> if (cursor != null && cursor.moveToFirst()) cursor.getString(0) ?: "" else "" }
                 .replace(Regex("[^\\p{L}\\p{N} ._()\\-]"), "_").take(180)
             val extension = original.substringAfterLast('.', "").lowercase()
-            require(when (kind) { "mp3" -> extension == "mp3"; "csv" -> extension == "csv"; else -> extension in listOf("png", "jpg", "jpeg", "webp") })
+            require(when (kind) { "mp3" -> extension == "mp3"; "csv" -> extension == "csv"; "playlist" -> extension in listOf("csv", "json"); else -> extension in listOf("png", "jpg", "jpeg", "webp") })
             val folder = File(directory, index.toString()).apply { check(mkdirs()) }
             val destination = File(folder, original)
-            val limit = when (kind) { "mp3" -> 200L * 1024 * 1024; "csv" -> 5L * 1024 * 1024; else -> 10L * 1024 * 1024 }
+            val limit = when (kind) { "mp3" -> 200L * 1024 * 1024; "playlist", "csv" -> 5L * 1024 * 1024; else -> 10L * 1024 * 1024 }
             var size = 0L
             context.contentResolver.openInputStream(uri).use { input ->
                 requireNotNull(input)

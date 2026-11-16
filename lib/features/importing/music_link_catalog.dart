@@ -1,7 +1,7 @@
 import '../library/domain/models.dart';
 import 'music_link.dart';
 import 'music_catalog_transport.dart';
-import 'spotify_account_importer.dart';
+import 'trackhop_client.dart';
 import 'soundcloud_catalog.dart';
 
 class MusicLinkCatalog {
@@ -10,7 +10,7 @@ class MusicLinkCatalog {
       this.spotify,
       this.soundcloud});
   final MusicCatalogTransport transport;
-  final SpotifyAccountImporter? spotify;
+  final TrackhopClient? spotify;
   final SoundCloudCatalog? soundcloud;
 
   Future<ResolvedMusicLink> resolve(MusicLink link) async {
@@ -55,45 +55,12 @@ class MusicLinkCatalog {
               sourceKind: SourceKind.directMp3));
     }
     if (link.kind == MusicLinkKind.spotify) {
-      if (spotify?.isConnected != true) {
+      if (spotify == null) {
         throw const FormatException(
-            'Conecte o Spotify para conferir esta faixa.');
+            'Conecte o Trackhop para conferir esta faixa.');
       }
-      final row = await spotify!.read('/tracks/${link.id}');
-      if (row['id'] != link.id ||
-          row['type'] != 'track' ||
-          row['is_local'] == true) {
-        throw const FormatException(
-            'A resposta não corresponde à faixa Spotify.');
-      }
-      final artists = row['artists'];
-      final album = row['album'];
-      if (artists is! List || artists.isEmpty || album is! Map) {
-        throw const FormatException('Metadados Spotify incompletos.');
-      }
-      final artist = artists
-          .take(8)
-          .whereType<Map>()
-          .map((r) => _text(r['name']))
-          .join(', ');
-      final images = album['images'];
       return ResolvedMusicLink(
-          link: link,
-          draft: TrackDraft(
-              title: _text(row['name']),
-              artist: artist,
-              album: _text(album['name'], optional: true),
-              durationMs: _duration(row['duration_ms']),
-              sourceUrl: link.url,
-              isrc: row['external_ids'] is Map
-                  ? _text(row['external_ids']['isrc'], optional: true)
-                  : '',
-              coverUrl:
-                  images is List && images.isNotEmpty && images.first is Map
-                      ? _image(images.first['url'])
-                      : '',
-              explicit:
-                  row['explicit'] is bool ? row['explicit'] as bool : null));
+          link: link, draft: await spotify!.track(link.id, link.url));
     }
     Candidate source;
     if (link.kind == MusicLinkKind.deezer) {

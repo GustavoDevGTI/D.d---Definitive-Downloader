@@ -86,9 +86,10 @@ class ProbeContinuousDownloads extends ContinuousDownloadRepository {
       bool pauseMode = false,
       DownloadSort? sort,
       bool descending = false,
+      int? playlistId,
       String outputDirectory = ''}) async {
     probe.reads++;
-    return const DownloadListingSnapshot(0, [], {}, []);
+    return const DownloadListingSnapshot(0, [], {}, [], []);
   }
 }
 

@@ -28,6 +28,8 @@ class WorkspaceController extends ChangeNotifier {
   HistoryPage history = const HistoryPage([], [], 0);
   ContentCategory category = ContentCategory.music;
   DownloadFilter filter = DownloadFilter.all;
+  int? downloadPlaylistId;
+  List<DownloadPlaylistColor> get downloadColors => _downloadListing.colors;
   DownloadSort? downloadSort;
   bool downloadDescending = false;
   int tableRevision = 0;
@@ -73,6 +75,7 @@ class WorkspaceController extends ChangeNotifier {
             pauseMode: library.pauseMode,
             sort: downloadSort,
             descending: downloadDescending,
+            playlistId: downloadPlaylistId,
             outputDirectory: library.outputDirectory),
         repository.history(
             folder: folder, query: historyQuery, offset: historyOffset),
@@ -165,6 +168,7 @@ class WorkspaceController extends ChangeNotifier {
     downloadDescending = false;
     downloadQuery = '';
     filter = DownloadFilter.all;
+    downloadPlaylistId = null;
     selection.clear();
     tableRevision++;
     columnWidths = downloadColumns.map((c) => c.width).toList();
@@ -188,6 +192,13 @@ class WorkspaceController extends ChangeNotifier {
 
   Future<void> setFilter(DownloadFilter value) async {
     filter = value;
+    selection.clear();
+    await refresh();
+  }
+
+  Future<void> filterDownloadsByPlaylist(int? collectionId) async {
+    if (downloadPlaylistId == collectionId) return;
+    downloadPlaylistId = collectionId;
     selection.clear();
     await refresh();
   }

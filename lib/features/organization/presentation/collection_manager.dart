@@ -140,6 +140,10 @@ class _CollectionManagerState extends State<CollectionManager> {
                 Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: LayoutBuilder(builder: (context, box) {
+                      final themeColor = item.themeColor;
+                      final accent = themeColor == null
+                          ? null
+                          : Color(0xFF000000 | themeColor);
                       final tile = CollectionMp3DropTarget(
                           controller: widget.library,
                           collectionId: item.id,
@@ -151,11 +155,13 @@ class _CollectionManagerState extends State<CollectionManager> {
                               leading: ArtworkThumbnail(
                                   reference: item.coverPath,
                                   size: 44,
+                                  placeholderColor: accent == null
+                                      ? AppColors.surface
+                                      : Color.alphaBlend(
+                                          accent.withAlpha(42), Colors.white),
                                   icon: Icons.library_music_outlined),
                               icon: Icons.library_music_outlined,
-                              accent: item.themeColor == null
-                                  ? null
-                                  : Color(0xFF000000 | item.themeColor!),
+                              accent: accent,
                               onPressed: () => widget.onOpen(item)));
                       final actions =
                           Row(mainAxisSize: MainAxisSize.min, children: [

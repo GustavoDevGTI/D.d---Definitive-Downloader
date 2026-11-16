@@ -28,6 +28,7 @@ class DownloadTable extends StatefulWidget {
       this.paused = false,
       this.onVisible,
       this.viewKey,
+      this.compact = false,
       required this.output});
   final List<DownloadEntry> entries;
   final List<double> widths;
@@ -44,6 +45,7 @@ class DownloadTable extends StatefulWidget {
   final double? progress;
   final TransferProgress? transfer;
   final bool paused;
+  final bool compact;
   final ValueChanged<List<int>>? onVisible;
   final Object? viewKey;
   final String output;
@@ -130,9 +132,10 @@ class _DownloadTableState extends State<DownloadTable> {
             paused = widget.paused,
             output = widget.output;
         final widths = [...widget.widths];
+        final verticalRail = widget.compact ? 0.0 : _rail;
         final total = widths.fold<double>(0, (sum, value) => sum + value);
         final available =
-            (constraints.maxWidth - _rail).clamp(0, double.infinity);
+            (constraints.maxWidth - verticalRail).clamp(0, double.infinity);
         if (total < available) widths[1] += available - total;
         return ScrollbarTheme(
             data: ScrollbarThemeData(
@@ -157,12 +160,12 @@ class _DownloadTableState extends State<DownloadTable> {
                       child: ColoredBox(color: AppColors.navigation)),
                   Scrollbar(
                       controller: _horizontal,
-                      thumbVisibility: true,
+                      thumbVisibility: !widget.compact,
                       notificationPredicate: (n) =>
                           n.metrics.axis == Axis.horizontal,
                       child: Column(children: [
                         Padding(
-                            padding: const EdgeInsets.only(right: _rail),
+                            padding: EdgeInsets.only(right: verticalRail),
                             child: SizedBox(
                                 height: _headerHeight,
                                 child: SingleChildScrollView(
@@ -226,22 +229,22 @@ class _DownloadTableState extends State<DownloadTable> {
                                         key: const ValueKey(
                                             'download-vertical-scrollbar'),
                                         controller: _vertical,
-                                        thumbVisibility: true,
-                                        trackVisibility: true,
+                                        thumbVisibility: !widget.compact,
+                                        trackVisibility: !widget.compact,
                                         interactive: true,
                                         thumbColor:
                                             AppColors.accent.withAlpha(210),
                                         trackColor: AppColors.surface,
                                         trackBorderColor: AppColors.line,
-                                        thickness: 10,
+                                        thickness: widget.compact ? 4 : 10,
                                         radius: const Radius.circular(6),
                                         padding: const EdgeInsets.fromLTRB(
                                             0, 8, 1, 8),
                                         notificationPredicate: (n) =>
                                             n.metrics.axis == Axis.vertical,
                                         child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: _rail),
+                                            padding: EdgeInsets.only(
+                                                right: verticalRail),
                                             child: SingleChildScrollView(
                                                 key: const ValueKey(
                                                     'download-horizontal-rows'),
@@ -325,29 +328,39 @@ class _DownloadTableState extends State<DownloadTable> {
       bool hovered = false,
       int? playlistColor,
       int index = 0}) {
-    final playlistTint = playlistColor == null
+    final accent =
+        playlistColor == null ? null : Color(0xFF000000 | playlistColor);
+    final playlistTint = accent == null
         ? null
         : Color.alphaBlend(
-            Color(0xFF000000 | playlistColor)
-                .withAlpha(hovered ? 42 : (index.isOdd ? 29 : 18)),
+            accent.withAlpha(selected
+                ? 64
+                : hovered
+                    ? 47
+                    : index.isOdd
+                        ? 35
+                        : 24),
             Colors.white);
+    final defaultTint = selected
+        ? AppColors.accentSoft
+        : hovered
+            ? AppColors.accentSoft.withAlpha(190)
+            : index.isOdd
+                ? Color.alphaBlend(
+                    AppColors.accentSoft.withAlpha(100), Colors.white)
+                : Colors.white;
     return Container(
         key: header ? const ValueKey('download-table-header') : null,
         constraints: const BoxConstraints(minHeight: 56),
         decoration: BoxDecoration(
-            color: header
-                ? AppColors.navigation
-                : selected
-                    ? AppColors.accentSoft
-                    : playlistTint ??
-                        (hovered
-                            ? AppColors.accentSoft.withAlpha(190)
-                            : index.isOdd
-                                ? Color.alphaBlend(
-                                    AppColors.accentSoft.withAlpha(100),
-                                    Colors.white)
-                                : Colors.white),
-            border: const Border(bottom: BorderSide(color: AppColors.line))),
+            color: header ? AppColors.navigation : playlistTint ?? defaultTint,
+            border: header
+                ? null
+                : const Border(bottom: BorderSide(color: AppColors.line))),
+        foregroundDecoration: accent == null
+            ? null
+            : BoxDecoration(
+                border: Border(left: BorderSide(color: accent, width: 3))),
         child: Row(children: [
           for (var i = 0; i < cells.length; i++)
             SizedBox(

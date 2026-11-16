@@ -11,11 +11,14 @@ void main() {
   final calls = <MethodCall>[];
   setUp(() {
     calls.clear();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(AndroidDocuments.channel, (call) async => switch (call.method) {
-      'destinations' => [],
-      'playback' => (call.arguments as Map)['uri'],
-      _ => null,
-    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            AndroidDocuments.channel,
+            (call) async => switch (call.method) {
+                  'destinations' => [],
+                  'playback' => (call.arguments as Map)['uri'],
+                  _ => null,
+                });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(AndroidFiles.channel, (call) async {
       calls.add(call);
@@ -28,7 +31,8 @@ void main() {
     });
   });
   tearDown(() {
-    final binding = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final binding =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     binding.setMockMethodCallHandler(AndroidFiles.channel, null);
     binding.setMockMethodCallHandler(AndroidDocuments.channel, null);
   });
@@ -39,8 +43,10 @@ void main() {
     expect(await files.defaultOutputDirectory(), '/storage/app/media');
     expect(await files.chooseMp3Files(), ['/cache/imports/song.mp3']);
     expect(calls.last.arguments, {'kind': 'mp3'});
-    expect(await files.chooseCsv(), '/cache/imports/song.mp3');
-    expect(calls.last.arguments, {'kind': 'csv'});
+    expect(await files.choosePlaylistFile(), '/cache/imports/song.mp3');
+    expect(calls.last.arguments, {'kind': 'playlist'});
+    await files.releasePlaylistFile('/cache/imports/song.mp3');
+    expect(calls.last.method, 'releasePlaylistFile');
     await files.chooseCover();
     expect(calls.last.arguments, {'kind': 'cover'});
     expect(await files.chooseOutput(), isNull);
@@ -52,7 +58,8 @@ void main() {
     expect(engine.call({'operation': 'download'}),
         throwsA(isA<FormatException>()));
   });
-  test('pasta Android usa navegador nativo sem converter URI em caminho', () async {
+  test('pasta Android usa navegador nativo sem converter URI em caminho',
+      () async {
     await AndroidFiles().openFolder('/storage/app/media');
     expect(calls.single.method, 'openFolder');
     expect(calls.single.arguments, {'path': '/storage/app/media'});

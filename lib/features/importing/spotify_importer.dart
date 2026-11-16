@@ -6,20 +6,34 @@ import '../library/domain/models.dart';
 class SpotifyImporter {
   const SpotifyImporter(this.http);
   final BoundedHttp http;
-  String playlistId(String input) {
+  String playlistId(String input) => idFromLink(input);
+
+  static bool recognizesPlaylist(String input) {
+    final value = input.trim();
+    if (value.startsWith('spotify:playlist:')) return true;
+    final uri = Uri.tryParse(value);
+    return uri?.host == 'open.spotify.com' &&
+        uri!.pathSegments.contains('playlist');
+  }
+
+  static String idFromLink(String input) {
     final text = input.trim();
     final uri = Uri.tryParse(text);
     String? id;
     if (text.startsWith('spotify:playlist:')) {
       id = text.split(':').last;
-    } else if (uri != null && uri.scheme == 'https' &&
-        uri.host == 'open.spotify.com' && uri.port == 443 && uri.userInfo.isEmpty) {
+    } else if (uri != null &&
+        uri.scheme == 'https' &&
+        uri.host == 'open.spotify.com' &&
+        uri.port == 443 &&
+        uri.userInfo.isEmpty) {
       final segments = uri.pathSegments;
       final index = segments.indexOf('playlist');
       if (index >= 0 && segments.length == index + 2) id = segments[index + 1];
     }
     if (id == null || !RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(id)) {
-      throw const FormatException('Cole um link de playlist de open.spotify.com.');
+      throw const FormatException(
+          'Cole um link de playlist de open.spotify.com.');
     }
     return id;
   }

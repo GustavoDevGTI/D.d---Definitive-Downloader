@@ -64,10 +64,13 @@ class DesktopFiles {
     return p.join(directory.path, AppIdentity.name);
   }
 
-  Future<String?> chooseCsv() async => (await openFile(acceptedTypeGroups: [
-        const XTypeGroup(label: 'Lista de faixas CSV', extensions: ['csv'])
+  Future<String?> choosePlaylistFile() async =>
+      (await openFile(acceptedTypeGroups: [
+        const XTypeGroup(
+            label: 'Playlist (CSV ou JSON)', extensions: ['csv', 'json'])
       ]))
           ?.path;
+  Future<void> releasePlaylistFile(String path) async {}
   Future<List<String>> chooseMp3Files() async =>
       (await openFiles(acceptedTypeGroups: [
         const XTypeGroup(

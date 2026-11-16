@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet('Local','Essential','Regression')][string]$Profile='Local',
     [string[]]$Area=@(),
     [string[]]$TestFiles=@(),
@@ -8,6 +8,8 @@
     [string]$PythonPath=''
 )
 $ErrorActionPreference='Stop'
+# Android build/test caches live in the existing profile-quota exclusion.
+if ($IsWindows) { $env:GRADLE_USER_HOME = Join-Path $env:LOCALAPPDATA 'Gradle' }
 $workspace=[IO.Path]::GetFullPath($WorkspaceRoot)
 $manifest=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'test_suites.json') -Raw | ConvertFrom-Json
 if($Profile -ne 'Local' -and ($Area.Count -gt 0 -or $TestFiles.Count -gt 0)) {

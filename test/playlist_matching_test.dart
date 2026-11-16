@@ -8,7 +8,7 @@ import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/importing/csv_importer.dart';
-import 'package:definitive_downloader/features/importing/spotify_account_importer.dart';
+import 'package:definitive_downloader/features/importing/trackhop_client.dart';
 import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
@@ -33,15 +33,15 @@ class FixturePlaylist extends SpotifyImporter {
       tracks: Stream.fromIterable(tracks));
 }
 
-class _ConnectedPlaylistFixture extends SpotifyAccountImporter {
+class _ConnectedPlaylistFixture extends TrackhopClient {
   _ConnectedPlaylistFixture(this.tracks)
-      : super((_, {query = const {}}) async => throw UnimplementedError(),
-            () => true);
+      : super(Uri.parse(TrackhopClient.desktopAddress), 'fixture-trackhop-key');
   final List<TrackDraft> tracks;
   final opened = Completer<void>();
 
   @override
-  Future<ImportedCollection> open(String input) async {
+  Future<ImportedCollection> playlist(String input,
+      {bool Function()? cancelled, void Function(int, int)? onProgress}) async {
     opened.complete();
     return ImportedCollection(
         name: 'Playlist de teste',
@@ -102,7 +102,7 @@ void main() {
         repository: repository,
         files: DesktopFiles(),
         spotify: const SpotifyImporter(BoundedHttp()),
-        accountSpotify: importer,
+        trackhopClient: () => importer,
         csv: const CsvImporter(),
         catalog: const DeezerCatalog(BoundedHttp()),
         music: resolver,

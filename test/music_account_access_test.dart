@@ -1,3 +1,6 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:definitive_downloader/features/connections/application/trackhop_connection.dart';
+import 'trackhop_fixture.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -5,7 +8,6 @@ import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/core/platform/desktop_files.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
-import 'package:definitive_downloader/features/importing/spotify_account_importer.dart';
 import 'package:definitive_downloader/features/importing/csv_importer.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
@@ -21,20 +23,165 @@ import 'package:definitive_downloader/features/connections/domain/music_account.
 import 'package:definitive_downloader/features/connections/domain/deezer_login_policy.dart';
 import 'package:definitive_downloader/features/connections/presentation/music_connection_actions.dart';
 import 'package:definitive_downloader/features/connections/presentation/account_request_dialog.dart';
-import 'package:definitive_downloader/features/connections/application/spotify_connection_controller.dart';
-import 'spotify_fixtures.dart';
+import 'spotify_playlist_export_test.dart' show playlistExport;
 
 const playlist = 'https://open.spotify.com/playlist/1234567890123456789012';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('exportação Spotify pede Deezer primeiro e abre a conferência pelo CSV',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('dd-search-export-');
+    final file = await File('${dir.path}/Minha lista.csv').writeAsString(
+        'Track name,Artist name,Album,Playlist name,Type,ISRC,Spotify - id\n'
+        'Uma,Artista,Disco,Minha lista,Playlist,,1234567890123456789012\n'
+        'Duas,Outro,Disco,Minha lista,Playlist,,\n'
+        'Uma,Artista,Disco,Minha lista,Playlist,,1234567890123456789012\n');
+    final repository = LibraryRepository(AppDatabase('${dir.path}/library.db'));
+    await repository.database.initialize();
+    final requests = <MusicAccount>[];
+    var deezer = false;
+    final access = MusicAccountAccess(
+        spotifyConnected: () => false, deezerConnected: () => deezer);
+    access.requestLogin = (account, {required allowLater}) async {
+      requests.add(account);
+      expect(allowLater, isFalse);
+      deezer = account == MusicAccount.deezer;
+      return deezer
+          ? MusicAccountDecision.connected
+          : MusicAccountDecision.cancelled;
+    };
+    final controller = LibraryController(
+        repository: repository,
+        files: DesktopFiles(),
+        spotify: const SpotifyImporter(BoundedHttp()),
+        accounts: access,
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: DownloadService(const BoundedHttp(), rootBundle));
+    try {
+      expect(await repository.collections(), isEmpty);
+      expect(await controller.importSpotifyExport(file.path), isTrue);
+      final owner = (await repository.collections()).single;
+      final tracks = (await repository.page(owner.id)).items;
+      expect(tracks.map((t) => t.title), ['Uma', 'Duas', 'Uma']);
+      expect(tracks.first.sourceUrl,
+          'https://open.spotify.com/track/1234567890123456789012');
+      expect(controller.focused?.id, tracks.first.id);
+      expect(controller.inspectorRequest, 1);
+      expect(owner.completedCount, 0);
+      expect(requests, [MusicAccount.deezer]);
+    } finally {
+      controller.dispose();
+      await dir.delete(recursive: true);
+    }
+  });
+  test('transcrição Spotify revisa a lista completa antes de gravar', () async {
+    final work = await Directory.systemTemp.createTemp('dd-transcription-');
+    final repository =
+        LibraryRepository(AppDatabase('${work.path}/library.db'));
+    await repository.database.initialize();
+    final accounts = <MusicAccount>[];
+    var connected = false;
+    final access = MusicAccountAccess(
+        spotifyConnected: () => connected, deezerConnected: () => false);
+    access.requestLogin = (account, {required allowLater}) async {
+      accounts.add(account);
+      connected = account == MusicAccount.spotify;
+      return connected
+          ? MusicAccountDecision.connected
+          : MusicAccountDecision.cancelled;
+    };
+    final engine = _LoginEngine();
+    final deezer = DeezerConnectionController(_SessionStore(), engine);
+    var changed = false;
+    final controller = LibraryController(
+        repository: repository,
+        files: DesktopFiles(),
+        spotify: const SpotifyImporter(BoundedHttp()),
+        accounts: access,
+        trackhopClient: () => FixtureTrackhop(
+            titles: ['Uma', 'Duas', 'Uma'],
+            onRead: () {
+              if (changed) throw const FormatException('Leitura interrompida.');
+            }),
+        music: MusicResolver(engine, deezer),
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: DownloadService(const BoundedHttp(), rootBundle));
+    try {
+      final preview =
+          await controller.transcribePlaylist(playlist, DownloadCancellation());
+      expect(
+          preview.tracks.map((track) => track.title), ['Uma', 'Duas', 'Uma']);
+      expect(await repository.collections(), isEmpty);
+      expect(accounts, [MusicAccount.spotify]);
+      await controller.saveTranscription(preview);
+      final collection = (await repository.collections()).single;
+      expect(collection.trackCount, 3);
+      expect(collection.completedCount, 0);
+      expect(engine.calls, 0);
+      changed = true;
+      await expectLater(
+          controller.transcribePlaylist(playlist, DownloadCancellation()),
+          throwsFormatException);
+      expect(await repository.collections(), hasLength(1));
+    } finally {
+      controller.dispose();
+      deezer.dispose();
+      await work.delete(recursive: true);
+    }
+  });
+  test('exportação local permite cancelar, importar e reabrir sem contas',
+      () async {
+    final work = await Directory.systemTemp.createTemp('dd-local-export-');
+    final file = await File('${work.path}/Playlist1.json')
+        .writeAsString(playlistExport());
+    final repository =
+        LibraryRepository(AppDatabase('${work.path}/library.db'));
+    await repository.database.initialize();
+    var loginRequests = 0;
+    final access = MusicAccountAccess(
+        spotifyConnected: () => false, deezerConnected: () => false);
+    access.requestLogin = (_, {required allowLater}) async {
+      loginRequests++;
+      return MusicAccountDecision.cancelled;
+    };
+    final engine = _LoginEngine();
+    final deezer = DeezerConnectionController(_SessionStore(), engine);
+    final files = _PlaylistFiles(file.path);
+    final controller = LibraryController(
+        repository: repository,
+        files: files,
+        spotify: const SpotifyImporter(BoundedHttp()),
+        accounts: access,
+        music: MusicResolver(engine, deezer),
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: DownloadService(const BoundedHttp(), rootBundle));
+    try {
+      await controller.importPlaylistFile((_) async => null);
+      expect(await repository.collections(), isEmpty);
+      await controller.importPlaylistFile((choices) async => choices.last);
+      final collection = (await repository.collections()).single;
+      expect(collection.name, 'Segunda');
+      expect(collection.trackCount, 3);
+      expect(collection.completedCount, 0);
+      await controller.openCollection(collection);
+      await controller.preparationDone;
+      expect(loginRequests, 0);
+      expect(engine.calls, 0);
+      expect(files.released, [file.path, file.path]);
+    } finally {
+      controller.dispose();
+      deezer.dispose();
+      await work.delete(recursive: true);
+    }
+  });
   testWidgets('cancelar pedido Deezer não cancela uma restauração Spotify',
       (tester) async {
-    final spotify = SpotifyConnectionController(
-        store: MemorySpotifyStore(),
-        authorization: FakeSpotifyFlow(),
-        transport: FixtureSpotifyTransport((uri, method, headers, form) async =>
-            throw StateError('Sem rede neste teste')))
-      ..status = SpotifyConnectionStatus.restoring;
+    final spotify =
+        TrackhopConnection(const FlutterSecureStorage(), localDesktop: true)
+          ..busy = true;
     final deezer = DeezerConnectionController(_SessionStore(), _LoginEngine());
     await tester.pumpWidget(MaterialApp(
         home: Builder(
@@ -44,14 +191,14 @@ void main() {
                         context: context,
                         builder: (_) => AccountRequestDialog(
                             account: MusicAccount.deezer,
-                            spotify: spotify,
+                            trackhop: spotify,
                             deezer: deezer)),
                     child: const Text('Abrir'))))));
     await tester.tap(find.text('Abrir'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
-    expect(spotify.status, SpotifyConnectionStatus.restoring);
+    expect(spotify.busy, isTrue);
     await tester.pumpWidget(const SizedBox());
     spotify.dispose();
     deezer.dispose();
@@ -105,29 +252,8 @@ void main() {
           files: DesktopFiles(),
           spotify: const SpotifyImporter(BoundedHttp()),
           accounts: access,
-          accountSpotify:
-              SpotifyAccountImporter((path, {query = const {}}) async {
-            reads++;
-            if (path.endsWith('/items')) {
-              return {
-                'total': 1,
-                'items': [
-                  {
-                    'item': {
-                      'name': 'Faixa de teste',
-                      'artists': [
-                        {'name': 'Artista'}
-                      ]
-                    }
-                  }
-                ],
-              };
-            }
-            return {
-              'name': 'Playlist de teste',
-              'items': {'total': 1}
-            };
-          }, () => spotify),
+          trackhopClient: () => FixtureTrackhop(
+              titles: ['Faixa de teste'], onRead: () => reads++),
           music: MusicResolver(engine, deezer),
           csv: const CsvImporter(),
           catalog: const DeezerCatalog(BoundedHttp()),
@@ -140,7 +266,7 @@ void main() {
         expect(deezer.connected, isFalse);
         expect(engine.calls, 0);
         if (decision == MusicAccountDecision.later) {
-          expect(reads, 2);
+          expect(reads, 1);
           final collection = (await repository.collections()).single;
           expect(collection.trackCount, 1);
           expect(await access.ensure(playlist), isTrue);
@@ -240,12 +366,8 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final spotify = SpotifyConnectionController(
-          store: MemorySpotifyStore(),
-          authorization: FakeSpotifyFlow(),
-          transport: FixtureSpotifyTransport(
-              (uri, method, headers, form) async =>
-                  throw StateError('Sem rede neste teste')));
+      final spotify =
+          TrackhopConnection(const FlutterSecureStorage(), localDesktop: true);
       final deezer =
           DeezerConnectionController(_SessionStore(), _LoginEngine());
       MusicAccountDecision? decision;
@@ -258,7 +380,7 @@ void main() {
                             context: context,
                             builder: (_) => AccountRequestDialog(
                                 account: MusicAccount.deezer,
-                                spotify: spotify,
+                                trackhop: spotify,
                                 deezer: deezer,
                                 allowLater: true));
                       },
@@ -275,21 +397,19 @@ void main() {
       spotify.dispose();
       deezer.dispose();
     });
-    testWidgets('ícones conectam e desaparecem a $width px', (tester) async {
+    testWidgets('atalho Deezer aparece até conectar a $width px',
+        (tester) async {
       tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      var spotify = false, deezer = false;
+      var deezer = false;
       final changes = ValueNotifier(0);
       final access = MusicAccountAccess(
-          spotifyConnected: () => spotify, deezerConnected: () => deezer);
+          spotifyConnected: () => false, deezerConnected: () => deezer);
       access.requestLogin = (account, {required allowLater}) async {
-        if (account == MusicAccount.spotify) {
-          spotify = true;
-        } else {
-          deezer = true;
-        }
+        expect(account, MusicAccount.deezer);
+        deezer = true;
         changes.value++;
         return MusicAccountDecision.connected;
       };
@@ -301,9 +421,8 @@ void main() {
                   builder: (context, revision, child) => MusicConnectionsScope(
                       access: access,
                       child: const MusicConnectionActions())))));
-      await tester.tap(find.byTooltip('Entrar no Spotify · ampliar busca'));
-      await tester.pump();
-      expect(find.byTooltip('Entrar no Spotify · ampliar busca'), findsNothing);
+      expect(
+          find.byTooltip('Conectar Trackhop · importar Spotify'), findsNothing);
       expect(
           find.byTooltip('Entrar no Deezer · ampliar busca'), findsOneWidget);
       await tester.tap(find.byTooltip('Entrar no Deezer · ampliar busca'));
@@ -314,6 +433,18 @@ void main() {
       changes.dispose();
     });
   }
+}
+
+class _PlaylistFiles extends DesktopFiles {
+  _PlaylistFiles(this.path);
+  final String path;
+  final released = <String>[];
+
+  @override
+  Future<String?> choosePlaylistFile() async => path;
+
+  @override
+  Future<void> releasePlaylistFile(String path) async => released.add(path);
 }
 
 class _LoginEngine implements MusicEngine {

@@ -154,6 +154,17 @@ void main() {
     final delta = await data.read(ContentCategory.music, since: revision);
     expect(delta.changed.map((e) => e.track.id), unorderedEquals(before));
     expect(delta.changed.every((e) => e.playlistColor == 0xBB6600), isTrue);
+    final filtered = (await listing.load(ContentCategory.music,
+        playlistId: firstId, query: 'Primeira'))!;
+    expect(filtered.items.map((e) => e.track.id), before);
+    expect(listing.colors, [
+      (collectionId: firstId, name: 'Primeira', rgb: 0xBB6600),
+      (collectionId: secondId, name: 'Segunda', rgb: 0x125500),
+    ]);
+    final empty = (await listing.load(ContentCategory.music,
+        playlistId: firstId, filter: DownloadFilter.completed))!;
+    expect(empty.items, isEmpty);
+    expect(listing.colors, hasLength(2));
     final byColor = (await listing.load(ContentCategory.music,
         sort: DownloadSort.playlistColor))!;
     expect(byColor.items.map((e) => e.collectionName),

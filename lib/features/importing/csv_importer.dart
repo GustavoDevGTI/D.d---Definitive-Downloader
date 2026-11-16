@@ -5,17 +5,20 @@ import '../library/domain/models.dart';
 
 class CsvImporter {
   const CsvImporter();
-  ImportedCollection open(String path) => ImportedCollection(
-      name: p.basenameWithoutExtension(path),
-      source: 'Arquivo CSV',
-      sourceUrl: '',
-      tracks: read(File(path)));
+  static const spotifyExportSource = 'Spotify · exportação CSV';
+  ImportedCollection open(String path, {bool spotifyExport = false}) =>
+      ImportedCollection(
+          name: p.basenameWithoutExtension(path),
+          source: spotifyExport ? spotifyExportSource : 'Arquivo CSV',
+          sourceUrl: '',
+          tracks: read(File(path), spotifyExport: spotifyExport));
 
-  Stream<TrackDraft> read(File file) async* {
+  Stream<TrackDraft> read(File file, {bool spotifyExport = false}) async* {
     if (await file.length() > 20 * 1024 * 1024) {
       throw const FormatException('O CSV ultrapassa 20 MB.');
     }
     List<String>? headers;
+    String? playlistName;
     var separator = ',';
     var lineNumber = 0;
     await for (var line in file
@@ -40,8 +43,12 @@ class CsvImporter {
                   'track name',
                   'name'
                 ].contains(h)) ||
-            !headers.any(
-                (h) => ['artista', 'artist', 'artist name(s)'].contains(h))) {
+            !headers.any((h) => [
+                  'artista',
+                  'artist',
+                  'artist name',
+                  'artist name(s)'
+                ].contains(h))) {
           throw const FormatException(
               'O CSV precisa das colunas titulo e artista.');
         }
@@ -54,13 +61,28 @@ class CsvImporter {
       }
 
       final title = field(['titulo', 'título', 'title', 'track name', 'name']);
-      final artist = field(['artista', 'artist', 'artist name(s)']);
+      final artist =
+          field(['artista', 'artist', 'artist name', 'artist name(s)']);
       if (title.isEmpty || artist.isEmpty) {
         throw FormatException(
             'Título ou artista ausente na linha $lineNumber.');
       }
       final duration = field(['duration_ms', 'track duration (ms)']);
       final seconds = field(['duracao', 'duração', 'duration']);
+      if (spotifyExport) {
+        final listedName = field(['playlist name']);
+        if (listedName.isNotEmpty) {
+          playlistName ??= listedName;
+          if (playlistName != listedName) {
+            throw const FormatException('Use um CSV com apenas uma playlist.');
+          }
+        }
+      }
+      final spotifyId = field(['spotify - id', 'spotify – id', 'spotify id']);
+      final source = field(['spotify_url', 'track uri', 'url']);
+      final spotifyTrack = RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(spotifyId)
+          ? 'https://open.spotify.com/track/$spotifyId'
+          : '';
       yield TrackDraft(
           title: title,
           artist: artist,
@@ -71,7 +93,7 @@ class CsvImporter {
                   : null),
           coverUrl: field(['capa', 'cover_url']),
           isrc: field(['isrc']),
-          sourceUrl: field(['spotify_url', 'track uri', 'url']));
+          sourceUrl: source.isEmpty ? spotifyTrack : source);
     }
   }
 

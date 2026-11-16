@@ -5,8 +5,9 @@ import 'artwork_thumbnail.dart';
 import 'track_download_badge.dart';
 
 class TrackIdentity extends StatelessWidget {
-  const TrackIdentity({super.key, required this.track});
+  const TrackIdentity({super.key, required this.track, this.accent});
   final Track track;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
@@ -17,6 +18,7 @@ class TrackIdentity extends StatelessWidget {
                 ? track.coverUrl
                 : track.resolvedCoverUrl,
             audioPath: track.localPath,
+            borderColor: accent,
             size: 112);
         final identity = Column(
             mainAxisSize: MainAxisSize.min,

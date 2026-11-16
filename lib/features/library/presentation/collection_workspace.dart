@@ -8,12 +8,16 @@ import '../../workspace/presentation/link_entry_panel.dart';
 import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
+import 'artwork_thumbnail.dart';
 import 'collection_track_toolbar.dart';
 import 'collection_mp3_drop_target.dart';
+import 'playlist_file_action.dart';
+import 'playlist_transcription_page.dart';
+import 'spotify_playlist_visibility_dialog.dart';
 import '../../connections/presentation/music_connection_actions.dart';
 import '../../importing/music_link.dart';
 import '../../importing/playlist_catalog.dart';
-import '../../importing/public_playlist_link.dart';
+import '../../importing/spotify_importer.dart';
 
 class CollectionWorkspace extends StatefulWidget {
   const CollectionWorkspace(
@@ -75,7 +79,10 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
-    if (_detail && c.current != null) {
+    final collection = c.current;
+    if (_detail && collection != null) {
+      final rgb = collection.themeColor;
+      final accent = rgb == null ? null : Color(0xFF000000 | rgb);
       return PopScope(
           canPop: !widget.active,
           onPopInvokedWithResult: (didPop, result) {
@@ -87,16 +94,26 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
             _wide = wide;
             final panel =
                 Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(flex: 8, child: WorkspacePanel(child: _tracks(c, wide))),
+              Expanded(
+                  flex: 8,
+                  child: WorkspacePanel(
+                      color: accent == null
+                          ? AppColors.surface
+                          : Color.alphaBlend(
+                              accent.withAlpha(24), Colors.white),
+                      borderColor: accent ?? AppColors.line,
+                      child: _tracks(c, wide, accent))),
               if (wide) ...[
                 const SizedBox(width: 12),
                 Expanded(
                     flex: 5,
-                    child: WorkspacePanel(child: TrackInspector(controller: c)))
+                    child: WorkspacePanel(
+                        borderColor: accent ?? AppColors.line,
+                        child: TrackInspector(controller: c)))
               ],
             ]);
             final drop = CollectionMp3DropTarget(
-                controller: c, collectionId: c.current!.id, child: panel);
+                controller: c, collectionId: collection.id, child: panel);
             return drop;
           }));
     }
@@ -115,6 +132,12 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
           actionIcon: Icons.playlist_add_rounded,
           onAction: c.busy ? null : () => unawaited(_import(_url.text)),
           secondaryActions: [
+            OutlinedButton.icon(
+                onPressed: c.busy
+                    ? null
+                    : () => unawaited(_transcribe(_url.text.trim())),
+                icon: const Icon(Icons.playlist_add_check, size: 18),
+                label: const Text('Transcrever playlist')),
             const MusicConnectionActions(),
             if (c.importing)
               IconButton(
@@ -124,8 +147,10 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
             OutlinedButton(
                 onPressed: widget.onConnections, child: const Text('Conexões')),
             IconButton(
-                tooltip: 'Importar CSV · Ctrl+O',
-                onPressed: c.busy ? null : () => unawaited(c.importCsv()),
+                tooltip: 'Importar arquivo (CSV ou JSON) · Ctrl+O',
+                onPressed: c.busy
+                    ? null
+                    : () => unawaited(importPlaylistFile(context, c)),
                 icon: const Icon(Icons.upload_file_outlined, size: 19)),
           ]),
       const SizedBox(height: 12),
@@ -144,10 +169,47 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
       onPressed: () => setState(() => _detail = false),
       icon: const Icon(Icons.arrow_back, size: 18));
   Future<void> _import(String value) async {
-    final before = widget.controller.current?.id;
-    await widget.controller.importPlaylist(value);
-    if (mounted && widget.controller.current?.id != before) {
+    final library = widget.controller;
+    final before = library.current?.id;
+    _loginTimer?.cancel();
+    _urlFocus.unfocus();
+    Future<bool> importLink() async {
+      var needsPublicAccess = false;
+      await library.importPlaylist(value,
+          onPublicSpotifyRequired: () => needsPublicAccess = true);
+      return needsPublicAccess;
+    }
+
+    if (await importLink() && mounted && widget.active) {
+      await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => SpotifyPlaylistVisibilityDialog(
+              playlistId: SpotifyImporter.idFromLink(value),
+              retryImport: importLink));
+    }
+    if (mounted && library.current?.id != before) {
       setState(() => _detail = true);
+    }
+  }
+
+  Future<void> _transcribe(String input) async {
+    final library = widget.controller;
+    final before = library.current?.id;
+    _loginTimer?.cancel();
+    final result = await showPlaylistTranscription(context, library, input);
+    if (!mounted || result == null) return;
+    await library.saveTranscription(result);
+    if (mounted && library.current?.id != before) {
+      setState(() => _detail = true);
+    }
+  }
+
+  bool _isPlaylist(String value) {
+    try {
+      return PlaylistCatalog.isCollection(value);
+    } on FormatException {
+      return false;
     }
   }
 
@@ -156,44 +218,68 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     final value = raw.trim(), access = widget.controller.accounts;
     if (access == null || value == _lastLoginInput || !widget.active) return;
     final uri = Uri.tryParse(value);
-    final spotify = value.startsWith('spotify:') || uri?.host == 'open.spotify.com';
+    final spotify =
+        value.startsWith('spotify:') || uri?.host == 'open.spotify.com';
     final deezer = const {'deezer.com', 'www.deezer.com'}.contains(uri?.host);
     if (!spotify && !deezer) return;
+    if (_isPlaylist(value)) return;
     try {
-      if (PlaylistCatalog.isCollection(value)) {
-        if (spotify) { widget.controller.spotify.playlistId(value); }
-        else { PublicPlaylistLink.recognize(value); }
-      } else { MusicLink.parse(value); }
-    } on FormatException { return; }
+      MusicLink.parse(value);
+    } on FormatException {
+      return;
+    }
     _lastLoginInput = value;
     _loginTimer = Timer(const Duration(milliseconds: 600), () async {
       if (!mounted || widget.controller.busy) return;
-      try { await access.ensure(value); } on FormatException { /* Only valid, configured account flows are offered. */ }
+      try {
+        await access.ensure(value);
+      } on FormatException {
+        /* Only valid, configured account flows are offered. */
+      }
     });
   }
 
-  Widget _tracks(LibraryController c, bool wide) =>
+  Widget _tracks(LibraryController c, bool wide, Color? accent) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (!widget.keyboardOpen)
           Padding(
               padding: EdgeInsets.fromLTRB(
                   14, MediaQuery.sizeOf(context).height < 500 ? 0 : 10, 8, 0),
-              child: Row(children: [
-                _back(),
-                Expanded(
-                    child: Text(c.current!.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600))),
-                if (c.page.selectedCount > 0) ...[
+              child: LayoutBuilder(builder: (context, box) {
+                final selected = c.page.selectedCount;
+                final selectionLabel =
+                    '$selected ${selected == 1 ? 'selecionada' : 'selecionadas'}';
+                return Row(children: [
+                  _back(),
+                  ArtworkThumbnail(
+                      reference: c.current!.coverPath,
+                      size: 28,
+                      placeholderColor: accent == null
+                          ? AppColors.surface
+                          : Color.alphaBlend(
+                              accent.withAlpha(42), Colors.white),
+                      icon: Icons.library_music_outlined),
                   const SizedBox(width: 8),
-                  Text(
-                      '${c.page.selectedCount} ${c.page.selectedCount == 1 ? 'selecionada' : 'selecionadas'}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.muted)),
-                ],
-              ])),
+                  Expanded(
+                      child: Text(c.current!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600))),
+                  if (selected > 0) ...[
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: box.maxWidth / 2),
+                        child: Tooltip(
+                            message: selectionLabel,
+                            child: Text(selectionLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppColors.muted)))),
+                  ],
+                ]);
+              })),
         CollectionTrackToolbar(
             controller: c,
             query: _query,
@@ -225,7 +311,9 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               ])),
         Expanded(
             child: TrackTable(
-                controller: c, onFocus: (track) => _focus(track, wide))),
+                controller: c,
+                accent: accent,
+                onFocus: (track) => _focus(track, wide))),
       ]);
   void _focus(Track track, bool wide) {
     widget.controller.focus(track);

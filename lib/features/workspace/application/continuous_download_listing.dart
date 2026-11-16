@@ -10,6 +10,7 @@ class ContinuousDownloadListing {
   final _checking = <int>{};
   int _revision = -1, _request = 0;
   ContentCategory? _category;
+  List<DownloadPlaylistColor> colors = const [];
   List<DownloadEntry> selected(Set<int> ids) =>
       ids.map((id) => _entries[id]).whereType<DownloadEntry>().toList();
   Future<DownloadPage?> load(ContentCategory category,
@@ -18,6 +19,7 @@ class ContinuousDownloadListing {
       bool pauseMode = false,
       DownloadSort? sort,
       bool descending = false,
+      int? playlistId,
       String outputDirectory = ''}) async {
     final request = ++_request;
     final snapshot = await repository.read(category,
@@ -27,6 +29,7 @@ class ContinuousDownloadListing {
         pauseMode: pauseMode,
         sort: sort,
         descending: descending,
+        playlistId: playlistId,
         outputDirectory: outputDirectory);
     if (request != _request) return null;
     if (_category != category) {
@@ -49,6 +52,7 @@ class ContinuousDownloadListing {
     }
     _category = category;
     _revision = snapshot.revision;
+    colors = List.unmodifiable(snapshot.colors);
     return DownloadPage(
         List.unmodifiable(snapshot.ids.map((id) => _entries[id]!)),
         snapshot.ids.length);
@@ -104,5 +108,6 @@ class ContinuousDownloadListing {
     _checked.clear();
     _category = null;
     _revision = -1;
+    colors = const [];
   }
 }

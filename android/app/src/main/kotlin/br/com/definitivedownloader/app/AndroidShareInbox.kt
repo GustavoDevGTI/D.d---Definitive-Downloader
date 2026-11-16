@@ -47,11 +47,17 @@ class AndroidShareInbox(private val context: Context, messenger: BinaryMessenger
 
     @Suppress("DEPRECATION")
     fun receive(intent: Intent?) {
-        if (intent?.action !in listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) return
+        val csv = intent?.type in setOf("text/csv", "application/csv", "application/vnd.ms-excel")
+        val action = intent?.action
+        if (action !in listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE) &&
+            !(action == Intent.ACTION_VIEW && csv)) return
         val text = intent?.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: ""
-        val streams = if (intent?.action == Intent.ACTION_SEND_MULTIPLE)
-            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.toList() ?: emptyList()
-        else listOfNotNull(intent?.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+        val streams = when (action) {
+            Intent.ACTION_VIEW -> listOfNotNull(intent?.data)
+            Intent.ACTION_SEND_MULTIPLE ->
+                intent?.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.toList() ?: emptyList()
+            else -> listOfNotNull(intent?.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) ?: intent?.clipData?.takeIf { it.itemCount == 1 }?.getItemAt(0)?.uri)
+        }
         executor.execute {
             val db = store.writableDatabase
             val count = db.rawQuery("SELECT COUNT(*) FROM batches", null).use { it.moveToFirst(); it.getInt(0) }
@@ -69,11 +75,11 @@ class AndroidShareInbox(private val context: Context, messenger: BinaryMessenger
                 val paths = if (streams.isNotEmpty()) {
                     val bytes = db.rawQuery("SELECT COALESCE(SUM(size),0) FROM files", null).use { it.moveToFirst(); it.getLong(0) }
                     require(bytes < 1024L * 1024 * 1024)
-                    AndroidDocumentCopies(context).copy(streams, "mp3", directory, 1024L * 1024 * 1024 - bytes) { false }.also { copies ->
+                    AndroidDocumentCopies(context).copy(streams, if (csv) "csv" else "mp3", directory, 1024L * 1024 * 1024 - bytes) { false }.also { copies ->
                         require(bytes + copies.sumOf { File(it).length() } <= 1024L * 1024 * 1024)
                     }
                 } else {
-                    require(text.isNotBlank() && text.length <= 32768)
+                    require(!csv && text.isNotBlank() && text.length <= 32768)
                     emptyList()
                 }
                 db.beginTransaction()
@@ -87,7 +93,8 @@ class AndroidShareInbox(private val context: Context, messenger: BinaryMessenger
             } catch (_: Exception) {
                 directory.deleteRecursively() // UUID directory created only by this receipt.
                 db.execSQL("UPDATE batches SET ready=1,error=? WHERE id=?",
-                    arrayOf("Link vazio, arquivo indisponível ou limite excedido (100 MP3, 200 MB por arquivo e 1 GB na caixa de entrada).", id))
+                    arrayOf(if (csv) "CSV indisponível, inválido ou maior que 5 MB." else
+                        "Link vazio, arquivo indisponível ou limite excedido (100 MP3, 200 MB por arquivo e 1 GB na caixa de entrada).", id))
             }
             main.post { channel.invokeMethod("changed", null) }
         }
