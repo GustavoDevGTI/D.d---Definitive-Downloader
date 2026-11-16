@@ -243,6 +243,7 @@ void main() {
           return MusicAccountDecision.connected;
         }
         expect(allowLater, isTrue);
+        expect(reads, 1);
         return decision;
       };
       final engine = _LoginEngine();
@@ -272,7 +273,7 @@ void main() {
           expect(await access.ensure(playlist), isTrue);
           expect(calls, hasLength(2));
         } else {
-          expect(reads, 0);
+          expect(reads, 1);
           expect(await repository.collections(), isEmpty);
           expect(controller.message, contains('cancelada'));
         }
@@ -360,7 +361,7 @@ void main() {
         isFalse);
   });
   for (final width in [390.0, 1360.0]) {
-    testWidgets('Fazer login depois cabe no diálogo a $width px',
+    testWidgets('Deixar para depois cabe no diálogo a $width px',
         (tester) async {
       tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1;
@@ -388,7 +389,7 @@ void main() {
       await tester.tap(find.text('Abrir'));
       await tester.pumpAndSettle();
       expect(find.text('Entrar na Deezer'), findsOneWidget);
-      await tester.tap(find.text('Fazer login depois'));
+      await tester.tap(find.text('Deixar para depois'));
       await tester.pumpAndSettle();
       expect(decision, MusicAccountDecision.later);
       expect(deezer.connected, isFalse);

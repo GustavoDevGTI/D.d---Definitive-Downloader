@@ -3,7 +3,7 @@ import '../../../core/network/bounded_http.dart';
 import '../../importing/spotify_importer.dart';
 import '../../importing/music_link.dart';
 
-/// Account decisions precede metadata reads and playlist mutations.
+/// Coordinates account prompts and deferral between music operations.
 class MusicAccountAccess {
   MusicAccountAccess(
       {required this.spotifyConnected, required this.deezerConnected});
@@ -22,16 +22,21 @@ class MusicAccountAccess {
       await _decide(account, allowLater: false) ==
       MusicAccountDecision.connected;
 
+  Future<MusicAccountDecision> offerDeezerForPlaylist() =>
+      _decide(MusicAccount.deezer, allowLater: true, repeatOffer: true);
+
   Future<MusicAccountDecision> _decide(MusicAccount account,
-      {required bool allowLater}) async {
+      {required bool allowLater, bool repeatOffer = false}) async {
     if (connected(account)) return MusicAccountDecision.connected;
     final pending = _pending;
     if (pending != null) {
       final decision = await pending.decision;
       if (pending.account == account) return decision;
-      return _decide(account, allowLater: allowLater);
+      return _decide(account, allowLater: allowLater, repeatOffer: repeatOffer);
     }
-    if (allowLater && deezerDeferred) return MusicAccountDecision.later;
+    if (allowLater && deezerDeferred && !repeatOffer) {
+      return MusicAccountDecision.later;
+    }
     final operation = _request(account, allowLater: allowLater);
     _pending = (account: account, decision: operation);
     try {

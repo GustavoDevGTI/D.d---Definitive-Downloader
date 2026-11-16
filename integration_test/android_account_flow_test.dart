@@ -93,7 +93,7 @@ void main() {
           initialPlaylist: 'https://open.spotify.com/playlist/$_playlistId'));
       final importing = controller
           .importSpotify('https://open.spotify.com/playlist/$_playlistId');
-      await tap(find.text('Fazer login depois'));
+      await tap(find.text('Deixar para depois'));
       await importing;
       await _until(tester, () => controller.current != null && !controller.busy,
           'importação com Deezer adiado');
@@ -120,7 +120,7 @@ void main() {
           tester,
           () => find.text('Conectar Deezer').evaluate().isNotEmpty,
           'pedido de conexão na conferência');
-      expect(find.text('Fazer login depois'), findsNothing);
+      expect(find.text('Deixar para depois'), findsNothing);
       await deezer.login(() async => _deezerSession);
       await _until(
           tester,

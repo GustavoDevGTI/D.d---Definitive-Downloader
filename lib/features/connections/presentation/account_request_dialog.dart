@@ -60,19 +60,8 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
               width: 420,
               child: SingleChildScrollView(
                   child: widget.account == MusicAccount.deezer
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                              DeezerConnectionPane(
-                                  controller: widget.deezer,
-                                  allowChanges: true),
-                              if (widget.allowLater)
-                                const Padding(
-                                    padding: EdgeInsets.only(top: 12),
-                                    child: Text(
-                                        'Você pode importar pelo Spotify e conectar o Deezer depois.')),
-                            ])
+                      ? DeezerConnectionPane(
+                          controller: widget.deezer, allowChanges: true)
                       : TrackhopConnectionPane(connection: widget.trackhop))),
           actions: [
             TextButton(
@@ -85,6 +74,6 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
                       ? null
                       : () =>
                           Navigator.pop(context, MusicAccountDecision.later),
-                  child: const Text('Fazer login depois')),
+                  child: const Text('Deixar para depois')),
           ]);
 }

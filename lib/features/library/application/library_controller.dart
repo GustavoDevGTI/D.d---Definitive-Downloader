@@ -68,16 +68,27 @@ class LibraryController extends ChangeNotifier {
   final MusicAccountAccess? accounts;
   final ManagedSpotifyPlaylists? managedSpotify;
 
-  Future<bool> _authorize(String input) async {
+  Future<bool> _authorize(String input,
+      {bool importingPlaylists = false}) async {
     try {
-      final requiringAccounts = managedSpotify == null
-          ? input
-          : input.split(RegExp(r'[\r\n]+')).where((ref) {
-              if (!SpotifyImporter.recognizesPlaylist(ref)) return true;
-              spotify.playlistId(ref);
-              return false;
-            }).join('\n');
-      final allowed = await accounts?.ensure(requiringAccounts) ?? true;
+      final requiringAccounts = <String>[];
+      var needsTrackhop = false;
+      for (final raw in input.split(RegExp(r'[\r\n]+'))) {
+        final ref = raw.trim();
+        if ((managedSpotify != null || importingPlaylists) &&
+            SpotifyImporter.recognizesPlaylist(ref)) {
+          spotify.playlistId(ref);
+          needsTrackhop = managedSpotify == null;
+        } else if (importingPlaylists && _isDeezerPlaylist(ref)) {
+          continue;
+        } else {
+          requiringAccounts.add(ref);
+        }
+      }
+      final access = accounts;
+      final allowed = access == null ||
+          ((!needsTrackhop || await access.connect(MusicAccount.spotify)) &&
+              await access.ensure(requiringAccounts.join('\n')));
       if (!allowed) {
         message = 'Conexão cancelada. A playlist não foi alterada.';
         notifyListeners();
@@ -88,6 +99,20 @@ class LibraryController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  bool _isDeezerPlaylist(String input) {
+    final uri = Uri.tryParse(input);
+    return const {'deezer.com', 'www.deezer.com'}.contains(uri?.host) &&
+        uri!.pathSegments.contains('playlist');
+  }
+
+  Future<bool> _offerDeezerForPlaylist() async {
+    final decision = await accounts!.offerDeezerForPlaylist();
+    if (_disposed || decision == MusicAccountDecision.cancelled) {
+      throw const DownloadCancelled();
+    }
+    return decision == MusicAccountDecision.connected;
   }
 
   final DeezerPlaylistCatalog deezerPlaylists;
@@ -129,7 +154,7 @@ class LibraryController extends ChangeNotifier {
   Future<bool> addLinks(int collectionId, String input,
       {ChooseDuplicate? chooseDuplicate,
       Future<void> Function(List<Track>)? beforeRemoval}) async {
-    if (!await _authorize(input)) return false;
+    if (!await _authorize(input, importingPlaylists: true)) return false;
     return _addition((token) async {
       final owner = await repository.collectionById(collectionId);
       if (owner == null) {
@@ -652,7 +677,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> loadExample() => _import(() async => demoCollection());
   Future<void> importSpotify(String url) => importPlaylist(url);
-  PlaylistCatalog get _playlists => PlaylistCatalog(
+  PlaylistCatalog _playlists({bool importingLinks = false}) => PlaylistCatalog(
       spotify: spotify,
       trackhop: trackhopClient?.call(),
       managedSpotify: managedSpotify,
@@ -660,9 +685,11 @@ class LibraryController extends ChangeNotifier {
       deezer: deezerPlaylists,
       youtube: youtubePlaylists,
       available: music?.available == true,
-      deezerConnected: music?.connection.connected == true);
+      deezerConnected: music?.connection.connected == true,
+      offerDeezer:
+          importingLinks && accounts != null ? _offerDeezerForPlaylist : null);
   CollectionLinkComposer get _composer => CollectionLinkComposer(
-      _playlists,
+      _playlists(importingLinks: true),
       MusicLinkService(
           linkCatalog ??
               MusicLinkCatalog(
@@ -670,10 +697,10 @@ class LibraryController extends ChangeNotifier {
           music));
   Future<void> importPlaylist(String url,
       {VoidCallback? onPublicSpotifyRequired}) async {
-    if (busy || !await _authorize(url)) return;
+    if (busy || !await _authorize(url, importingPlaylists: true)) return;
     final before = current?.id;
     await _import(
-        () => _playlists.read(url,
+        () => _playlists(importingLinks: true).read(url,
             cancelled: () =>
                 _disposed || _importCancellation?.cancelled == true,
             onProgress: (done, total) {
@@ -734,7 +761,7 @@ class LibraryController extends ChangeNotifier {
     }
     cancellation.check();
     final collection =
-        await _playlists.read(url, cancelled: () => cancellation.cancelled);
+        await _playlists().read(url, cancelled: () => cancellation.cancelled);
     return PlaylistTranscription.read(collection, cancellation);
   }
 
@@ -745,7 +772,8 @@ class LibraryController extends ChangeNotifier {
       {int? groupId, String link = ''}) async {
     if (busy) throw const FormatException('Aguarde a operação em andamento.');
     final valid = organizationName(name);
-    if (link.trim().isNotEmpty && !await _authorize(link)) {
+    if (link.trim().isNotEmpty &&
+        !await _authorize(link, importingPlaylists: true)) {
       throw const FormatException('Conexão cancelada. Playlist não criada.');
     }
     if (busy) throw const FormatException('Aguarde a operação em andamento.');

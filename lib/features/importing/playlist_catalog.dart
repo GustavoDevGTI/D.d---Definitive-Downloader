@@ -1,4 +1,5 @@
 import '../library/domain/models.dart';
+import '../downloads/download_cancellation.dart';
 import 'deezer_playlist_catalog.dart';
 import 'youtube_playlist_catalog.dart';
 import 'public_playlist_link.dart';
@@ -19,7 +20,8 @@ class PlaylistCatalog {
       this.deezer = const DeezerPlaylistCatalog(),
       this.youtube = const YouTubePlaylistCatalog(),
       this.available = false,
-      this.deezerConnected = false});
+      this.deezerConnected = false,
+      this.offerDeezer});
   final SpotifyImporter spotify;
   final TrackhopClient? trackhop;
   final ManagedSpotifyPlaylists? managedSpotify;
@@ -27,6 +29,7 @@ class PlaylistCatalog {
   final DeezerPlaylistCatalog deezer;
   final YouTubePlaylistCatalog youtube;
   final bool available, deezerConnected;
+  final Future<bool> Function()? offerDeezer;
 
   static bool isCollection(String value) {
     if (value.startsWith('spotify:playlist:')) return true;
@@ -58,7 +61,7 @@ class PlaylistCatalog {
     if (link != null) {
       return link.kind == PublicPlaylistKind.deezer
           ? deezer.open(link,
-              downloadAvailable: available && deezerConnected,
+              downloadAvailable: await _offerDeezer(cancelled) && available,
               cancelled: cancelled,
               onProgress: onProgress)
           : youtube.open(link,
@@ -67,6 +70,20 @@ class PlaylistCatalog {
               onProgress: onProgress);
     }
     spotify.playlistId(url); // Validate before asking for any account.
+    final playlist = await _readSpotify(url, cancelled, onProgress);
+    await _offerDeezer(cancelled);
+    return playlist;
+  }
+
+  Future<bool> _offerDeezer(bool Function()? cancelled) async {
+    if (cancelled?.call() == true) throw const DownloadCancelled();
+    final connected = await offerDeezer?.call() ?? deezerConnected;
+    if (cancelled?.call() == true) throw const DownloadCancelled();
+    return connected;
+  }
+
+  Future<ImportedCollection> _readSpotify(String url,
+      bool Function()? cancelled, void Function(int, int)? onProgress) async {
     final managed = managedSpotify;
     if (managed != null) {
       try {
