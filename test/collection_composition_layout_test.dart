@@ -24,6 +24,17 @@ import 'widget_io.dart';
 class LocalPickerFixture extends DesktopFiles {
   LocalPickerFixture(this.output, this.file);
   final String output, file;
+  String? folder;
+  final releasedFolders = <String>[];
+
+  @override
+  Future<String?> chooseAudioFolder() async => folder;
+
+  @override
+  Future<void> releaseAudioFolder(String path) async {
+    releasedFolders.add(path);
+  }
+
   @override
   Future<String> defaultOutputDirectory() async => output;
   @override
@@ -84,6 +95,74 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   }, variant: const TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets('Importar pasta seleciona áudios aninhados e abre a playlist', (
+    tester,
+  ) async {
+    late Directory temp, folder;
+    late LocalPickerFixture files;
+    late LibraryController library;
+    await tester.runAsync(() async {
+      temp = await Directory.systemTemp.createTemp('dd-android-folder-layout-');
+      folder = await Directory('${temp.path}/Áudio de viagem').create();
+      final inner = await Directory('${folder.path}/B').create();
+      final fixture = File('assets/demo/tone.mp3');
+      await fixture.copy('${folder.path}/A.mp3');
+      await fixture.copy('${inner.path}/B.mp3');
+      await File('${inner.path}/ignorar.txt').writeAsString('texto');
+      files = LocalPickerFixture('${temp.path}/output', '');
+      library = LibraryController(
+        repository: LibraryRepository(AppDatabase('${temp.path}/library.db')),
+        files: files,
+        spotify: FixturePlaylist([]),
+        csv: const CsvImporter(),
+        catalog: const DeezerCatalog(BoundedHttp()),
+        downloader: DownloadService(const BoundedHttp(), rootBundle),
+        localInspector: LocalInspectorFixture(),
+      );
+      await library.initialize();
+    });
+    addTearDown(() async {
+      library.dispose();
+      await temp.delete(recursive: true);
+    });
+    int? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: appTheme(),
+        home: Scaffold(
+          body: CollectionManager(
+            library: library,
+            onOpen: (collection) => opened = collection.id,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final import = find.byKey(const ValueKey('import-audio-folder'));
+    await tester.runAsync(() => tester.tap(import));
+    await ioUntil(tester, () => !library.importing);
+    expect(opened, isNull);
+    expect(library.collections, isEmpty);
+
+    files.folder = folder.path;
+    await tester.runAsync(() => tester.tap(import));
+    await ioUntil(tester, () => opened != null);
+    await tester.runAsync(() async {
+      final playlist = (await library.repository.collectionById(opened!))!;
+      expect(playlist.name, 'Áudio de viagem');
+      final tracks = (await library.repository.page(playlist.id)).items;
+      expect(tracks.map((track) => track.position), [1, 2]);
+      expect(
+        tracks.map((track) => Uri.parse(track.sourceUrl).pathSegments.last),
+        ['A.mp3', 'B.mp3'],
+      );
+      expect(await File(tracks.last.localPath).exists(), isTrue);
+      expect(await File('${folder.path}/B/B.mp3').exists(), isTrue);
+      expect(files.releasedFolders, [folder.path]);
+    });
+    expect(tester.takeException(), isNull);
+  }, variant: const TargetPlatformVariant({TargetPlatform.android}));
 
   for (final width in [1360.0, 390.0]) {
     testWidgets(

@@ -34,6 +34,17 @@ const localAudioExtensions = {
 /// A silent decoder probe, with structural validation for MP3.
 class MediaKitLocalAudioInspector implements LocalAudioInspector {
   const MediaKitLocalAudioInspector();
+
+  static const _androidMimeTypes = {
+    '.mp3': {'audio/mpeg', 'audio/mp3'},
+    '.wav': {'audio/x-wav', 'audio/wav', 'audio/wave'},
+    '.flac': {'audio/flac', 'audio/x-flac'},
+    '.m4a': {'audio/mp4', 'audio/x-m4a'},
+    '.aac': {'audio/aac', 'audio/aac-adts', 'audio/aacp'},
+    '.ogg': {'application/ogg', 'audio/ogg'},
+    '.opus': {'application/ogg', 'audio/ogg', 'audio/opus'},
+  };
+
   @override
   Future<LocalAudioMetadata> inspect(String path) async {
     final extension = p.extension(path).toLowerCase();
@@ -50,15 +61,24 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       final duration = metadata?['durationMs'] as int? ?? 0;
       if (duration < 1 ||
           duration > const Duration(hours: 24).inMilliseconds ||
-          !['audio/mpeg', 'audio/mp3'].contains(metadata?['mime'])) {
-        throw const FormatException(
-            'O arquivo não contém áudio MP3 utilizável.');
+          metadata?['hasVideo'] == true ||
+          !_androidMimeTypes[extension]!.contains(metadata?['mime'])) {
+        throw FormatException(
+          'O arquivo não contém áudio $extension utilizável.',
+        );
       }
       return LocalAudioMetadata(
-          durationMs: duration,
-          title: tags.title,
-          artist: tags.artist,
-          album: tags.album);
+        durationMs: duration,
+        title: tags.title.isEmpty
+            ? (metadata?['title'] as String? ?? '')
+            : tags.title,
+        artist: tags.artist.isEmpty
+            ? (metadata?['artist'] as String? ?? '')
+            : tags.artist,
+        album: tags.album.isEmpty
+            ? (metadata?['album'] as String? ?? '')
+            : tags.album,
+      );
     }
     mk.MediaKit.ensureInitialized();
     final player = mk.Player(

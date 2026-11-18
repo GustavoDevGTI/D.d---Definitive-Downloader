@@ -122,7 +122,7 @@ class CollectionTrackToolbar extends StatelessWidget {
           Row(children: [
             Expanded(child: _commands(context)),
             const SizedBox(width: 8),
-            conference,
+            Flexible(child: conference),
           ]),
         ]);
       }));

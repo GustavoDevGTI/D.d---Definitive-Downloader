@@ -52,7 +52,11 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
   }
 
   Future<void> _observe() async {
-    if (_checking || _finished || _socialSignInBlocked || _error.isNotEmpty) {
+    if (_checking ||
+        _finished ||
+        _socialSignInBlocked ||
+        _resettingPassword ||
+        _error.isNotEmpty) {
       return;
     }
     final attempt = _attempt;
@@ -263,7 +267,7 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
   @override
   Widget build(BuildContext context) {
     final status = _resettingPassword
-        ? 'Use o e-mail da sua conta para redefinir a senha.'
+        ? 'Use o e-mail da sua conta Deezer e siga o link que chegar.'
         : 'Entre com o e-mail e a senha da Deezer.';
     final waiting = _loading || _verifying;
     return Dialog(
@@ -299,7 +303,9 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
                                 child: Text(status,
                                     style: const TextStyle(
                                         color: AppColors.muted)))),
-                        if (_view != null && !_verifying)
+                        if (_view != null &&
+                            !_verifying &&
+                            !_socialSignInBlocked)
                           TextButton(
                               onPressed: () => unawaited(_openPage(
                                   _resettingPassword
@@ -307,7 +313,7 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
                                       : DeezerWebLogin.resetUrl)),
                               child: Text(_resettingPassword
                                   ? 'Voltar ao login'
-                                  : 'Redefinir senha')),
+                                  : 'Definir senha')),
                       ])),
                   SizedBox(
                       height: 2,
@@ -339,7 +345,7 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
                                       const SizedBox(
                                           width: 360,
                                           child: Text(
-                                              'O login por uma conta externa exige o navegador. Aqui, use o mesmo e-mail e a senha da Deezer.',
+                                              'Use o mesmo e-mail do Google com a sua senha Deezer. Se precisar, defina a senha pelo e-mail da conta.',
                                               textAlign: TextAlign.center))
                                     else
                                       Text(
@@ -349,15 +355,33 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
                                           textAlign: TextAlign.center),
                                     if (_view != null) ...[
                                       const SizedBox(height: 12),
-                                      FilledButton(
-                                          onPressed: () => unawaited(_openPage(
-                                              _resettingPassword
-                                                  ? DeezerWebLogin.resetUrl
-                                                  : DeezerWebLogin.loginUrl)),
-                                          child: Text(_socialSignInBlocked &&
-                                                  _error.isEmpty
-                                              ? 'Voltar ao login'
-                                              : 'Tentar novamente')),
+                                      if (_socialSignInBlocked &&
+                                          _error.isEmpty)
+                                        Wrap(
+                                            alignment: WrapAlignment.center,
+                                            spacing: 8,
+                                            children: [
+                                              TextButton(
+                                                  onPressed: () => unawaited(
+                                                      _openPage(DeezerWebLogin
+                                                          .loginUrl)),
+                                                  child: const Text(
+                                                      'Voltar ao login')),
+                                              FilledButton(
+                                                  onPressed: () => unawaited(
+                                                      _openPage(DeezerWebLogin
+                                                          .resetUrl)),
+                                                  child: const Text(
+                                                      'Definir senha')),
+                                            ])
+                                      else
+                                        FilledButton(
+                                            onPressed: () => unawaited(
+                                                _openPage(_resettingPassword
+                                                    ? DeezerWebLogin.resetUrl
+                                                    : DeezerWebLogin.loginUrl)),
+                                            child:
+                                                const Text('Tentar novamente')),
                                     ],
                                   ]))),
                   ]))),

@@ -194,22 +194,48 @@ class LibraryController extends ChangeNotifier {
     await addLocalFiles(collectionId, paths);
   }
 
-  Future<Collection?> importLocalFolders(List<String> paths,
-      {int? groupId}) async {
-    if (importBlocked || _disposed) return null;
-    final folders = <String>{};
-    for (final path in paths) {
-      if (p.isAbsolute(path) && await files.isDirectory(path)) {
-        folders.add(p.normalize(path));
-      }
-    }
-    if (folders.isEmpty || importBlocked || _disposed) return null;
+  bool _pickingAudioFolder = false;
+
+  Future<Collection?> chooseLocalFolder({int? groupId}) =>
+      _importLocalFolders(const [], groupId: groupId, pick: true);
+
+  Future<Collection?> importLocalFolders(List<String> paths, {int? groupId}) =>
+      _importLocalFolders(paths, groupId: groupId);
+
+  Future<Collection?> _importLocalFolders(List<String> paths,
+      {int? groupId, bool pick = false}) async {
+    if (importBlocked || _disposed || (!pick && paths.isEmpty)) return null;
     importing = true;
     final token = _importCancellation = DownloadCancellation();
     final importer =
         LocalMediaImporter(repository, inspector: localInspector, files: files);
     final created = <int>[];
+    String? selected;
     try {
+      if (pick) {
+        _pickingAudioFolder = true;
+        message = 'Selecionando ou lendo pasta de áudio…';
+        notifyListeners();
+        try {
+          selected = await files.chooseAudioFolder();
+        } finally {
+          _pickingAudioFolder = false;
+        }
+        token.check();
+        if (selected == null || _disposed) {
+          message = '';
+          return null;
+        }
+        paths = [selected];
+      }
+      final folders = <String>{};
+      for (final path in paths) {
+        token.check();
+        if (p.isAbsolute(path) && await files.isDirectory(path)) {
+          folders.add(p.normalize(path));
+        }
+      }
+      if (folders.isEmpty) message = '';
       for (final folder in folders) {
         token.check();
         final name = p.basename(folder);
@@ -235,10 +261,14 @@ class LibraryController extends ChangeNotifier {
       message = operationMessage(error);
       return null;
     } finally {
-      importing = false;
-      _importCancellation = null;
-      if (!_disposed) await refresh();
-      notifyListeners();
+      try {
+        if (selected != null) await files.releaseAudioFolder(selected);
+      } finally {
+        importing = false;
+        _importCancellation = null;
+        if (!_disposed) await refresh();
+        notifyListeners();
+      }
     }
   }
 
@@ -1309,6 +1339,7 @@ class LibraryController extends ChangeNotifier {
     final token = _importCancellation;
     if (token == null) return;
     token.cancelled = true;
+    if (_pickingAudioFolder) unawaited(files.cancelAudioFolder());
     message = 'Interrompendo a importação…';
     notifyListeners();
   }

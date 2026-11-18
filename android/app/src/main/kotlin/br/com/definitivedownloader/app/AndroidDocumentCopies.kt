@@ -22,24 +22,30 @@ class AndroidDocumentCopies(private val context: Context) {
             val folder = File(directory, index.toString()).apply { check(mkdirs()) }
             val destination = File(folder, original)
             val limit = when (kind) { "mp3" -> 200L * 1024 * 1024; "playlist", "csv" -> 5L * 1024 * 1024; else -> 10L * 1024 * 1024 }
-            var size = 0L
-            context.contentResolver.openInputStream(uri).use { input ->
-                requireNotNull(input)
-                destination.outputStream().use { output ->
-                    val buffer = ByteArray(65536)
-                    while (true) {
-                        check(!cancelled())
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        size += read; total += read
-                        require(size <= limit && total <= maxTotal)
-                        output.write(buffer, 0, read)
-                    }
-                    output.fd.sync()
-                }
-            }
-            require(size > 0)
+            total += copyTo(uri, destination, minOf(limit, maxTotal - total), cancelled)
             destination.path
         }
+    }
+
+    internal fun copyTo(uri: Uri, destination: File, maxBytes: Long, cancelled: () -> Boolean): Long {
+        require(uri.scheme == "content" && uri.authority != "${context.packageName}.files")
+        var size = 0L
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input)
+            destination.outputStream().use { output ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    check(!cancelled())
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    size += read
+                    check(size <= maxBytes) { "O limite de tamanho da importação foi ultrapassado." }
+                    output.write(buffer, 0, read)
+                }
+                output.fd.sync()
+            }
+        }
+        check(size > 0 && !cancelled())
+        return size
     }
 }

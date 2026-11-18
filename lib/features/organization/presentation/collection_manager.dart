@@ -89,6 +89,23 @@ class _CollectionManagerState extends State<CollectionManager> {
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Nova playlist')),
                   ]),
+                  if (defaultTargetPlatform == TargetPlatform.android)
+                    Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                            key: const ValueKey('import-audio-folder'),
+                            onPressed: !widget.library.importBlocked &&
+                                    !c.saving
+                                ? () async {
+                                    final playlist = await widget.library
+                                        .chooseLocalFolder(groupId: group?.id);
+                                    if (mounted && playlist != null) {
+                                      widget.onOpen(playlist);
+                                    }
+                                  }
+                                : null,
+                            icon: const Icon(Icons.folder_open, size: 18),
+                            label: const Text('Importar pasta'))),
                   if (defaultTargetPlatform == TargetPlatform.windows)
                     const Padding(
                         padding: EdgeInsets.only(bottom: 8),

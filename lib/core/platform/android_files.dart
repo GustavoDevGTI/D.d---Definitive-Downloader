@@ -90,6 +90,37 @@ class AndroidFiles extends DesktopFiles {
   }
 
   @override
+  Future<String?> chooseAudioFolder() async {
+    try {
+      return (await _pick('audioFolder')).firstOrNull;
+    } on PlatformException catch (error) {
+      throw FormatException(error.message ?? 'Não foi possível ler a pasta.');
+    }
+  }
+
+  @override
+  Future<void> cancelAudioFolder() async {
+    try {
+      await channel.invokeMethod<void>('cancelAudioFolder');
+    } on PlatformException {
+      // The picker may have closed before it received the cancellation.
+    } on MissingPluginException {
+      // The Activity may have detached.
+    }
+  }
+
+  @override
+  Future<void> releaseAudioFolder(String path) async {
+    try {
+      await channel.invokeMethod<void>('releaseAudioFolder', {'path': path});
+    } on PlatformException {
+      // A cache cleanup failure does not change the committed playlist.
+    } on MissingPluginException {
+      // The temporary files are in the app-owned cache.
+    }
+  }
+
+  @override
   Future<String?> chooseCover() async => (await _pick('cover')).firstOrNull;
   @override
   Future<List<String>> chooseMp3Files() => _pick('mp3');

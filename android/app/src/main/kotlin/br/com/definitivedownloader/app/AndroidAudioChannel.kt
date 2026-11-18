@@ -190,9 +190,17 @@ class AndroidAudioChannel(private val context: Context, messenger: BinaryMesseng
                 reader.setDataSource(path)
                 val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
                 val mime = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE) ?: ""
-                handler.post { result.success(mapOf("durationMs" to duration, "mime" to mime)) }
+                val metadata = mapOf(
+                    "durationMs" to duration,
+                    "mime" to mime,
+                    "hasVideo" to (reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"),
+                    "title" to reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty(),
+                    "artist" to reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST).orEmpty(),
+                    "album" to reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty(),
+                )
+                handler.post { result.success(metadata) }
             } catch (_: Exception) {
-                handler.post { result.error("metadata", "Não foi possível conferir este MP3.", null) }
+                handler.post { result.error("metadata", "Não foi possível conferir este áudio.", null) }
             } finally { runCatching { reader.release() } }
         }
     }

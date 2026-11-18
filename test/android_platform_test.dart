@@ -24,6 +24,9 @@ void main() {
       calls.add(call);
       return switch (call.method) {
         'defaultOutput' => '/storage/app/media',
+        'pickFiles' when (call.arguments as Map)['kind'] == 'audioFolder' => [
+            '/cache/imports/Áudio'
+          ],
         'pickFiles' => ['/cache/imports/song.mp3'],
         'chooseOutput' => null,
         _ => null,
@@ -47,6 +50,13 @@ void main() {
     expect(calls.last.arguments, {'kind': 'playlist'});
     await files.releasePlaylistFile('/cache/imports/song.mp3');
     expect(calls.last.method, 'releasePlaylistFile');
+    expect(await files.chooseAudioFolder(), '/cache/imports/Áudio');
+    expect(calls.last.arguments, {'kind': 'audioFolder'});
+    await files.cancelAudioFolder();
+    expect(calls.last.method, 'cancelAudioFolder');
+    await files.releaseAudioFolder('/cache/imports/Áudio');
+    expect(calls.last.method, 'releaseAudioFolder');
+    expect(calls.last.arguments, {'path': '/cache/imports/Áudio'});
     await files.chooseCover();
     expect(calls.last.arguments, {'kind': 'cover'});
     expect(await files.chooseOutput(), isNull);

@@ -75,6 +75,10 @@ class DesktopFiles {
       ]))
           ?.path;
   Future<void> releasePlaylistFile(String path) async {}
+  Future<String?> chooseAudioFolder() =>
+      getDirectoryPath(confirmButtonText: 'Importar pasta');
+  Future<void> cancelAudioFolder() async {}
+  Future<void> releaseAudioFolder(String path) async {}
   Future<List<String>> chooseMp3Files() async =>
       (await openFiles(acceptedTypeGroups: [
         const XTypeGroup(
