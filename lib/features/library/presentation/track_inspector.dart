@@ -7,6 +7,7 @@ import '../../workspace/presentation/workspace_components.dart';
 import 'track_review_actions.dart';
 import 'edit_track_dialog.dart';
 import 'track_identity.dart';
+import 'playlist_palette.dart';
 import '../../player/presentation/listening_actions.dart';
 
 class TrackInspector extends StatefulWidget {
@@ -33,6 +34,7 @@ class _TrackInspectorState extends State<TrackInspector> {
     final c = widget.controller, t = c.focused;
     final rgb = c.current?.themeColor;
     final accent = rgb == null ? null : Color(0xFF000000 | rgb);
+    final ink = playlistInk(accent);
     if (_trackId != t?.id ||
         _revision != c.inspectorRevision ||
         (_status != t?.status && t?.status == TrackStatus.completed)) {
@@ -46,39 +48,10 @@ class _TrackInspectorState extends State<TrackInspector> {
         color: Colors.white,
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          DecoratedBox(
-              decoration: BoxDecoration(
-                  color: accent == null
-                      ? Colors.white
-                      : Color.alphaBlend(accent.withAlpha(24), Colors.white),
-                  border: Border(
-                      top: BorderSide(
-                          width: 3, color: accent ?? Colors.transparent))),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 13, 8, 8),
-                child: Row(children: [
-                  const Expanded(
-                      child: Text('Conferência',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600))),
-                  if (Navigator.of(context).canPop())
-                    IconButton(
-                        tooltip: 'Fechar conferência',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, size: 20)),
-                ]),
-              )),
+          _header(accent, hasTrack: t != null),
           if (t == null)
             const Expanded(child: Center(child: Text('Selecione uma faixa')))
           else ...[
-            Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: CategoryTabs(
-                    labels: const ['Correspondência', 'Informações'],
-                    selected: _tab,
-                    accent: accent,
-                    bottomSpacing: 0,
-                    onSelect: (v) => setState(() => _tab = v))),
             Expanded(
                 child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
@@ -93,7 +66,8 @@ class _TrackInspectorState extends State<TrackInspector> {
                               'Correspondência',
                               t.redownloadReview
                                   ? 'Escolher fonte novamente'
-                                  : t.matchStatus.label),
+                                  : t.matchStatus.label,
+                              emphasis: t.needsReview ? ink : null),
                           _line(
                               'Fonte identificada',
                               t.hasManualSource
@@ -107,17 +81,21 @@ class _TrackInspectorState extends State<TrackInspector> {
                           _line('Duração encontrada',
                               formatDuration(t.resolvedDurationMs)),
                           if (t.error.isNotEmpty)
-                            Padding(
-                                padding: const EdgeInsets.only(top: 10),
+                            Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(top: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                    color: playlistReviewSurface(accent),
+                                    borderRadius: BorderRadius.circular(8)),
                                 child: Text(t.error,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF9C4141)))),
+                                    style:
+                                        TextStyle(fontSize: 12, color: ink))),
                           const Divider(height: 24),
                           if (_tab == 1) ...[
                             Align(
                                 alignment: Alignment.centerLeft,
-                                child: ListeningActions(track: t)),
+                                child: ListeningActions(track: t, accent: ink)),
                             _line('Álbum original',
                                 t.album.isEmpty ? 'Não informado' : t.album),
                             if (t.customTitle.isNotEmpty)
@@ -193,19 +171,18 @@ class _TrackInspectorState extends State<TrackInspector> {
                                               ? null
                                               : () => unawaited(
                                                   c.search(_query.text)),
-                                          icon: const Icon(Icons.search,
-                                              color: AppColors.accentActive))),
+                                          icon:
+                                              Icon(Icons.search, color: ink))),
                                   onSubmitted: c.searching || c.busy
                                       ? null
                                       : (v) => unawaited(c.search(v))),
                             ],
                             const SizedBox(height: 8),
-                            SingleChildScrollView(
+                            Padding(
                                 key: const ValueKey('conference-actions'),
-                                scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4),
-                                child: TrackReviewActions(controller: c)),
+                                padding: const EdgeInsets.all(4),
+                                child: TrackReviewActions(
+                                    controller: c, accent: ink)),
                             if ((!t.hasManualSource || t.redownloadReview) &&
                                 t.status != TrackStatus.completed)
                               RadioGroup<Candidate>(
@@ -213,7 +190,7 @@ class _TrackInspectorState extends State<TrackInspector> {
                                   onChanged: c.selectCandidate,
                                   child: Column(children: [
                                     for (final candidate in c.candidates)
-                                      _option(candidate)
+                                      _option(candidate, ink)
                                   ])),
                             if (c.isExample)
                               const Text('Exemplo local com áudio sintético.',
@@ -225,12 +202,50 @@ class _TrackInspectorState extends State<TrackInspector> {
         ]));
   }
 
-  Widget _line(String label, String value) => Padding(
+  Widget _header(Color? accent, {required bool hasTrack}) => DecoratedBox(
+      key: const ValueKey('conference-header'),
+      decoration: BoxDecoration(
+          color: accent == null
+              ? AppColors.surface
+              : Color.alphaBlend(accent.withAlpha(24), Colors.white),
+          border: const Border(bottom: BorderSide(color: AppColors.line))),
+      child: Padding(
+          padding: const EdgeInsets.fromLTRB(15, 12, 15, 12),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Expanded(
+                  child: Text('Conferência',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600))),
+              if (Navigator.of(context).canPop())
+                IconButton(
+                    tooltip: 'Fechar conferência',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, size: 20)),
+            ]),
+            if (hasTrack) ...[
+              const SizedBox(height: 8),
+              CategoryTabs(
+                  labels: const ['Correspondência', 'Informações'],
+                  selected: _tab,
+                  accent: accent,
+                  showDivider: false,
+                  bottomSpacing: 0,
+                  onSelect: (v) => setState(() => _tab = v)),
+            ],
+          ])));
+
+  Widget _line(String label, String value, {Color? emphasis}) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: LayoutBuilder(builder: (context, box) {
         final caption = Text(label,
             style: const TextStyle(fontSize: 11, color: AppColors.muted));
-        final detail = Text(value, style: const TextStyle(fontSize: 12));
+        final detail = Text(value,
+            style: TextStyle(
+                fontSize: 12,
+                color: emphasis,
+                fontWeight: emphasis == null ? null : FontWeight.w600));
         if (box.maxWidth < 340 &&
             MediaQuery.textScalerOf(context).scale(11) > 14) {
           return Column(
@@ -250,22 +265,32 @@ class _TrackInspectorState extends State<TrackInspector> {
           Expanded(child: detail),
         ]);
       }));
-  Widget _option(Candidate candidate) {
+  Widget _option(Candidate candidate, Color ink) {
     final assessment = widget.controller.assess(candidate);
     return RadioListTile<Candidate>(
         dense: true,
         contentPadding: EdgeInsets.zero,
         value: candidate,
+        activeColor: ink,
+        selected: widget.controller.selectedCandidate == candidate,
+        selectedTileColor: Color.alphaBlend(ink.withAlpha(16), Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text(candidate.title, style: const TextStyle(fontSize: 12)),
         subtitle:
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
-              '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}\n${assessment.needsReview ? assessment.reason : 'Correspondência provável'}',
+              '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}',
               style: const TextStyle(fontSize: 11)),
+          Text(
+              assessment.needsReview
+                  ? assessment.reason
+                  : 'Correspondência provável',
+              style: TextStyle(
+                  fontSize: 11, color: assessment.needsReview ? ink : null)),
           ListeningActions(
               track: widget.controller.focused!,
               candidate: candidate,
-              library: widget.controller),
+              accent: ink),
         ]));
   }
 }

@@ -110,7 +110,8 @@ class _DownloadWorkspaceState extends State<DownloadWorkspace> {
                         !library.preparing &&
                         !library.editing &&
                         library.current != null
-                    ? () => unawaited(showAddMusicLinks(context, library))
+                    ? () => unawaited(
+                        showAddMusicLinks(context, library, enqueue: true))
                     : null,
                 paused: library.pauseMode,
                 onStart: canStart || (enabled && library.pauseMode)

@@ -23,7 +23,7 @@ void main() {
     workspace = WorkspaceRepository(library.database);
   });
   tearDown(() => directory.delete(recursive: true));
-  Future<List<Track>> seed(int count) async {
+  Future<List<Track>> seed(int count, {bool inDownloads = false}) async {
     final id = await library.importCollection(ImportedCollection(
         name: 'Repetições',
         source: 'CSV',
@@ -35,13 +35,17 @@ void main() {
                 artist: 'Pessoa',
                 album: 'Original',
                 durationMs: 180000)))));
+    if (inDownloads) {
+      await library.database.run((db) => db.execute(
+          'UPDATE tracks SET queue_added=1 WHERE collection_id=?', [id]));
+    }
     return (await library.page(id, limit: 100)).items;
   }
 
   test(
       'ordenação cobre páginas e filtros sem alterar ocorrências ou prioridade',
       () async {
-    final rows = await seed(45);
+    final rows = await seed(45, inDownloads: true);
     await library.database.run((db) {
       for (var i = 0; i < rows.length; i++) {
         db.execute(
@@ -86,7 +90,7 @@ void main() {
   });
 
   test('ordena valores exibidos de nome, servidor, status e pasta', () async {
-    final rows = await seed(3);
+    final rows = await seed(3, inDownloads: true);
     await library.database.run((db) {
       db.execute(
           "UPDATE tracks SET source_kind='directMp3',media_url='https://example.org/a.mp3',title='Zulu',custom_title='Alpha',status='ready' WHERE id=?",
@@ -120,7 +124,7 @@ void main() {
 
   test('tamanho vem do arquivo real e nome fica título antes do artista',
       () async {
-    final rows = await seed(2);
+    final rows = await seed(2, inDownloads: true);
     final file = File('${directory.path}/001 - Artista - Nome antigo.mp3');
     await file.writeAsBytes(List.filled(8192, 0));
     await library.setStatus(rows[0].id, TrackStatus.completed,
@@ -145,7 +149,7 @@ void main() {
   test(
       'Baixado em ordena conclusões entre páginas e deixa desconhecidos no fim',
       () async {
-    final rows = await seed(45);
+    final rows = await seed(45, inDownloads: true);
     final origin = DateTime.utc(2026, 11, 3, 12);
     await library.database.run((db) {
       for (var i = 0; i < rows.length; i++) {
@@ -232,7 +236,7 @@ void main() {
 
   test('prioridade e remoção persistem sem perder ocorrências ou histórico',
       () async {
-    final rows = await seed(3);
+    final rows = await seed(3, inDownloads: true);
     for (final t in rows) {
       await library.linkSource(t,
           url: 'https://example.org/${t.id}.mp3', kind: SourceKind.directMp3);
@@ -420,12 +424,12 @@ void main() {
   });
   test('filas paginadas por categoria e remoção de registro preserva arquivo',
       () async {
-    final rows = await seed(45);
+    final rows = await seed(45, inDownloads: true);
     for (final t in rows) {
       await library.linkSource(t,
           url: 'https://example.org/${t.id}.mp3', kind: SourceKind.directMp3);
     }
-    final second = (await seed(1)).single;
+    final second = (await seed(1, inDownloads: true)).single;
     await library.linkSource(second,
         url: 'https://example.org/other.mp3', kind: SourceKind.directMp3);
     expect((await workspace.downloads(ContentCategory.music)).items.length, 40);

@@ -402,7 +402,11 @@ class AppDatabase {
           rethrow;
         }
       }
-      // Stale run membership is not work: the occurrences themselves stay queued.
+      // Preserve explicit submissions made by an older build before clearing
+      // the interrupted execution's transient order.
+      db.execute(
+          '''UPDATE tracks SET queue_added=1 WHERE queue_added=0 AND id IN (
+        SELECT track_id FROM download_run_additions)''');
       db.execute('DELETE FROM download_run_additions');
       db.execute(
           "UPDATE tracks SET status='ready', error='Transferência interrompida; pronta para reiniciar.' WHERE status='downloading'");

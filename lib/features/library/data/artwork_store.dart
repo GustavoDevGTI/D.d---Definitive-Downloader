@@ -110,7 +110,11 @@ class ArtworkStore {
     if (await file.length() > 5 * 1024 * 1024) {
       throw const FormatException('A capa deve ter até 5 MB.');
     }
-    final data = await normalize(await file.readAsBytes());
+    return saveCover(await file.readAsBytes(), supportDirectory);
+  }
+
+  Future<String> saveCover(Uint8List bytes, String supportDirectory) async {
+    final data = await normalize(bytes);
     final folder = Directory(p.join(supportDirectory, 'playlist-covers'));
     await folder.create(recursive: true);
     final target = File(p.join(folder.path, '${sha256.convert(data)}.png'));

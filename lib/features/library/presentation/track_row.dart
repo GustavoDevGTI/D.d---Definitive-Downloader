@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../domain/models.dart';
 import 'artwork_thumbnail.dart';
+import 'playlist_palette.dart';
 import 'track_source_cell.dart';
 import '../../player/presentation/player_scope.dart';
 
@@ -26,22 +27,22 @@ class TrackRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = track;
-    final playlistColor = accent;
+    final ink = playlistInk(accent);
     return Material(
         key: ValueKey('track-row-${t.id}'),
-        color: playlistColor != null && !t.needsReview
-            ? Color.alphaBlend(
-                playlistColor.withAlpha(focused
-                    ? 54
+        color: t.needsReview
+            ? playlistReviewSurface(accent, selected: focused || t.selected)
+            : accent != null
+                ? Color.alphaBlend(
+                    accent!.withAlpha(focused
+                        ? 54
+                        : t.selected
+                            ? 35
+                            : 12),
+                    Colors.white)
+                : focused
+                    ? Color.lerp(AppColors.accentSoft, AppColors.accent, .12)
                     : t.selected
-                        ? 35
-                        : 12),
-                Colors.white)
-            : focused
-                ? Color.lerp(AppColors.accentSoft, AppColors.accent, .12)
-                : t.selected
-                    ? AppColors.accentSoft
-                    : t.needsReview
                         ? AppColors.accentSoft
                         : Colors.white,
         child: InkWell(
@@ -54,9 +55,7 @@ class TrackRow extends StatelessWidget {
                     border: Border(
                         left: BorderSide(
                             width: 3,
-                            color: t.needsReview
-                                ? AppColors.accentActive
-                                : Colors.transparent),
+                            color: t.needsReview ? ink : Colors.transparent),
                         bottom: const BorderSide(color: AppColors.line))),
                 child: Row(children: [
                   SizedBox(
@@ -64,6 +63,7 @@ class TrackRow extends StatelessWidget {
                       child: Checkbox(
                           semanticLabel: 'Selecionar ${t.displayTitle}',
                           value: t.selected,
+                          activeColor: ink,
                           onChanged: !selectionEnabled
                               ? null
                               : (v) => onSelect(v ?? false))),
@@ -74,7 +74,10 @@ class TrackRow extends StatelessWidget {
                               ? t.coverUrl
                               : t.resolvedCoverUrl,
                           audioPath: t.localPath,
-                          borderColor: playlistColor,
+                          borderColor: accent,
+                          placeholderColor: accent == null
+                              ? AppColors.accentSoft
+                              : playlistReviewSurface(accent),
                           size: compact ? 36 : 44)),
                   Expanded(
                       child: Padding(
@@ -90,7 +93,7 @@ class TrackRow extends StatelessWidget {
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: t.needsReview
-                                            ? AppColors.accentActive
+                                            ? ink
                                             : AppColors.ink)),
                                 Text(t.artist,
                                     maxLines: 1,
@@ -100,7 +103,8 @@ class TrackRow extends StatelessWidget {
                               ]))),
                   SizedBox(
                       width: compact ? 88 : 104,
-                      child: TrackSourceCell(track: t, compact: compact)),
+                      child: TrackSourceCell(
+                          track: t, compact: compact, accent: accent)),
                   if (!compact) ...[
                     SizedBox(
                         width: 56,
@@ -113,9 +117,7 @@ class TrackRow extends StatelessWidget {
                             t.needsReview ? 'Conferir' : t.matchStatus.label,
                             style: TextStyle(
                                 fontSize: 11,
-                                color: t.needsReview
-                                    ? AppColors.accentActive
-                                    : AppColors.muted,
+                                color: t.needsReview ? ink : AppColors.muted,
                                 fontWeight: t.needsReview
                                     ? FontWeight.w700
                                     : FontWeight.w400))),
@@ -136,7 +138,7 @@ class TrackRow extends StatelessWidget {
                             PlayerScope.of(context)!.canListenTrack(t)
                                 ? Icons.play_arrow_rounded
                                 : Icons.open_in_new_rounded,
-                            color: AppColors.accentActive,
+                            color: ink,
                             size: 21)),
                 ]))));
   }

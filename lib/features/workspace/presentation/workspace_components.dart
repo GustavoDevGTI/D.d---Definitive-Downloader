@@ -7,12 +7,16 @@ class CategoryTabs extends StatelessWidget {
       required this.labels,
       required this.selected,
       required this.onSelect,
+      this.onBack,
       this.accent,
+      this.showDivider = true,
       this.bottomSpacing = 20});
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelect;
+  final VoidCallback? onBack;
   final double bottomSpacing;
+  final bool showDivider;
   final Color? accent;
   @override
   Widget build(BuildContext context) {
@@ -20,10 +24,30 @@ class CategoryTabs extends StatelessWidget {
     final selectedSurface = color == null
         ? AppColors.accentSoft
         : Color.alphaBlend(color.withAlpha(40), Colors.white);
+    Widget tab(int i) => OutlinedButton(
+        style: OutlinedButton.styleFrom(
+            backgroundColor: i == selected ? selectedSurface : Colors.white,
+            side: BorderSide(
+                color: i == selected
+                    ? color ?? selectedSurface
+                    : Colors.transparent),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            foregroundColor: i == selected
+                ? color == null
+                    ? AppColors.accentActive
+                    : AppColors.ink
+                : AppColors.muted,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
+        onPressed: () => onSelect(i),
+        child: Text(labels[i],
+            style: TextStyle(
+                fontWeight:
+                    i == selected ? FontWeight.w600 : FontWeight.w400)));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
           padding: EdgeInsets.only(
-              bottom: MediaQuery.sizeOf(context).height < 500
+              bottom: !showDivider || MediaQuery.sizeOf(context).height < 500
                   ? 0
                   : MediaQuery.sizeOf(context).shortestSide < 600
                       ? 8
@@ -32,31 +56,18 @@ class CategoryTabs extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Wrap(spacing: 6, runSpacing: 6, children: [
                 for (var i = 0; i < labels.length; i++)
-                  OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                          backgroundColor:
-                              i == selected ? selectedSurface : Colors.white,
-                          side: BorderSide(
-                              color: i == selected
-                                  ? color ?? selectedSurface
-                                  : Colors.transparent),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          foregroundColor: i == selected
-                              ? color == null
-                                  ? AppColors.accentActive
-                                  : AppColors.ink
-                              : AppColors.muted,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10)),
-                      onPressed: () => onSelect(i),
-                      child: Text(labels[i],
-                          style: TextStyle(
-                              fontWeight: i == selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400))),
+                  if (i == 0 && onBack != null)
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(
+                          tooltip: 'Voltar às coleções',
+                          onPressed: onBack,
+                          icon: const Icon(Icons.arrow_back, size: 18)),
+                      tab(i),
+                    ])
+                  else
+                    tab(i),
               ]))),
-      const Divider(height: 1),
+      if (showDivider) const Divider(height: 1),
       SizedBox(
           height: MediaQuery.sizeOf(context).height < 500
               ? bottomSpacing.clamp(0, 4)

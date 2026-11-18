@@ -231,6 +231,9 @@ class WorkspaceRepository {
           } finally {
             insert.dispose();
           }
+          db.execute(
+              '''UPDATE tracks SET queue_added=1 WHERE queue_added=0 AND id IN (
+            SELECT track_id FROM download_run_additions WHERE run=?)''', [run]);
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');
@@ -280,7 +283,7 @@ class WorkspaceRepository {
             db.execute('UPDATE collections SET editing_locked=1 WHERE id=?',
                 [track.collectionId]);
             db.execute(
-                "UPDATE tracks SET queue_run=?,status='downloading',error='' WHERE id=?",
+                "UPDATE tracks SET queue_added=1,queue_run=?,status='downloading',error='' WHERE id=?",
                 [run, track.id]);
           }
           db.execute('COMMIT');
@@ -297,11 +300,11 @@ class WorkspaceRepository {
 
   Future<ActivitySummary> summary() => database.run((db) {
         final counts = db.select('''SELECT
-      COALESCE(SUM(source_kind!='none' OR manual_url!='' OR queue_added=1),0) AS records,
+      COUNT(*) AS records,
       COALESCE(SUM(status='downloading'),0) AS active,
       COALESCE(SUM(selected=1 AND status IN ('ready','failed') AND source_kind!='none'
         AND match_status!='review' AND redownload_state!='review' AND NOT(manual_url!='' AND manual_mode='extractAudio')),0) AS queued
-      FROM tracks WHERE queue_hidden=0''').first;
+      FROM tracks t WHERE ${DownloadListingQuery.membership}''').first;
         final completed = db
             .select('SELECT COUNT(*) AS n FROM download_history WHERE hidden=0')
             .first['n'] as int;

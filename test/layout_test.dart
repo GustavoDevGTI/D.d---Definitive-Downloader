@@ -1,6 +1,7 @@
 import 'package:definitive_downloader/features/library/domain/track_listing.dart';
 import 'widget_io.dart';
 import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
+import 'package:definitive_downloader/features/organization/data/collection_organization_repository.dart';
 import 'package:definitive_downloader/features/workspace/presentation/workspace_components.dart';
 import 'dart:io';
 import 'package:flutter/gestures.dart';
@@ -40,6 +41,9 @@ Future<void> fixtureEditingLock(AppDatabase database, int id, bool locked) =>
 Future<void> fixtureTrackStatus(AppDatabase database, int id, String status) =>
     database.run((db) =>
         db.execute('UPDATE tracks SET status=? WHERE id=?', [status, id]));
+Future<void> fixtureDownloadMembership(AppDatabase database, int id) =>
+    database.run((db) => db.execute(
+        'UPDATE tracks SET queue_added=1 WHERE collection_id=?', [id]));
 
 void main() {
   Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
@@ -108,6 +112,9 @@ void main() {
             downloader: DownloadService(const BoundedHttp(), rootBundle));
         controller.outputDirectory = directory.path;
         await controller.loadExample();
+        final example = controller.current!;
+        await CollectionOrganizationRepository(repository.database)
+            .rename(example.id, example.name, themeColor: 0xD99052);
         // Visual metadata fixtures only; no provider is contacted or downloaded.
         final rows = (await repository.page(controller.current!.id)).items;
         await repository.linkSource(rows[0],
@@ -116,6 +123,8 @@ void main() {
         await repository.linkSource(rows[1],
             url: 'https://music.youtube.com/watch?v=abcdefghijk',
             kind: SourceKind.youtubeMusic);
+        await fixtureDownloadMembership(
+            repository.database, rows.first.collectionId);
         await controller.refresh();
         controller.clearMessage();
       });
@@ -132,6 +141,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Visão geral'), findsOneWidget);
       expect(find.text('Meus arquivos'), findsOneWidget);
+      expect(find.textContaining('O que vem'), findsNothing);
+      final homeImport = find.descendant(
+          of: find.byType(HomeWorkspace),
+          matching: find.text('Importar playlist'));
+      expect(homeImport, findsOneWidget);
       final surface =
           tester.getRect(find.byKey(const ValueKey('app-edge-to-edge')));
       expect(surface.left, 0);
@@ -141,9 +155,10 @@ void main() {
       final nav = width < 780
           ? find.byType(MobileNavigation)
           : find.byType(LibrarySidebar);
-      await tester
-          .tap(find.descendant(of: nav, matching: find.text('Músicas')));
+      await tester.tap(homeImport);
       await tester.pumpAndSettle();
+      final playlistUrl = find.byKey(const ValueKey('playlist-url'));
+      expect(tester.widget<TextField>(playlistUrl).focusNode!.hasFocus, isTrue);
       expect(find.text('Minhas coleções'), findsOneWidget);
       await ioUntil(
           tester,
@@ -194,14 +209,37 @@ void main() {
       await capture(tester, captureKey, 'music-connections-${width.toInt()}');
       await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.textContaining('Exemplo local').first);
+      final exampleCard = find.byKey(
+          ValueKey('collection-open-${controller.collections.first.id}'));
+      await tester.ensureVisible(exampleCard);
       await tester.pumpAndSettle();
-      await tester.runAsync(
-          () => tester.tap(find.textContaining('Exemplo local').first));
+      await tester.runAsync(() => tester.tap(exampleCard));
       await tester.runAsync(() => controller.refresh());
       await tester.pumpAndSettle();
       expect(find.byTooltip('Baixar selecionadas'), findsOneWidget);
+      final back = find.descendant(
+          of: find.byType(CategoryTabs),
+          matching: find.byTooltip('Voltar às coleções'));
+      expect(back, findsOneWidget);
+      if (width == 1360) {
+        await tester
+            .tap(find.descendant(of: nav, matching: find.text('Início')));
+        await tester.pumpAndSettle();
+        await tester.tap(homeImport);
+        await tester.pumpAndSettle();
+        expect(
+            tester.widget<TextField>(playlistUrl).focusNode!.hasFocus, isTrue);
+        expect(find.text('Faixa / artista'), findsNothing);
+        final example = find.byKey(
+            ValueKey('collection-open-${controller.collections.first.id}'));
+        await ioUntil(tester, () => example.evaluate().isNotEmpty);
+        await tester.runAsync(() => tester.tap(example));
+        await tester.runAsync(controller.refresh);
+        await tester.pumpAndSettle();
+      }
       expect(find.text('Faixa / artista'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Iniciar conferência'),
+          findsOneWidget);
       expect(find.text('Selecionar todas'), findsNothing);
       if (width == 1360 || width == 390) {
         final trackId = controller.page.items.first.id;
@@ -214,7 +252,21 @@ void main() {
             tester
                 .widget<Material>(find.byKey(ValueKey('track-row-$trackId')))
                 .color,
-            const Color(0xFFFDE7ED));
+            Color.alphaBlend(
+                const Color(0xFFD99052).withAlpha(60), Colors.white));
+        if (width == 1360) {
+          final warning = find.descendant(
+              of: find.byKey(ValueKey('track-row-$trackId')),
+              matching: find.text('Conferir'));
+          final ink = tester.widget<Text>(warning).style!.color!;
+          final surface = Color.alphaBlend(
+              const Color(0xFFD99052).withAlpha(82), Colors.white);
+          expect(
+              (surface.computeLuminance() + .05) /
+                  (ink.computeLuminance() + .05),
+              greaterThanOrEqualTo(4.5));
+          expect(ink, isNot(const Color(0xFFA01F45)));
+        }
         await capture(tester, captureKey, 'review-highlight-${width.toInt()}');
         final filter = find.byKey(ValueKey('track-filter-${controller.view}'));
         await tester.ensureVisible(filter);
@@ -334,7 +386,19 @@ void main() {
               find.text('Conferência').evaluate().isNotEmpty);
       expect(find.text('Conferência'), findsOneWidget);
       expect(controller.page.selectedCount, 1);
+      final conferenceHeader = find.byKey(const ValueKey('conference-header'));
+      final headerBounds = tester.getRect(conferenceHeader);
+      for (final label in ['Correspondência', 'Informações']) {
+        final tab = find.descendant(
+            of: conferenceHeader,
+            matching: find.widgetWithText(OutlinedButton, label));
+        final tabBounds = tester.getRect(tab);
+        expect(tabBounds.left, greaterThanOrEqualTo(headerBounds.left + 12));
+        expect(tabBounds.right, lessThanOrEqualTo(headerBounds.right - 12));
+        expect(tabBounds.bottom, lessThanOrEqualTo(headerBounds.bottom - 8));
+      }
       await capture(tester, captureKey, 'verification-${width.toInt()}');
+      const audioUrl = 'https://music.youtube.com/watch?v=zyxwvutsrqp';
       await tester.runAsync(() async {
         final track = controller.focused!;
         await controller.repository.saveCandidates(track.id, [
@@ -347,7 +411,18 @@ void main() {
               previewUrl: '',
               coverUrl: '',
               kind: SourceKind.youtube,
-              recordingType: 'MUSIC_VIDEO_TYPE_OMV')
+              recordingType: 'MUSIC_VIDEO_TYPE_OMV'),
+          if (width == 1360)
+            const Candidate(
+                title: 'Versão de áudio para usar',
+                artist: 'Pessoa',
+                album: '',
+                durationMs: 4000,
+                pageUrl: audioUrl,
+                previewUrl: '',
+                coverUrl: '',
+                kind: SourceKind.youtubeMusic,
+                recordingType: 'MUSIC_VIDEO_TYPE_ATV'),
         ]);
         controller.focus(track);
         controller.candidates =
@@ -358,8 +433,10 @@ void main() {
       await tester.ensureVisible(find.text('Versão de vídeo para revisão'));
       await tester.tap(find.text('Versão de vídeo para revisão'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byTooltip('Aprovar videoclipe'));
-      await tester.tap(find.byTooltip('Aprovar videoclipe'));
+      final approveVideo =
+          find.widgetWithText(FilledButton, 'Aprovar videoclipe');
+      await tester.ensureVisible(approveVideo);
+      await tester.tap(approveVideo);
       await tester.pumpAndSettle();
       expect(find.text('Aprovar esta versão'), findsOneWidget);
       expect(find.textContaining('Duração desta versão:'), findsOneWidget);
@@ -368,6 +445,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(
           controller.focused!.sourceAuthorization, SourceAuthorization.catalog);
+      if (width == 1360) {
+        final previousSource = controller.focused!.mediaUrl;
+        final audio = find.text('Versão de áudio para usar');
+        await tester.ensureVisible(audio);
+        await tester.tap(audio);
+        await tester.pumpAndSettle();
+        expect(controller.focused!.mediaUrl, previousSource);
+        final useAudio = find.widgetWithText(FilledButton, 'Usar esta versão');
+        await tester.ensureVisible(useAudio);
+        final flag = find.byTooltip('Marcar para revisão');
+        expect(tester.getCenter(useAudio).dy, tester.getCenter(flag).dy);
+        expect(tester.getRect(useAudio).right,
+            lessThan(tester.getRect(flag).left));
+        await tester.runAsync(() => tester.tap(useAudio));
+        await ioUntil(tester, () => controller.focused?.mediaUrl == audioUrl);
+        expect(controller.focused!.status, isNot(TrackStatus.downloading));
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+      }
       await tester.ensureVisible(find.byTooltip('Informar link manualmente'));
       await tester.runAsync(
           () => tester.tap(find.byTooltip('Informar link manualmente')));

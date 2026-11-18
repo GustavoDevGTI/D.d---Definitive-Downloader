@@ -15,6 +15,7 @@ import 'package:definitive_downloader/features/library/data/library_repository.d
 import 'package:definitive_downloader/features/library/presentation/collection_workspace.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/player/data/player_library.dart';
+import 'package:definitive_downloader/features/organization/presentation/collection_manager.dart';
 import 'collection_composition_test.dart'
     show YouTubeFixture, LocalInspectorFixture;
 import 'playlist_matching_test.dart' show FixturePlaylist;
@@ -30,6 +31,60 @@ class LocalPickerFixture extends DesktopFiles {
 }
 
 void main() {
+  testWidgets('solta uma pasta sobre Minhas coleções e abre a playlist criada',
+      (tester) async {
+    late Directory temp;
+    late LibraryController library;
+    late File input;
+    await tester.runAsync(() async {
+      temp = await Directory.systemTemp.createTemp('dd-folder-layout-');
+      final folder = await Directory('${temp.path}/Pasta de ensaio').create();
+      input = await File('assets/demo/tone.mp3').copy('${folder.path}/tom.mp3');
+      final repo = LibraryRepository(AppDatabase('${temp.path}/library.db'));
+      library = LibraryController(
+          repository: repo,
+          files: LocalPickerFixture('${temp.path}/output', input.path),
+          spotify: FixturePlaylist([]),
+          csv: const CsvImporter(),
+          catalog: const DeezerCatalog(BoundedHttp()),
+          downloader: DownloadService(const BoundedHttp(), rootBundle),
+          localInspector: LocalInspectorFixture());
+      await library.initialize();
+    });
+    addTearDown(() async {
+      library.dispose();
+      await temp.delete(recursive: true);
+    });
+    int? opened;
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme(),
+        home: Scaffold(
+            body: CollectionManager(
+                library: library,
+                onOpen: (collection) => opened = collection.id))));
+    await tester.pumpAndSettle();
+    Future<void> drop(String method, Object args) =>
+        tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+            'desktop_drop',
+            const StandardMethodCodec()
+                .encodeMethodCall(MethodCall(method, args)),
+            (_) {});
+    final point = tester.getCenter(find.text('Minhas coleções'));
+    await drop('entered', [point.dx, point.dy]);
+    await tester.runAsync(() => drop('performOperation', [input.parent.path]));
+    await ioUntil(tester, () => opened != null);
+    await tester.runAsync(() async {
+      final playlist = (await library.repository.collectionById(opened!))!;
+      expect(playlist.name, 'Pasta de ensaio');
+      expect(playlist.trackCount, 1);
+      final track = (await library.repository.page(playlist.id)).items.single;
+      expect(await File(track.localPath).exists(), isTrue);
+      expect(await input.exists(), isTrue);
+      expect(track.localPath, isNot(input.path));
+    });
+    expect(tester.takeException(), isNull);
+  }, variant: const TargetPlatformVariant({TargetPlatform.windows}));
+
   for (final width in [1360.0, 390.0]) {
     testWidgets(
         'criação por link, MP3 pelo canal de arraste e seletor a ${width.toInt()}px',
@@ -120,7 +175,7 @@ void main() {
       await platform('entered', [point.dx, point.dy]);
       await tester.pumpAndSettle();
       expect(find.text('Adicionar MP3 à playlist'), findsOneWidget);
-      await platform('performOperation', [input, input]);
+      await tester.runAsync(() => platform('performOperation', [input, input]));
       await ioUntil(tester,
           () => !library.addingLinks && library.current?.trackCount == 4);
       await tester.runAsync(() async {

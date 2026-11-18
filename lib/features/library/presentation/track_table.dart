@@ -11,6 +11,7 @@ import '../domain/models.dart';
 import '../domain/track_listing.dart';
 import 'edit_track_dialog.dart';
 import 'track_row.dart';
+import 'playlist_palette.dart';
 import '../../player/presentation/player_scope.dart';
 
 class TrackTable extends StatefulWidget {
@@ -118,6 +119,7 @@ class _TrackTableState extends State<TrackTable> {
                             semanticLabel:
                                 'Selecionar todas as faixas do filtro',
                             tristate: true,
+                            activeColor: playlistInk(accent),
                             value: controller.allFilteredSelected
                                 ? true
                                 : controller.page.filteredSelectedCount > 0
@@ -174,7 +176,9 @@ class _TrackTableState extends State<TrackTable> {
                                       interactive: true,
                                       thickness: 8,
                                       radius: const Radius.circular(4),
-                                      thumbColor: AppColors.accent,
+                                      thumbColor: accent == null
+                                          ? AppColors.accent
+                                          : playlistInk(accent),
                                       trackColor: AppColors.surface,
                                       padding:
                                           const EdgeInsets.fromLTRB(0, 6, 1, 6),
@@ -261,7 +265,7 @@ class _TrackTableState extends State<TrackTable> {
                           ? Icons.arrow_downward
                           : Icons.arrow_upward,
                       size: 14,
-                      color: AppColors.accentActive),
+                      color: playlistInk(widget.accent)),
               ]))));
 
   Future<void> _click(Track track) async {
@@ -381,9 +385,9 @@ class _TrackTableState extends State<TrackTable> {
         ]));
     if (!_reorderable || track.orderLocked) return row;
     final feedback = Material(
-        color: AppColors.accentSoft,
-        shape: const RoundedRectangleBorder(
-            side: BorderSide(color: AppColors.accentActive)),
+        color: playlistReviewSurface(widget.accent),
+        shape: RoundedRectangleBorder(
+            side: BorderSide(color: playlistInk(widget.accent))),
         child: SizedBox(
             width: math.min(width, 420),
             height: math.min(rowHeight, 80),
@@ -397,8 +401,8 @@ class _TrackTableState extends State<TrackTable> {
                             : track.displayTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: AppColors.accentActive,
+                        style: TextStyle(
+                            color: playlistInk(widget.accent),
                             fontWeight: FontWeight.w600))))));
     void start() {
       setState(() => _drag = payload);
@@ -459,10 +463,10 @@ class _TrackTableState extends State<TrackTable> {
           alignment: after ? Alignment.bottomCenter : Alignment.topCenter,
           child: candidates.isEmpty
               ? null
-              : const SizedBox(
+              : SizedBox(
                   height: 3,
                   width: double.infinity,
-                  child: ColoredBox(color: AppColors.accentActive))));
+                  child: ColoredBox(color: playlistInk(widget.accent)))));
 
   Future<void> _reportMove(Future<String?> movement) async {
     final error = await movement;

@@ -139,14 +139,34 @@ class LibraryRepository {
         }
       });
 
+  static const _manualPreparation =
+      '''status='pending' AND match_status='manual'
+          AND manual_url!='' AND
+            (source_kind IN ('youtubeMusic','youtube','soundcloud')
+              OR (source_kind='deezerFull' AND ?=1))''';
+  static const _pendingPreparation =
+      '''status='pending' AND match_status='pending'
+          AND source_kind='none' AND manual_url='' ''';
+  static const _fullPreparation =
+      "status!='completed' AND manual_url='' AND source_kind!='localExample'";
+
   Future<bool> needsSourcePreparation(int id, {bool deezerConnected = false}) =>
       database.run((db) => db.select('''SELECT 1 FROM tracks
-        WHERE collection_id=? AND status='pending' AND redownload_state=''
-        AND ((match_status='pending' AND source_kind='none' AND manual_url='')
-          OR (match_status='manual' AND manual_url!='' AND
-            (source_kind IN ('youtubeMusic','youtube','soundcloud')
-              OR (source_kind='deezerFull' AND ?=1)))) LIMIT 1''',
+        WHERE collection_id=? AND redownload_state=''
+        AND (($_pendingPreparation) OR ($_manualPreparation)) LIMIT 1''',
           [id, deezerConnected ? 1 : 0]).isNotEmpty);
+
+  Future<({int total, int pending})> sourcePreparationCounts(int id,
+          {required bool onlyPending, required bool deezerConnected}) =>
+      database.run((db) {
+        final automatic = onlyPending ? _pendingPreparation : _fullPreparation;
+        final row = db.select('''SELECT COUNT(*) AS total,
+          COUNT(CASE WHEN redownload_state='' AND (($automatic) OR
+            ($_manualPreparation)) THEN 1 END) AS pending
+          FROM tracks WHERE collection_id=?''',
+            [deezerConnected ? 1 : 0, id]).single;
+        return (total: row['total'] as int, pending: row['pending'] as int);
+      });
 
   Future<TrackPage> page(int id,
           {int offset = 0,
@@ -317,6 +337,15 @@ class LibraryRepository {
           .select(
               "SELECT * FROM tracks WHERE collection_id=? AND status='completed' AND position>? ORDER BY position LIMIT 100",
               [id, afterPosition])
+          .map(readTrack)
+          .toList());
+
+  Future<List<Track>> coverCandidates(int collectionId, int offset) =>
+      database.run((db) => db
+          .select(
+              '''SELECT * FROM tracks WHERE status='completed' AND local_path!=''
+              ORDER BY (collection_id=?) DESC, collection_id, position LIMIT 24 OFFSET ?''',
+              [collectionId, offset])
           .map(readTrack)
           .toList());
 

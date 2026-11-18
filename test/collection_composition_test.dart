@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data' show Endian;
 import 'package:media_kit/media_kit.dart' as mk;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -385,6 +386,41 @@ void main() {
       expect(copies.first.artist, isNotEmpty);
       expect((await readAudioTags(copies.first.localPath)).cover, isNotNull);
     }
+    final folder = await Directory('${temp.path}/Áudios mistos').create();
+    await input.copy('${folder.path}/01 - MP3.mp3');
+    final wav = ByteData(44 + 16000)
+      ..setUint32(0, 0x52494646)
+      ..setUint32(4, 16036, Endian.little)
+      ..setUint32(8, 0x57415645)
+      ..setUint32(12, 0x666D7420)
+      ..setUint32(16, 16, Endian.little)
+      ..setUint16(20, 1, Endian.little)
+      ..setUint16(22, 1, Endian.little)
+      ..setUint32(24, 8000, Endian.little)
+      ..setUint32(28, 16000, Endian.little)
+      ..setUint16(32, 2, Endian.little)
+      ..setUint16(34, 16, Endian.little)
+      ..setUint32(36, 0x64617461)
+      ..setUint32(40, 16000, Endian.little);
+    final nested = await Directory('${folder.path}/Subpasta').create();
+    await File('${nested.path}/02 - Piano.wav')
+        .writeAsBytes(wav.buffer.asUint8List());
+    await File('${folder.path}/Notas.txt').writeAsString('material de ensaio');
+    final mixed = await LocalMediaImporter(privateRepo).importFolder(
+        folder.path, directory.path,
+        cancellation: DownloadCancellation());
+    final imported = (await privateRepo.collectionById(mixed.id))!;
+    expect(imported.name, 'Áudios mistos');
+    expect(imported.isPartial, isFalse);
+    final tracks = (await privateRepo.page(mixed.id)).items;
+    expect(tracks.map((t) => t.localPath.split('.').last), ['mp3', 'wav']);
+    expect(tracks.last.title, 'Piano');
+    expect(tracks.last.durationMs, closeTo(1000, 100));
+    expect(await File(tracks.last.localPath).readAsBytes(),
+        wav.buffer.asUint8List());
+    expect(
+        (await PlayerLibrary(privateRepo.database).collection(mixed.id)).length,
+        2);
     await File('${directory.path}/result.json').writeAsString(jsonEncode({
       'result': result,
       'count': copies.length,

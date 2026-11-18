@@ -393,15 +393,17 @@ void main() {
           LibraryMusicSources(repository, const MusicLinkCatalog(), resolver);
       final before = await sources.prepare(collection, DownloadCancellation(),
           onlyPending: true,
-          onTrack: (_) => fail('Fonte manual não deve fazer busca'),
-          recordsChanged: () async {});
+          onChecked: (_) async => fail('A sessão está desconectada.'));
       expect(before.prepared, 0);
       connection.connected = true;
+      var checked = 0;
       final result = await sources.prepare(collection, DownloadCancellation(),
-          onlyPending: true,
-          onTrack: (_) => fail('Fonte manual não deve fazer busca'),
-          recordsChanged: () async {});
+          onlyPending: true, onChecked: (_) async {
+        checked++;
+      });
       expect(result.prepared, 1);
+      expect(checked, 1);
+      expect(result.review, 0);
       final tracks = (await repository.page(owner)).items;
       expect(tracks.first.canDownload, isTrue);
       expect(tracks.first.manualUrl, 'https://www.deezer.com/track/1');

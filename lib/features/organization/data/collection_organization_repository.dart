@@ -59,12 +59,12 @@ class CollectionOrganizationRepository {
           CollectionGroup(r['id'] as int, r['name'] as String, r['n'] as int))
       .toList());
 
-  Future<int> create(String name, {int? groupId}) async {
+  Future<int> create(String name, {int? groupId, bool partial = false}) async {
     final valid = organizationName(name);
     return database.run((db) {
       db.execute(
-          'INSERT INTO collections(name,storage_name,source,source_url,group_id) VALUES(?,?,?,\'\',?)',
-          [valid, valid, 'Local', groupId]);
+          "INSERT INTO collections(name,storage_name,source,source_url,group_id,partial) VALUES(?,?,?,'',?,?)",
+          [valid, valid, 'Local', groupId, partial ? 1 : 0]);
       return db.lastInsertRowId;
     });
   }

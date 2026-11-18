@@ -70,6 +70,7 @@ class DownloadQueueRun {
           collectionId: collectionId,
           failedOnly: failedOnly);
       onEvent(DownloadRunMembership(run));
+      await recordsChanged();
       while (!token.cancelled) {
         final mutation = pendingMutation?.call();
         if (mutation != null) {

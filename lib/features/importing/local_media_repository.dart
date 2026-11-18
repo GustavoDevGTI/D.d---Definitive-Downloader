@@ -32,9 +32,10 @@ class LocalMediaRepository {
         return (owner: owner, last: last);
       });
 
-  Future<void> commit(int id, int last, List<LocalMediaCopy> copies) =>
+  Future<void> commit(int id, int last, List<LocalMediaCopy> copies,
+          {bool completeImport = false}) =>
       database.run((db) {
-        if (copies.isEmpty || copies.length > 100) {
+        if (copies.isEmpty || copies.length > (completeImport ? 10000 : 100)) {
           throw const FormatException('Lote local inválido.');
         }
         db.execute('BEGIN IMMEDIATE');
@@ -75,8 +76,9 @@ class LocalMediaRepository {
                   m.durationMs
                 ]);
           }
-          db.execute(
-              'UPDATE collections SET editing_locked=1 WHERE id=?', [id]);
+          db.execute('''UPDATE collections SET editing_locked=1,
+              partial=CASE WHEN ?=1 THEN 0 ELSE partial END WHERE id=?''',
+              [completeImport ? 1 : 0, id]);
           db.execute('COMMIT');
         } catch (_) {
           db.execute('ROLLBACK');

@@ -36,6 +36,7 @@ import '../../importing/music_link.dart';
 import '../domain/models.dart';
 import '../domain/track_listing.dart';
 import '../domain/matching.dart';
+import '../domain/preparation_progress.dart';
 import '../../organization/data/collection_organization_repository.dart';
 import '../../organization/domain/collection_organization.dart';
 import '../../importing/local_media_importer.dart';
@@ -152,7 +153,8 @@ class LibraryController extends ChangeNotifier {
   Future<Collection?> collectionChoice(int id) => repository.collectionById(id);
 
   Future<bool> addLinks(int collectionId, String input,
-      {ChooseDuplicate? chooseDuplicate,
+      {bool enqueue = false,
+      ChooseDuplicate? chooseDuplicate,
       Future<void> Function(List<Track>)? beforeRemoval}) async {
     if (!await _authorize(input, importingPlaylists: true)) return false;
     return _addition((token) async {
@@ -173,6 +175,7 @@ class LibraryController extends ChangeNotifier {
           cancellation: token,
           holdQueue: () => _holdQueueForReview = true,
           run: () => _cancellation?.cancelled == true ? null : _activeRun,
+          enqueue: enqueue,
           progress: _additionProgress,
           beforeRemoval: beforeRemoval);
     });
@@ -183,6 +186,62 @@ class LibraryController extends ChangeNotifier {
               inspector: localInspector, files: files)
           .add(collectionId, paths, outputDirectory,
               cancellation: token, onProgress: _additionProgress));
+
+  Future<void> addDroppedMp3(int collectionId, List<String> paths) async {
+    for (final path in paths) {
+      if (await files.isDirectory(path)) return;
+    }
+    await addLocalFiles(collectionId, paths);
+  }
+
+  Future<Collection?> importLocalFolders(List<String> paths,
+      {int? groupId}) async {
+    if (importBlocked || _disposed) return null;
+    final folders = <String>{};
+    for (final path in paths) {
+      if (p.isAbsolute(path) && await files.isDirectory(path)) {
+        folders.add(p.normalize(path));
+      }
+    }
+    if (folders.isEmpty || importBlocked || _disposed) return null;
+    importing = true;
+    final token = _importCancellation = DownloadCancellation();
+    final importer =
+        LocalMediaImporter(repository, inspector: localInspector, files: files);
+    final created = <int>[];
+    try {
+      for (final folder in folders) {
+        token.check();
+        final name = p.basename(folder);
+        message = '$name · Lendo pasta…';
+        notifyListeners();
+        final result = await importer.importFolder(folder, outputDirectory,
+            groupId: groupId, cancellation: token, onProgress: (progress) {
+          if (token.cancelled) return;
+          message = '$name · $progress';
+          notifyListeners();
+        });
+        created.add(result.id);
+        message = result.message;
+      }
+      if (created.length > 1) message = '${created.length} playlists criadas.';
+      return created.length == 1
+          ? await repository.collectionById(created.single)
+          : null;
+    } on DownloadCancelled {
+      message = 'Importação de pasta cancelada.';
+      return null;
+    } catch (error) {
+      message = operationMessage(error);
+      return null;
+    } finally {
+      importing = false;
+      _importCancellation = null;
+      if (!_disposed) await refresh();
+      notifyListeners();
+    }
+  }
+
   Future<void> chooseLocalFiles() async {
     final id = current?.id;
     if (id == null || reorderingBusy) return;
@@ -350,7 +409,7 @@ class LibraryController extends ChangeNotifier {
   bool importing = false;
   bool searching = false;
   bool downloading = false;
-  bool preparing = false;
+  bool get preparing => _preparation != null;
   double? progress;
   TransferProgress? transfer;
   String activeTitle = '';
@@ -369,14 +428,14 @@ class LibraryController extends ChangeNotifier {
 
   int _searchGeneration = 0;
   int _refreshGeneration = 0;
-  bool get busy =>
+  bool get importBlocked =>
       importing ||
       downloading ||
-      preparing ||
       addingLinks ||
       editing ||
       _startingRun ||
       _checkingDownloads;
+  bool get busy => importBlocked || preparing;
   bool get reorderingBusy =>
       importing ||
       preparing ||
@@ -389,7 +448,7 @@ class LibraryController extends ChangeNotifier {
       page.total > 0 && page.filteredSelectedCount == page.total;
 
   void clearMessage() {
-    if (message.isEmpty || busy) return;
+    if (message.isEmpty || importBlocked) return;
     message = '';
     notifyListeners();
   }
@@ -462,14 +521,15 @@ class LibraryController extends ChangeNotifier {
     trackDescending = false;
     message = '';
     await refresh();
-    if (!busy &&
+    if (!importBlocked &&
         collection.source != SpotifyPlaylistExport.source &&
         music?.available == true &&
         !isExample &&
         await repository.needsSourcePreparation(collection.id,
             deezerConnected: music!.connection.connected) &&
-        current?.id == collection.id) {
-      unawaited(prepareMusic(onlyPending: true));
+        current?.id == collection.id &&
+        !importBlocked) {
+      unawaited(_queuePreparation(collection, onlyPending: true));
     }
   }
 
@@ -590,63 +650,146 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
+  final _preparationQueue =
+      <int, ({Collection collection, bool onlyPending, String importNotice})>{};
   Future<void>? _preparation;
+  DownloadCancellation? _preparationCancellation;
+  Collection? _preparingCollection;
+  Collection? get preparingCollection => _preparingCollection;
+  PreparationProgress? _preparationProgress;
+  PreparationProgress? get preparationProgress => _preparationProgress;
+  PreparationProgress? preparationProgressFor(int id) =>
+      _preparingCollection?.id == id ? _preparationProgress : null;
+  bool get preparingCurrent =>
+      _preparingCollection != null && _preparingCollection!.id == current?.id;
+  String _preparationStatus = '';
+  String get preparationStatus => _preparationStatus;
+  bool get preparationPaused => _preparationCancellation?.pauseMode == true;
+  bool get preparationStopping => _preparationCancellation?.cancelled == true;
+  int get waitingPreparations => _preparationQueue.length;
+  String? preparationLabelFor(int id) => _preparingCollection?.id == id
+      ? (preparationPaused ? 'Conferência pausada' : 'Em conferência')
+      : _preparationQueue.containsKey(id)
+          ? 'Na fila de conferência'
+          : null;
   Future<void> get preparationDone => _preparation ?? Future<void>.value();
 
   Future<void> prepareMusic(
-      {bool onlyPending = false, String importNotice = ''}) {
-    if (busy || current == null || music?.available != true || isExample) {
-      return preparationDone;
-    }
-    return _preparation =
-        _prepareMusic(onlyPending: onlyPending, importNotice: importNotice);
+      {bool onlyPending = true, String importNotice = ''}) {
+    final collection = current;
+    if (busy || collection == null) return preparationDone;
+    return _queuePreparation(collection,
+        onlyPending: onlyPending, importNotice: importNotice);
   }
 
-  Future<void> _prepareMusic(
+  Future<void> _queuePreparation(Collection collection,
+      {required bool onlyPending, String importNotice = ''}) {
+    if (_disposed ||
+        music?.available != true ||
+        collection.source == 'Exemplo local' ||
+        _preparingCollection?.id == collection.id ||
+        _preparationQueue.containsKey(collection.id)) {
+      return preparationDone;
+    }
+    _preparationQueue[collection.id] = (
+      collection: collection,
+      onlyPending: onlyPending,
+      importNotice: importNotice,
+    );
+    _preparation ??= Future<void>.microtask(_runPreparations);
+    notifyListeners();
+    return preparationDone;
+  }
+
+  Future<void> _runPreparations() async {
+    try {
+      while (!_disposed && _preparationQueue.isNotEmpty) {
+        final job = _preparationQueue.remove(_preparationQueue.keys.first)!;
+        await _prepareMusic(job.collection,
+            onlyPending: job.onlyPending, importNotice: job.importNotice);
+      }
+    } finally {
+      _preparation = null;
+      _preparationStatus = '';
+      notifyListeners();
+    }
+  }
+
+  Future<void> _prepareMusic(Collection collection,
       {required bool onlyPending, required String importNotice}) async {
-    final collection = current;
-    if (collection == null || busy || music?.available != true || isExample) {
-      return;
-    }
-    if (accounts != null &&
-        !(onlyPending && collection.source == ManagedSpotifyPlaylists.source) &&
-        !accounts!.connected(MusicAccount.deezer) &&
-        await repository.needsSourcePreparation(collection.id) &&
-        ((onlyPending && accounts!.deezerDeferred) ||
-            !await _authorizePrimary())) {
-      return;
-    }
-    if (current?.id != collection.id || busy) return;
-    preparing = true;
-    message = 'Conferindo correspondências…';
-    final token = DownloadCancellation();
-    _cancellation = token;
+    final token = _preparationCancellation = DownloadCancellation();
+    _preparingCollection = collection;
+    _preparationStatus = '${collection.name} · Conferindo correspondências…';
+    var resultMessage = '';
     notifyListeners();
     try {
+      if (accounts != null &&
+          !(onlyPending &&
+              collection.source == ManagedSpotifyPlaylists.source) &&
+          !accounts!.connected(MusicAccount.deezer) &&
+          await repository.needsSourcePreparation(collection.id) &&
+          ((onlyPending && accounts!.deezerDeferred) ||
+              !await _authorizePrimary())) {
+        return;
+      }
+      token.check();
+      final counts = await repository.sourcePreparationCounts(collection.id,
+          onlyPending: onlyPending,
+          deezerConnected: music!.connection.connected);
+      token.check();
+      _preparationProgress = PreparationProgress(
+          total: counts.total,
+          checked: counts.total - counts.pending,
+          measured: 0,
+          elapsed: Duration.zero);
+      notifyListeners();
       final result = await _sources.prepare(collection, token,
-          onlyPending: onlyPending, recordsChanged: refresh, onTrack: (track) {
-        activeTitle = track.displayTitle;
-        message =
-            'Procurando faixas de áudio: ${track.position}/${collection.trackCount}';
+          onlyPending: onlyPending, onChecked: (elapsed) async {
+        final previous = _preparationProgress!;
+        _preparationProgress = PreparationProgress(
+            total: previous.total,
+            checked: (previous.checked + 1).clamp(0, previous.total),
+            measured: previous.measured + 1,
+            elapsed: previous.elapsed + elapsed);
         notifyListeners();
+        if (!_disposed && current?.id == collection.id) await refresh();
       });
-      message =
-          '${result.prepared} faixa(s) preparada(s). ${result.review} para revisão; videoclipes exigem aprovação.';
+      resultMessage =
+          '${collection.name} · ${result.prepared} faixa(s) preparada(s). ${result.review} para revisão.';
       if (collection.isPartial) {
-        message += '\nLeitura parcial: confira o total de faixas importadas.';
+        resultMessage +=
+            '\nLeitura parcial: confira o total de faixas importadas.';
       }
     } on DownloadCancelled {
-      message =
-          'Busca interrompida. As correspondências já conferidas foram mantidas.';
+      resultMessage =
+          '${collection.name} · Busca interrompida. As correspondências já conferidas foram mantidas.';
     } catch (error) {
-      message = operationMessage(error);
+      resultMessage = operationMessage(error);
     } finally {
-      if (importNotice.isNotEmpty) message += '\n$importNotice';
-      preparing = false;
-      activeTitle = '';
-      _cancellation = null;
-      await refresh();
-      if (focused != null) await _loadMusicCandidates(focused!);
+      try {
+        if (!_disposed) {
+          if (!importing &&
+              _preparationQueue.isEmpty &&
+              resultMessage.isNotEmpty &&
+              message.isEmpty) {
+            message = [resultMessage, if (importNotice.isNotEmpty) importNotice]
+                .join('\n');
+          }
+          await refresh();
+          final track = focused;
+          if (track?.collectionId == collection.id) {
+            await _loadMusicCandidates(track!);
+          }
+        }
+      } catch (error) {
+        if (!importing && message.isEmpty) {
+          message = operationMessage(error);
+        }
+      } finally {
+        _preparingCollection = null;
+        _preparationCancellation = null;
+        _preparationProgress = null;
+      }
     }
   }
 
@@ -697,9 +840,10 @@ class LibraryController extends ChangeNotifier {
           music));
   Future<void> importPlaylist(String url,
       {VoidCallback? onPublicSpotifyRequired}) async {
-    if (busy || !await _authorize(url, importingPlaylists: true)) return;
-    final before = current?.id;
-    await _import(
+    if (importBlocked || !await _authorize(url, importingPlaylists: true)) {
+      return;
+    }
+    final imported = await _import(
         () => _playlists(importingLinks: true).read(url,
             cancelled: () =>
                 _disposed || _importCancellation?.cancelled == true,
@@ -709,28 +853,29 @@ class LibraryController extends ChangeNotifier {
             }),
         onPublicSpotifyRequired: onPublicSpotifyRequired);
     if (!_disposed &&
-        current != null &&
-        current!.id != before &&
-        (current!.source == 'Spotify · Trackhop' ||
-            current!.source == ManagedSpotifyPlaylists.source)) {
+        imported != null &&
+        current?.id == imported.id &&
+        (imported.source == 'Spotify · Trackhop' ||
+            imported.source == ManagedSpotifyPlaylists.source)) {
       _openImportedPlaylist();
     }
   }
 
   Future<bool> importSpotifyExport(String path) async {
-    if (busy || _disposed) return false;
+    if (importBlocked || _disposed) return false;
     if (p.extension(path).toLowerCase() != '.csv') {
       message = 'Escolha um arquivo CSV de playlist.';
       notifyListeners();
       return false;
     }
-    if (!await _authorizePrimary() || _disposed || busy) return false;
-    final before = current?.id;
-    await _import(() async => csv.open(path, spotifyExport: true),
-        prepareAfterImport: false, announceSuccess: false);
-    if (_disposed || current == null || current!.id == before) return false;
-    _openImportedPlaylist();
-    if (music?.available == true) unawaited(prepareMusic(onlyPending: true));
+    if (!await _authorizePrimary() || _disposed || importBlocked) return false;
+    final imported = await _import(
+        () async => csv.open(path, spotifyExport: true),
+        prepareAfterImport: false,
+        announceSuccess: false);
+    if (_disposed || imported == null) return false;
+    if (current?.id == imported.id) _openImportedPlaylist();
+    unawaited(_queuePreparation(imported, onlyPending: true));
     return true;
   }
 
@@ -747,7 +892,7 @@ class LibraryController extends ChangeNotifier {
     if (url.length > 4096 || url.isEmpty) {
       throw const FormatException('Cole um link de playlist válido.');
     }
-    if (busy || _disposed) {
+    if (importBlocked || _disposed) {
       throw const FormatException('Aguarde a operação em andamento.');
     }
     if (PublicPlaylistLink.recognize(url) == null &&
@@ -770,13 +915,17 @@ class LibraryController extends ChangeNotifier {
 
   Future<int> createPlaylist(String name,
       {int? groupId, String link = ''}) async {
-    if (busy) throw const FormatException('Aguarde a operação em andamento.');
+    if (importBlocked) {
+      throw const FormatException('Aguarde a operação em andamento.');
+    }
     final valid = organizationName(name);
     if (link.trim().isNotEmpty &&
         !await _authorize(link, importingPlaylists: true)) {
       throw const FormatException('Conexão cancelada. Playlist não criada.');
     }
-    if (busy) throw const FormatException('Aguarde a operação em andamento.');
+    if (importBlocked) {
+      throw const FormatException('Aguarde a operação em andamento.');
+    }
     importing = true;
     final token = _importCancellation = DownloadCancellation();
     notifyListeners();
@@ -793,7 +942,8 @@ class LibraryController extends ChangeNotifier {
       token.check();
       created = await organization.create(valid, groupId: groupId);
       if (entries.isNotEmpty) {
-        await MusicLinkRepository(repository.database).append(created, entries);
+        await MusicLinkRepository(repository.database)
+            .append(created, entries, enqueue: false);
       }
       token.check();
       await refresh();
@@ -814,7 +964,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> importPlaylistFile(
       Future<SpotifyPlaylistExport?> Function(List<SpotifyPlaylistExport>)
           choosePlaylist) async {
-    if (busy || _choosingPlaylistFile) return;
+    if (importBlocked || _choosingPlaylistFile) return;
     _choosingPlaylistFile = true;
     String? path;
     try {
@@ -847,15 +997,16 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
-  Future<void> _import(Future<ImportedCollection?> Function() source,
+  Future<Collection?> _import(Future<ImportedCollection?> Function() source,
       {bool prepareAfterImport = true,
       bool announceSuccess = true,
       VoidCallback? onPublicSpotifyRequired}) async {
-    if (busy) return;
+    if (importBlocked || _disposed) return null;
     _searchGeneration++;
     importing = true;
     final token = _importCancellation = DownloadCancellation();
     message = 'Lendo a coleção…';
+    Collection? saved;
     var autoPrepare = false;
     var importNotice = '';
     notifyListeners();
@@ -864,7 +1015,7 @@ class LibraryController extends ChangeNotifier {
       token.check();
       if (imported == null || _disposed) {
         message = '';
-        return;
+        return null;
       }
       final id = await repository.importCollection(ImportedCollection(
           name: imported.name,
@@ -876,7 +1027,8 @@ class LibraryController extends ChangeNotifier {
             return track;
           })));
       collections = await repository.collections();
-      current = collections.firstWhere((c) => c.id == id);
+      saved = collections.firstWhere((c) => c.id == id);
+      current = saved;
       collectionOffset = 0;
       collectionQuery = '';
       focused = null;
@@ -885,7 +1037,11 @@ class LibraryController extends ChangeNotifier {
       view = 'collections';
       trackSort = TrackSort.position;
       trackDescending = false;
-      message = !announceSuccess
+      autoPrepare = prepareAfterImport &&
+          imported.source != SpotifyPlaylistExport.source &&
+          imported.source != 'Exemplo local' &&
+          music?.available == true;
+      message = !announceSuccess || autoPrepare
           ? ''
           : imported.isPartial
               ? 'Leitura parcial. Confira o total ou importe um CSV completo.'
@@ -898,8 +1054,7 @@ class LibraryController extends ChangeNotifier {
         message = '$message\n$importNotice'.trim();
       }
       await refresh();
-      autoPrepare =
-          prepareAfterImport && imported.source != SpotifyPlaylistExport.source;
+      return saved;
     } on DownloadCancelled {
       message = 'Importação cancelada.';
     } on PublicSpotifyPlaylistRequired catch (error) {
@@ -910,11 +1065,13 @@ class LibraryController extends ChangeNotifier {
     } finally {
       importing = false;
       _importCancellation = null;
-      if (autoPrepare && !isExample && music?.available == true) {
-        unawaited(prepareMusic(onlyPending: true, importNotice: importNotice));
+      if (autoPrepare && saved != null) {
+        unawaited(_queuePreparation(saved,
+            onlyPending: true, importNotice: importNotice));
       }
       notifyListeners();
     }
+    return null;
   }
 
   Future<void> search(String query) async {
@@ -1135,9 +1292,39 @@ class LibraryController extends ChangeNotifier {
   }
 
   void cancel() {
-    _importCancellation?.cancelled = true;
+    if (importing) {
+      cancelImport();
+      return;
+    }
+    if (!downloading && preparing) {
+      cancelPreparation();
+      return;
+    }
     _cancellation?.cancelled = true;
     message = 'Interrompendo após liberar a operação atual…';
+    notifyListeners();
+  }
+
+  void cancelImport() {
+    final token = _importCancellation;
+    if (token == null) return;
+    token.cancelled = true;
+    message = 'Interrompendo a importação…';
+    notifyListeners();
+  }
+
+  void cancelPreparation() {
+    final token = _preparationCancellation;
+    if (token == null) return;
+    token.cancelled = true;
+    _preparationStatus = 'Interrompendo a conferência atual…';
+    notifyListeners();
+  }
+
+  void togglePreparationPause() {
+    final token = _preparationCancellation;
+    if (token == null || token.cancelled) return;
+    token.pauseMode = !token.pauseMode;
     notifyListeners();
   }
 
@@ -1153,6 +1340,8 @@ class LibraryController extends ChangeNotifier {
     _refreshGeneration++;
     _searchGeneration++;
     _cancellation?.cancelled = true;
+    _preparationCancellation?.cancelled = true;
+    _preparationQueue.clear();
     _trackListing.clear();
     _importCancellation?.cancelled = true;
     _transferUpdates.dispose();

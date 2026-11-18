@@ -36,6 +36,27 @@ void main() {
               sourceKind: SourceKind.directMp3,
               mediaUrl: 'https://example.org/a.mp3')))));
 
+  test('somente a faixa enviada da playlist aparece em Downloads', () async {
+    final id = await import(3);
+    final tracks = (await repo.page(id)).items;
+    final queue = WorkspaceRepository(repo.database);
+    final listing = ContinuousDownloadRepository(repo.database);
+    await repo.select(tracks[1].id, true);
+    expect((await listing.read(ContentCategory.music, since: -1)).ids, isEmpty);
+    await queue.beginRun(run: 'uma-faixa', collectionId: id);
+    expect((await listing.read(ContentCategory.music, since: -1)).ids,
+        [tracks[1].id]);
+    expect((await queue.summary()).records, 1);
+    expect((await queue.claimNext(run: 'uma-faixa', snapshot: true))?.id,
+        tracks[1].id);
+    expect(await queue.claimNext(run: 'uma-faixa', snapshot: true), isNull);
+    await queue.finishRun('uma-faixa');
+    await repo.database.initialize();
+    expect((await listing.read(ContentCategory.music, since: -1)).ids,
+        [tracks[1].id]);
+    expect((await repo.page(id)).total, 3);
+  });
+
   test(
       '10 mil ocorrências ficam prontas numa lista, deltas não relêem as demais',
       () async {
@@ -72,14 +93,16 @@ void main() {
     final id = await import(235);
     final data = ContinuousDownloadRepository(repo.database);
     final listing = ContinuousDownloadListing(data);
-    final all = (await listing.load(ContentCategory.music))!;
-    expect(all.items.length, 235);
-    final last = all.items.last.track;
-    final selectedIds = all.items.map((e) => e.track.id).toList();
+    final selectedIds =
+        (await ContinuousTrackRepository(repo.database).read(id, since: -1))
+            .ids;
     expect(await RedownloadRepository(repo.database).hasWork(ids: selectedIds),
         isTrue);
     await WorkspaceRepository(repo.database)
         .beginRun(run: 'large-selection', ids: selectedIds);
+    final all = (await listing.load(ContentCategory.music))!;
+    expect(all.items.length, 235);
+    final last = all.items.last.track;
     final members = await repo.database.run((db) => db
         .select('SELECT COUNT(*) AS n FROM download_run_additions')
         .single['n']);
@@ -133,6 +156,10 @@ void main() {
     expect(second.themeColor, isNot(first.themeColor));
     expect((await repo.page(firstId)).items.map((t) => t.id), before);
     expect((await repo.page(firstId)).items.first.selected, isTrue);
+    await WorkspaceRepository(repo.database).beginRun(run: 'cores', ids: [
+      ...before,
+      ...(await repo.page(secondId)).items.map((t) => t.id)
+    ]);
 
     final organization = CollectionOrganizationRepository(repo.database);
     final thirdId = await organization.create('Nova');

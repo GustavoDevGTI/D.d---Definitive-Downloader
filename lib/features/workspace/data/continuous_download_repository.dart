@@ -54,8 +54,7 @@ class ContinuousDownloadRepository {
                       listing.args)
                   .map((r) => r['id'] as int)
                   .toList();
-          const eligible =
-              "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)";
+          const eligible = DownloadListingQuery.membership;
           final colors = category == ContentCategory.media
               ? <DownloadPlaylistColor>[]
               : db

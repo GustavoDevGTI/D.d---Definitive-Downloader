@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:media_kit/media_kit.dart' as mk;
+import 'package:path/path.dart' as p;
 import '../player/data/audio_tags.dart';
 import '../player/domain/playback.dart';
 import '../player/data/android_audio_engine.dart';
@@ -20,12 +21,28 @@ abstract interface class LocalAudioInspector {
   Future<LocalAudioMetadata> inspect(String path);
 }
 
-/// Structural MP3 validation and a silent decoder probe, independent of downloads.
+const localAudioExtensions = {
+  '.mp3',
+  '.wav',
+  '.flac',
+  '.m4a',
+  '.aac',
+  '.ogg',
+  '.opus'
+};
+
+/// A silent decoder probe, with structural validation for MP3.
 class MediaKitLocalAudioInspector implements LocalAudioInspector {
   const MediaKitLocalAudioInspector();
   @override
   Future<LocalAudioMetadata> inspect(String path) async {
-    await validateMp3Frames(path, maximumBytes: 500 * 1024 * 1024);
+    final extension = p.extension(path).toLowerCase();
+    if (!localAudioExtensions.contains(extension)) {
+      throw const FormatException('Formato de áudio indisponível.');
+    }
+    if (extension == '.mp3') {
+      await validateMp3Frames(path, maximumBytes: 500 * 1024 * 1024);
+    }
     final tags = await _tags(path);
     if (Platform.isAndroid) {
       final metadata = await AndroidAudioEngine.channel
@@ -63,12 +80,26 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       final value = player.state.duration > Duration.zero
           ? player.state.duration
           : await duration.future.timeout(const Duration(seconds: 12));
+      final tracks = player.state.tracks;
+      final audio = tracks.audio.any((t) => switch (extension) {
+            '.mp3' => t.codec == 'mp3' || t.codec == 'mp3float',
+            '.wav' => t.codec?.startsWith('pcm_') == true ||
+                t.codec?.startsWith('adpcm_') == true,
+            '.flac' => t.codec == 'flac',
+            '.m4a' => t.codec == 'aac' || t.codec == 'alac',
+            '.aac' => t.codec == 'aac',
+            '.ogg' => const {'vorbis', 'opus', 'flac'}.contains(t.codec),
+            '.opus' => t.codec == 'opus',
+            _ => false,
+          });
+      final video = tracks.video
+          .any((t) => t.codec != null && t.image != true && t.albumart != true);
       if (value.inMilliseconds < 1 ||
           value > const Duration(hours: 24) ||
-          !player.state.tracks.audio
-              .any((t) => t.codec == 'mp3' || t.codec == 'mp3float')) {
-        throw const FormatException(
-            'O arquivo não contém áudio MP3 utilizável.');
+          !audio ||
+          video) {
+        throw FormatException(
+            'O arquivo não contém áudio $extension utilizável.');
       }
       return LocalAudioMetadata(
           durationMs: value.inMilliseconds,
@@ -77,7 +108,7 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
           album: tags.album);
     } on TimeoutException {
       throw const FormatException(
-          'Não foi possível conferir o MP3 no tempo limite.');
+          'Não foi possível conferir o áudio no tempo limite.');
     } finally {
       for (final sub in subscriptions) {
         await sub.cancel();

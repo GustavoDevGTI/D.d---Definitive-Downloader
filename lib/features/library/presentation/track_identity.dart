@@ -34,7 +34,7 @@ class TrackIdentity extends StatelessWidget {
                   textAlign: beside ? TextAlign.start : TextAlign.center,
                   style: const TextStyle(color: AppColors.muted)),
               const SizedBox(height: 8),
-              TrackDownloadBadge(track: track),
+              TrackDownloadBadge(track: track, accent: accent),
             ]);
         return beside
             ? Row(children: [

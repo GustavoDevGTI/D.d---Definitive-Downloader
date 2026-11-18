@@ -122,9 +122,6 @@ void main() {
     await tester.tap(find.byTooltip('Abrir referência'));
     await tester.pumpAndSettle();
     expect(files.opened.single.toString(), 'https://www.deezer.com/track/123');
-    final accept = tester.widget<IconButton>(find.byWidgetPredicate((widget) =>
-        widget is IconButton && widget.tooltip == 'Usar esta versão'));
-    expect(accept.onPressed,
-        isNull); // No review controller: listening alone is insufficient.
+    expect(find.byTooltip('Usar esta versão'), findsNothing);
   });
 }

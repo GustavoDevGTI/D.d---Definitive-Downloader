@@ -4,6 +4,10 @@ import '../domain/workspace_models.dart';
 import '../domain/download_columns.dart';
 
 class DownloadListingQuery {
+  static const membership = "t.queue_hidden=0 AND (t.queue_added=1 "
+      "OR t.queue_run!='' OR t.status IN ('downloading','completed','failed') "
+      "OR t.redownload_state!='')";
+
   DownloadListingQuery(Database db,
       {required DownloadFilter filter,
       required String query,
@@ -22,8 +26,7 @@ class DownloadListingQuery {
       _ => '',
     };
     final search = query.trim();
-    where =
-        "t.queue_hidden=0 AND (t.source_kind!='none' OR t.manual_url!='' OR t.queue_added=1)$status"
+    where = "$membership$status"
         " AND (?='' OR instr(lower(t.title),lower(?))>0 OR instr(lower(t.artist),lower(?))>0"
         " OR instr(lower(t.custom_title),lower(?))>0 OR instr(lower(t.resolved_title),lower(?))>0 OR instr(lower(t.local_path),lower(?))>0"
         " OR instr(lower(c.name),lower(?))>0 OR instr(lower(CASE t.source_kind WHEN 'youtubeMusic' THEN 'YouTube Music' WHEN 'deezerFull' THEN 'Deezer' WHEN 'directMp3' THEN 'MP3 vinculado' ELSE t.source_kind END),lower(?))>0)"

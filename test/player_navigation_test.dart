@@ -113,11 +113,12 @@ void main() {
             tester.getRect(find.byKey(ValueKey('track-row-${track.id + 3}')));
         expect(fourth.top, greaterThanOrEqualTo(viewport.top));
         expect(fourth.bottom, lessThanOrEqualTo(viewport.bottom));
-        expect(
-            tester.getCenter(find.byTooltip('Ouvir playlist')).dy,
-            closeTo(
-                tester.getCenter(find.byKey(const ValueKey('track-search'))).dy,
-                4));
+        final play = tester.getRect(find.byTooltip('Ouvir playlist'));
+        final search =
+            tester.getRect(find.byKey(const ValueKey('track-search')));
+        expect(play.overlaps(search), isFalse);
+        expect(play.bottom, lessThan(viewport.top));
+        expect(search.bottom, lessThan(viewport.top));
       }
       await tester.ensureVisible(find.byKey(ValueKey('track-row-${track.id}')));
       await tester.tap(find.byKey(ValueKey('track-row-${track.id}')));

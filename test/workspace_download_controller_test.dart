@@ -17,6 +17,7 @@ import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/workspace/data/workspace_repository.dart';
 import 'package:definitive_downloader/features/workspace/application/workspace_controller.dart';
+import 'package:definitive_downloader/features/workspace/domain/workspace_models.dart';
 
 class HeldDownload extends DownloadService {
   HeldDownload({this.cleanupFails = false})
@@ -117,6 +118,8 @@ void main() {
         reason: 'Sucesso na fila não abre aviso modal.');
     expect((await WorkspaceRepository(repository.database).summary()).completed,
         3);
+    expect(
+        (await WorkspaceRepository(repository.database).summary()).records, 3);
     for (final id in [first[0].id, first[2].id, second[1].id]) {
       final saved = (await repository.trackById(id))!;
       expect(saved.status, TrackStatus.completed);
@@ -136,6 +139,22 @@ void main() {
     expect(list, contains('#EXTM3U'));
     expect(
         list, contains('${first[0].outputTitle} - ${first[0].outputArtist}'));
+  });
+  test('baixar a seleção da playlist salva somente uma faixa', () async {
+    await controller.loadExample();
+    final rows = controller.page.items;
+    final only = rows[1];
+    await repository.selectFromClick(only.collectionId, only.id, extend: false);
+
+    await controller.downloadSelected();
+
+    final queue = await WorkspaceRepository(repository.database)
+        .downloads(ContentCategory.music);
+    final downloaded = queue.items.single.track;
+    expect(downloaded.id, only.id);
+    expect(downloaded.status, TrackStatus.completed);
+    expect(await File(downloaded.localPath).exists(), isTrue);
+    expect((await repository.page(only.collectionId)).total, rows.length);
   });
   test(
       'cancelamento da fila preserva registros e deixa item pronto para nova tentativa',
@@ -195,6 +214,10 @@ void main() {
                 artist: 'Pessoa',
                 sourceKind: SourceKind.localExample,
                 mediaUrl: 'asset:assets/demo/tone.mp3')))));
+    final tracks = (await repository.page(id, limit: 45)).items;
+    final queue = WorkspaceRepository(repository.database);
+    await queue.beginRun(run: 'fixture', ids: tracks.map((t) => t.id).toList());
+    await queue.finishRun('fixture');
     final workspace = WorkspaceController(controller);
     try {
       await workspace.refresh();

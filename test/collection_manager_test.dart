@@ -11,6 +11,7 @@ import 'package:definitive_downloader/core/platform/desktop_files.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/importing/csv_importer.dart';
+import 'package:definitive_downloader/features/importing/managed_spotify_playlists.dart';
 import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
@@ -18,6 +19,19 @@ import 'package:definitive_downloader/features/library/domain/models.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/organization/data/collection_organization_repository.dart';
 import 'package:definitive_downloader/features/organization/presentation/collection_manager.dart';
+
+class _CoverFiles extends DesktopFiles {
+  _CoverFiles(this.directory);
+
+  final Directory directory;
+  String? image;
+
+  @override
+  Future<String> dataDirectory() async => directory.path;
+
+  @override
+  Future<String?> chooseCover() async => image;
+}
 
 void main() {
   for (final width in [1360.0, 390.0, 320.0]) {
@@ -43,17 +57,22 @@ void main() {
       }
       late Directory temp;
       late LibraryController library;
+      late _CoverFiles files;
       late CollectionOrganizationRepository repository;
       late int originalId;
       await tester.runAsync(() async {
         temp = await Directory.systemTemp.createTemp('dd-manager-ui-');
+        files = _CoverFiles(temp);
         final db = AppDatabase('${temp.path}/test.db');
         await db.initialize();
         repository = CollectionOrganizationRepository(db);
         originalId = await repository.create('Para ouvir no caminho');
+        await db.run((database) => database.execute(
+            'UPDATE collections SET source=? WHERE id=?',
+            [ManagedSpotifyPlaylists.source, originalId]));
         library = LibraryController(
             repository: LibraryRepository(db),
-            files: DesktopFiles(),
+            files: files,
             spotify: const SpotifyImporter(BoundedHttp()),
             csv: const CsvImporter(),
             catalog: const DeezerCatalog(BoundedHttp()),
@@ -82,6 +101,82 @@ void main() {
               .evaluate()
               .isNotEmpty);
       expect(find.text('Grupos'), findsNothing);
+      expect(find.text('0 faixas · 0 baixadas'), findsOneWidget);
+      expect(find.textContaining('importação por link'), findsNothing);
+      final cover = find.byKey(ValueKey('collection-cover-$originalId'));
+      await tester.tap(cover);
+      await ioUntil(
+          tester,
+          () => find
+              .text('Nenhuma capa de música baixada disponível.')
+              .evaluate()
+              .isNotEmpty);
+      expect(find.text('Escolher imagem'), findsOneWidget);
+      expect(opened, isNull);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      if (width == 390) {
+        late int trackId;
+        late int fixtureId;
+        await tester.runAsync(() async {
+          final audio = await File('assets/demo/tone.mp3')
+              .copy('${temp.path}/fixture.mp3');
+          fixtureId = await library.repository.importCollection(
+              ImportedCollection(
+                  name: 'Faixas baixadas',
+                  source: 'Teste',
+                  sourceUrl: '',
+                  tracks: Stream.value(const TrackDraft(
+                      title: 'Faixa com capa',
+                      artist: 'Artista',
+                      coverUrl: 'asset:assets/demo/cover.png'))));
+          trackId = (await library.repository.page(fixtureId)).items.single.id;
+          await library.repository
+              .setStatus(trackId, TrackStatus.completed, localPath: audio.path);
+          files.image = (await File('assets/demo/cover.png')
+                  .copy('${temp.path}/imagem.png'))
+              .path;
+        });
+        await tester.ensureVisible(cover);
+        await tester.pumpAndSettle();
+        await tester.tap(cover);
+        final trackCover =
+            find.byKey(ValueKey('playlist-cover-track-$trackId'));
+        await ioUntil(tester, () => trackCover.evaluate().isNotEmpty);
+        await tester.tap(trackCover);
+        Future<void> expectSavedCover() async {
+          final path =
+              (await library.repository.collectionById(originalId))!.coverPath;
+          expect(path, isNotEmpty);
+          expect(await File(path).exists(), isTrue);
+        }
+
+        await ioUntil(
+            tester,
+            () => library.collections
+                .any((c) => c.id == originalId && c.coverPath.isNotEmpty));
+        await tester.runAsync(expectSavedCover);
+        await tester.runAsync(() async {
+          await repository.setCover(originalId, '');
+          await library.refresh();
+        });
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(cover);
+        await tester.tap(cover);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.tap(find.text('Escolher imagem'));
+        await ioUntil(
+            tester,
+            () => library.collections
+                .any((c) => c.id == originalId && c.coverPath.isNotEmpty));
+        await tester.runAsync(expectSavedCover);
+        await tester.runAsync(() async {
+          await repository.remove(fixtureId);
+          await library.refresh();
+        });
+        await tester.pumpAndSettle();
+      }
       await tester
           .tap(find.byKey(ValueKey('collection-new-group-$originalId')));
       await tester.pumpAndSettle();
@@ -159,9 +254,11 @@ void main() {
         final owner = (await library.repository.collectionById(originalId))!;
         expect(owner.themeColor, 0x4374A9);
         expect(owner.name, 'Estrada e companhia');
+        expect(owner.source, ManagedSpotifyPlaylists.source);
         expect(owner.outputFolderName, 'Para ouvir no caminho');
         expect(owner.groupId, (await repository.groups()).single.id);
       });
+      expect(find.text('0 faixas · 0 baixadas · Viagens'), findsOneWidget);
       await tester.ensureVisible(find.text('Viagens (1)').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Viagens (1)').last);

@@ -6,6 +6,7 @@ import '../domain/track_listing.dart';
 import '../../player/presentation/player_scope.dart';
 import '../../workspace/presentation/download_action_button.dart';
 import 'add_music_links_dialog.dart';
+import 'playlist_palette.dart';
 
 class CollectionTrackToolbar extends StatelessWidget {
   const CollectionTrackToolbar(
@@ -14,11 +15,13 @@ class CollectionTrackToolbar extends StatelessWidget {
       required this.query,
       required this.onQueryChanged,
       required this.onClear,
-      required this.onDownload});
+      required this.onDownload,
+      this.accent});
   final LibraryController controller;
   final TextEditingController query;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClear, onDownload;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -69,7 +72,7 @@ class CollectionTrackToolbar extends StatelessWidget {
             });
         final sort = PopupMenuButton<TrackSort>(
             tooltip: 'Ordenar faixas',
-            icon: const Icon(Icons.sort, color: AppColors.accentActive),
+            icon: Icon(Icons.sort, color: playlistInk(accent)),
             onSelected: (v) => unawaited(c.sortTracks(v)),
             itemBuilder: (_) => [
                   for (final item in const [
@@ -84,7 +87,20 @@ class CollectionTrackToolbar extends StatelessWidget {
                         child: Text(
                             '${item.$2}${c.trackSort == item.$1 ? c.trackDescending ? ' ↓' : ' ↑' : ''}')),
                 ]);
-        if (box.maxWidth >= 600) {
+        final conference = OutlinedButton.icon(
+            key: const ValueKey('start-playlist-conference'),
+            icon: const Icon(Icons.manage_search_rounded, size: 20),
+            label: const Text('Iniciar conferência'),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: playlistInk(accent),
+                backgroundColor: playlistReviewSurface(accent),
+                side: BorderSide(color: playlistInk(accent).withAlpha(100)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+            onPressed: c.busy || c.isExample || c.music?.available != true
+                ? null
+                : () => unawaited(c.prepareMusic()));
+        if (box.maxWidth >= 760) {
           return Row(children: [
             _commands(context),
             const SizedBox(width: 8),
@@ -92,15 +108,21 @@ class CollectionTrackToolbar extends StatelessWidget {
             const SizedBox(width: 8),
             SizedBox(width: 104, child: filter),
             sort,
+            conference,
           ]);
         }
         return Column(children: [
-          Row(children: [Expanded(child: search), sort]),
+          Row(children: [
+            Expanded(child: search),
+            const SizedBox(width: 8),
+            SizedBox(width: 104, child: filter),
+            sort
+          ]),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _commands(context)),
             const SizedBox(width: 8),
-            SizedBox(width: 104, child: filter)
+            conference,
           ]),
         ]);
       }));
@@ -112,7 +134,7 @@ class CollectionTrackToolbar extends StatelessWidget {
         DownloadActionButton(
             label: 'Ouvir playlist',
             icon: Icons.play_arrow_rounded,
-            color: AppColors.accentActive,
+            color: playlistInk(accent),
             primary: true,
             onPressed: () => unawaited(player.playCollection(c.current!.id))),
       DownloadActionButton(
@@ -134,14 +156,7 @@ class CollectionTrackToolbar extends StatelessWidget {
           color: DownloadActionColors.add,
           onPressed:
               c.reorderingBusy ? null : () => unawaited(c.chooseLocalFiles())),
-      DownloadActionButton(
-          label: 'Rever correspondências',
-          icon: Icons.fact_check_outlined,
-          color: AppColors.accentActive,
-          onPressed: c.busy || c.isExample || c.music?.available != true
-              ? null
-              : () => unawaited(c.prepareMusic())),
-      if (c.preparing || c.downloading)
+      if (c.downloading)
         DownloadActionButton(
             label: 'Interromper',
             icon: Icons.stop,

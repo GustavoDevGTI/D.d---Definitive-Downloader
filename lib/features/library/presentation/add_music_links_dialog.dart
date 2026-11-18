@@ -8,11 +8,13 @@ import 'duplicate_music_dialog.dart';
 import '../../player/presentation/player_scope.dart';
 
 Future<void> showAddMusicLinks(
-        BuildContext context, LibraryController controller) =>
+        BuildContext context, LibraryController controller,
+        {bool enqueue = false}) =>
     showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AddMusicLinksDialog(controller: controller));
+        builder: (_) =>
+            AddMusicLinksDialog(controller: controller, enqueue: enqueue));
 
 class AddMusicLinksDialog extends StatefulWidget {
   const AddMusicLinksDialog(
@@ -20,11 +22,13 @@ class AddMusicLinksDialog extends StatefulWidget {
       required this.controller,
       this.initialText = '',
       this.localFiles = const [],
+      this.enqueue = false,
       this.received = false});
   final LibraryController controller;
   final String initialText;
   final List<String> localFiles;
   final bool received;
+  final bool enqueue;
   @override
   State<AddMusicLinksDialog> createState() => _AddMusicLinksDialogState();
 }
@@ -105,7 +109,7 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
           ? await widget.controller
               .addLocalFiles(_collectionId!, widget.localFiles)
           : await widget.controller.addLinks(_collectionId!, _links.text,
-              chooseDuplicate: (conflict) async {
+              enqueue: widget.enqueue, chooseDuplicate: (conflict) async {
               if (!mounted) return null;
               return chooseDuplicateMusic(context, conflict);
             }, beforeRemoval: player?.discardTracks);

@@ -5,9 +5,13 @@ import '../domain/workspace_models.dart';
 
 class HomeWorkspace extends StatelessWidget {
   const HomeWorkspace(
-      {super.key, required this.controller, required this.onNavigate});
+      {super.key,
+      required this.controller,
+      required this.onNavigate,
+      required this.onImportPlaylist});
   final WorkspaceController controller;
   final void Function(AppSection, int) onNavigate;
+  final VoidCallback onImportPlaylist;
   @override
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: controller,
@@ -15,50 +19,25 @@ class HomeWorkspace extends StatelessWidget {
         final summary = controller.summary;
         return ListView(primary: false, padding: EdgeInsets.zero, children: [
           LayoutBuilder(builder: (context, constraints) {
-            final compact = constraints.maxWidth < 650;
-            final introduction =
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('O que vem\npra coleção?',
-                  style: TextStyle(
-                      fontSize: compact ? 28 : 34,
-                      height: 1.12,
-                      letterSpacing: -1.2,
-                      fontWeight: FontWeight.w800)),
-            ]);
-            final import = FilledButton.icon(
-                onPressed: () => onNavigate(AppSection.music, 0),
-                icon: const Icon(Icons.playlist_add_rounded, size: 21),
-                label: const Text('Importar playlist'));
-            return Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 28),
-                child: compact
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                            introduction,
-                            const SizedBox(height: 18),
-                            import
-                          ])
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                            Expanded(child: introduction),
-                            const SizedBox(width: 24),
-                            import
-                          ]));
-          }),
-          LayoutBuilder(builder: (context, constraints) {
-            final width = constraints.maxWidth < 530
+            final width = constraints.maxWidth < 720
                 ? constraints.maxWidth
-                : (constraints.maxWidth - 14) / 2;
+                : (constraints.maxWidth - 28) / 3;
             return Wrap(spacing: 14, runSpacing: 12, children: [
+              _shortcut(
+                  width,
+                  Icons.playlist_add_rounded,
+                  'Importar playlist',
+                  'Cole o link da playlist.',
+                  AppColors.accentActive,
+                  AppColors.accentSoft,
+                  onImportPlaylist),
               _shortcut(
                   width,
                   Icons.headphones_rounded,
                   'Minhas coleções',
                   'Playlists, faixas e fontes.',
-                  AppColors.accent,
-                  AppColors.accentSoft,
+                  AppColors.music,
+                  AppColors.musicSoft,
                   () => onNavigate(AppSection.music, 0)),
               _shortcut(
                   width,

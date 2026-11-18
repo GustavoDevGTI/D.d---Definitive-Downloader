@@ -2,20 +2,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../library/domain/models.dart';
-import '../../library/application/library_controller.dart';
-import '../../library/presentation/track_review_actions.dart';
 import 'player_scope.dart';
 
 class ListeningActions extends StatelessWidget {
   const ListeningActions(
-      {super.key, required this.track, this.candidate, this.library});
+      {super.key, required this.track, this.candidate, this.accent});
   final Track track;
   final Candidate? candidate;
-  final LibraryController? library;
+  final Color? accent;
   @override
   Widget build(BuildContext context) {
     final player = PlayerScope.of(context);
     if (player == null) return const SizedBox.shrink();
+    final ink = accent ?? AppColors.accentActive;
     final version = candidate;
     final reference = version == null
         ? player.library.referenceFor(track)
@@ -23,23 +22,14 @@ class ListeningActions extends StatelessWidget {
     final listen = version == null
         ? player.canListenTrack(track)
         : player.canListenCandidate(track, version);
-    final canUse = version != null &&
-        library != null &&
-        !library!.busy &&
-        track.status != TrackStatus.completed &&
-        (!track.hasManualSource || track.redownloadReview) &&
-        (library!.music == null
-            ? version.previewUrl.isNotEmpty
-            : library!.music!.canUse(version));
-    Widget action(String label, IconData icon, VoidCallback? onPressed,
-            {bool use = false}) =>
+    Widget action(String label, IconData icon, VoidCallback onPressed) =>
         IconButton(
             tooltip: label,
             onPressed: onPressed,
             style: IconButton.styleFrom(
-                foregroundColor:
-                    use ? AppColors.success : AppColors.accentActive,
-                hoverColor: AppColors.accentSoft,
+                foregroundColor: ink,
+                hoverColor:
+                    accent == null ? AppColors.accentSoft : ink.withAlpha(24),
                 minimumSize: const Size(36, 36),
                 fixedSize: const Size(36, 36),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -55,7 +45,7 @@ class ListeningActions extends StatelessWidget {
           if (listen)
             TextButton.icon(
                 style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accentActive,
+                    foregroundColor: ink,
                     minimumSize: const Size(36, 36),
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     fixedSize: const Size.fromHeight(36),
@@ -74,15 +64,6 @@ class ListeningActions extends StatelessWidget {
             action('Copiar link', Icons.copy_rounded,
                 () => unawaited(player.copyReference(reference))),
           ],
-          if (version != null)
-            action(
-                'Usar esta versão',
-                Icons.check_rounded,
-                canUse
-                    ? () => unawaited(confirmCandidateVersion(context, library!,
-                        choice: version))
-                    : null,
-                use: true),
         ]);
   }
 }

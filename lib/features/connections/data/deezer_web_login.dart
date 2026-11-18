@@ -10,7 +10,9 @@ class DeezerWebLogin {
   CookieManager? _cookies;
   InAppWebViewController? _view;
   bool _reading = false, _closed = false;
-  static final loginUrl = WebUri('https://www.deezer.com/login');
+  static final loginUrl = WebUri('https://account.deezer.com/pt-br/login/');
+  static final resetUrl =
+      WebUri('https://account.deezer.com/pt-br/forgot-password/');
   static final cookieUrl = WebUri('https://www.deezer.com/');
   Future<void> initialize() async {
     if (Platform.isAndroid) {

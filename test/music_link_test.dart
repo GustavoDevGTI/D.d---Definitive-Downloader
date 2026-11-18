@@ -260,6 +260,10 @@ void main() {
     test(
         'busca consulta todas as páginas e limites de colunas sobrevivem ao reinício',
         () async {
+      expect((await queue.downloads(ContentCategory.music)).total, 0);
+      await library.database.run((db) => db.execute(
+          'UPDATE tracks SET queue_added=1 WHERE collection_id=?',
+          [collectionId]));
       expect((await queue.downloads(ContentCategory.music)).items.length, 40);
       final page =
           await queue.downloads(ContentCategory.music, query: 'Faixa 41');

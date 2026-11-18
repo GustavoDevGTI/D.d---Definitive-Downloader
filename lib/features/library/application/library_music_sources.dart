@@ -17,8 +17,7 @@ class LibraryMusicSources {
   Future<({int prepared, int review})> prepare(
       Collection collection, DownloadCancellation token,
       {required bool onlyPending,
-      required void Function(Track) onTrack,
-      required Future<void> Function() recordsChanged}) async {
+      required Future<void> Function(Duration) onChecked}) async {
     final resolver = music!;
     var after = 0;
     var prepared = 0;
@@ -38,9 +37,12 @@ class LibraryMusicSources {
                 track.sourceKind == SourceKind.soundcloud ||
                 (track.sourceKind == SourceKind.deezerFull &&
                     resolver.connection.connected))) {
+          await token.waitForQueue();
+          final clock = Stopwatch()..start();
           await repository.setStatus(track.id, TrackStatus.ready);
           prepared++;
-          await recordsChanged();
+          await onChecked(clock.elapsed);
+          continue;
         }
         if (onlyPending && !track.needsAutomaticMatching) continue;
         if (track.status == TrackStatus.completed ||
@@ -48,7 +50,8 @@ class LibraryMusicSources {
             track.sourceKind == SourceKind.localExample) {
           continue;
         }
-        onTrack(track);
+        await token.waitForQueue();
+        final clock = Stopwatch()..start();
         if (Uri.tryParse(track.sourceUrl)?.host == 'api.soundcloud.com' &&
             track.durationMs == null) {
           await repository.markForReview(track.id);
@@ -56,7 +59,7 @@ class LibraryMusicSources {
               error:
                   'Esta ocorrência não está disponível no SoundCloud. Informe uma versão na conferência.');
           review++;
-          await recordsChanged();
+          await onChecked(clock.elapsed);
           continue;
         }
         try {
@@ -80,7 +83,7 @@ class LibraryMusicSources {
               error: operationMessage(error));
           await repository.markForReview(track.id);
         }
-        await recordsChanged();
+        await onChecked(clock.elapsed);
       }
       after += batch.items.length;
     }

@@ -18,6 +18,7 @@ class CollectionLinkAddition {
       required DownloadCancellation cancellation,
       required void Function() holdQueue,
       required String? Function() run,
+      bool enqueue = true,
       required void Function(String) progress,
       Future<void> Function(List<Track>)? beforeRemoval}) async {
     final existing = await repository.database.run((db) => db
@@ -75,8 +76,8 @@ class CollectionLinkAddition {
     String? warning;
     try {
       cancellation.check();
-      await MusicLinkRepository(repository.database)
-          .append(owner.id, selected, run: run(), replaced: removed);
+      await MusicLinkRepository(repository.database).append(owner.id, selected,
+          run: run(), enqueue: enqueue, replaced: removed);
       committed = true;
     } finally {
       warning =

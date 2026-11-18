@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/network/bounded_http.dart';
@@ -13,7 +14,9 @@ import 'package:definitive_downloader/features/importing/spotify_importer.dart';
 import 'package:definitive_downloader/features/library/application/library_controller.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/domain/models.dart';
+import 'package:definitive_downloader/features/library/domain/preparation_progress.dart';
 import 'package:definitive_downloader/features/library/domain/track_listing.dart';
+import 'package:definitive_downloader/features/library/presentation/library_operation_status.dart';
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
@@ -38,11 +41,16 @@ class _ConnectedPlaylistFixture extends TrackhopClient {
       : super(Uri.parse(TrackhopClient.desktopAddress), 'fixture-trackhop-key');
   final List<TrackDraft> tracks;
   final opened = Completer<void>();
+  Completer<void>? paused, release;
 
   @override
   Future<ImportedCollection> playlist(String input,
       {bool Function()? cancelled, void Function(int, int)? onProgress}) async {
-    opened.complete();
+    if (!opened.isCompleted) opened.complete();
+    if (release != null) {
+      paused?.complete();
+      await release!.future;
+    }
     return ImportedCollection(
         name: 'Playlist de teste',
         source: 'Spotify · conta conectada',
@@ -56,12 +64,17 @@ class FixtureMatching extends MusicResolver {
   Completer<void>? gate;
   final started = Completer<void>();
   final calls = <int>[];
+  Completer<void>? secondStarted, secondGate;
   @override
   Future<List<Candidate>> search(Track track, String query,
       {DownloadCancellation? cancellation}) async {
     calls.add(track.id);
     if (!started.isCompleted) started.complete();
     await gate?.future;
+    if (calls.length == 2 && secondGate != null) {
+      secondStarted?.complete();
+      await secondGate!.future;
+    }
     cancellation?.check();
     if (track.title == 'Erro') {
       throw const FormatException('Busca indisponível.');
@@ -129,6 +142,62 @@ void main() {
     await temp.delete(recursive: true);
   });
 
+  test('estimativa usa amostras da busca e descarta faixas já conferidas', () {
+    const progress = PreparationProgress(
+        total: 10, checked: 6, measured: 2, elapsed: Duration(seconds: 30));
+    expect(progress.fraction, .6);
+    expect(progress.remaining, const Duration(minutes: 1));
+    const resuming = PreparationProgress(
+        total: 10, checked: 6, measured: 0, elapsed: Duration.zero);
+    expect(resuming.remaining, isNull);
+  });
+
+  testWidgets('painel da conferência exibe contagem, barra e previsão',
+      (tester) async {
+    final c = controller([
+      const TrackDraft(title: 'Primeira', artist: 'Pessoa', durationMs: 180000),
+      const TrackDraft(title: 'Segunda', artist: 'Pessoa', durationMs: 180000),
+    ]);
+    addTearDown(() {
+      if (resolver.secondGate?.isCompleted == false) {
+        resolver.secondGate!.complete();
+      }
+    });
+    await tester.runAsync(() async {
+      resolver.gate = Completer<void>();
+      resolver.secondGate = Completer<void>();
+      resolver.secondStarted = Completer<void>();
+      await c.importPlaylist(fixturePlaylistUrl);
+      await resolver.started.future.timeout(const Duration(seconds: 10));
+    });
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: LibraryOperationStatus(controller: c))));
+    expect(find.text('0 de 2 faixas conferidas'), findsOneWidget);
+    expect(find.text('Calculando tempo restante…'), findsOneWidget);
+    await tester.runAsync(() async {
+      resolver.gate!.complete();
+      await resolver.secondStarted!.future.timeout(const Duration(seconds: 10));
+    });
+    await tester.pump();
+    expect(find.text('1 de 2 faixas conferidas'), findsOneWidget);
+    expect(find.textContaining('1 min restante'), findsOneWidget);
+    expect(
+        tester
+            .widget<LinearProgressIndicator>(
+                find.byType(LinearProgressIndicator))
+            .value,
+        .5);
+    await tester.tap(find.text('Pausar'));
+    await tester.pump();
+    expect(find.text('Pausada'), findsOneWidget);
+    expect(find.text('Retomar'), findsOneWidget);
+    await tester.runAsync(() async {
+      resolver.secondGate!.complete();
+      await c.preparationDone.timeout(const Duration(seconds: 10));
+    });
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test(
       'cancelar importação preserva a biblioteca anterior e não começa conferência',
       () async {
@@ -143,6 +212,133 @@ void main() {
     expect(c.message, 'Importação cancelada.');
     expect(await repository.collections(), isEmpty);
     expect(resolver.calls, isEmpty);
+  });
+
+  test('retomar após parar consulta somente as faixas ainda não conferidas',
+      () async {
+    resolver.secondStarted = Completer<void>();
+    resolver.secondGate = Completer<void>();
+    final c = controller([
+      for (final title in ['Vazia', 'Pendente', 'Última'])
+        TrackDraft(title: title, artist: 'Pessoa', durationMs: 180000)
+    ]);
+    await c.importPlaylist(fixturePlaylistUrl);
+    await resolver.secondStarted!.future;
+    final rows = (await repository.page(c.current!.id)).items;
+    expect(rows.first.matchStatus, MatchStatus.review);
+    c.cancelPreparation();
+    resolver.secondGate!.complete();
+    await finishMatching(c);
+    expect(resolver.calls, rows.take(2).map((t) => t.id));
+    resolver.gate = Completer<void>();
+    final resumed = c.prepareMusic();
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (c.preparationProgress == null && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(c.preparationProgress?.checked, 1);
+    expect(c.preparationProgress?.total, 3);
+    expect(c.preparationProgress?.remaining, isNull);
+    resolver.gate!.complete();
+    await resumed;
+    expect(resolver.calls, [rows[0].id, rows[1].id, rows[1].id, rows[2].id]);
+    expect(
+        (await repository.trackById(rows.last.id))!.status, TrackStatus.ready);
+  });
+
+  test('pausar termina a faixa atual e espera antes da próxima', () async {
+    resolver.gate = Completer<void>();
+    final c = controller([
+      const TrackDraft(title: 'Primeira', artist: 'Pessoa', durationMs: 180000),
+      const TrackDraft(title: 'Segunda', artist: 'Pessoa', durationMs: 180000),
+    ]);
+    await c.importPlaylist(fixturePlaylistUrl);
+    await resolver.started.future;
+    final rows = (await repository.page(c.current!.id)).items;
+    c.togglePreparationPause();
+    expect(c.preparationPaused, isTrue);
+    resolver.gate!.complete();
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    Track? first;
+    do {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+      first = await repository.trackById(rows.first.id);
+    } while ((first?.status != TrackStatus.ready ||
+            c.preparationProgress?.checked != 1) &&
+        DateTime.now().isBefore(deadline));
+    expect(first?.status, TrackStatus.ready);
+    expect(resolver.calls, [rows.first.id]);
+    expect(c.preparing, isTrue);
+    expect(c.preparationProgress?.checked, 1);
+    expect(c.preparationProgress?.total, 2);
+    expect(c.preparationProgress?.remaining, isNotNull);
+    c.togglePreparationPause();
+    await finishMatching(c);
+    expect(resolver.calls, rows.map((t) => t.id));
+  });
+
+  test('importa a segunda playlist enquanto a primeira está em conferência',
+      () async {
+    resolver.gate = Completer<void>();
+    final c = controller([
+      const TrackDraft(title: 'Faixa', artist: 'Pessoa', durationMs: 180000)
+    ]);
+    await c.importPlaylist(fixturePlaylistUrl);
+    await resolver.started.future;
+    final first = c.current!;
+    final firstTrack = (await repository.page(first.id)).items.single.id;
+
+    await c.importPlaylist(
+        'https://open.spotify.com/playlist/1123456789012345678901');
+
+    expect(c.preparing, isTrue);
+    expect(c.importing, isFalse);
+    expect(await repository.collections(), hasLength(2));
+    final second = c.current!;
+    expect(second.id, isNot(first.id));
+    expect(c.preparationLabelFor(first.id), 'Em conferência');
+    expect(c.preparationLabelFor(second.id), 'Na fila de conferência');
+    expect(c.waitingPreparations, 1);
+    expect(resolver.calls, [firstTrack]);
+    await c.openCollection(first);
+    await c.openCollection(second);
+    resolver.gate!.complete();
+    await finishMatching(c);
+    final secondTrack = (await repository.page(second.id)).items.single;
+    expect(resolver.calls, [firstTrack, secondTrack.id]);
+    expect(c.current?.id, second.id);
+    expect(c.preparationLabelFor(second.id), isNull);
+    expect(secondTrack.status, TrackStatus.ready);
+    expect((await repository.trackById(firstTrack))?.status, TrackStatus.ready);
+  });
+
+  test('cancelar a segunda importação mantém a primeira conferência ativa',
+      () async {
+    resolver.gate = Completer<void>();
+    final c = controller([
+      const TrackDraft(title: 'Faixa', artist: 'Pessoa', durationMs: 180000)
+    ]);
+    await c.importPlaylist(fixturePlaylistUrl);
+    await resolver.started.future;
+    final first = c.current!;
+    importer.paused = Completer<void>();
+    importer.release = Completer<void>();
+    final second = c.importPlaylist(
+        'https://open.spotify.com/playlist/1123456789012345678901');
+    await importer.paused!.future;
+    expect(c.preparing && c.importing, isTrue);
+
+    c.cancelImport();
+    importer.release!.complete();
+    await second;
+
+    expect(c.preparing, isTrue);
+    expect(c.message, 'Importação cancelada.');
+    expect(await repository.collections(), hasLength(1));
+    resolver.gate!.complete();
+    await finishMatching(c);
+    expect((await repository.page(first.id)).items.single.status,
+        TrackStatus.ready);
   });
 
   test(

@@ -8,9 +8,10 @@ import '../../workspace/presentation/link_entry_panel.dart';
 import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
-import 'artwork_thumbnail.dart';
+import 'playlist_cover_picker.dart';
+import 'playlist_palette.dart';
 import 'collection_track_toolbar.dart';
-import 'collection_mp3_drop_target.dart';
+import 'collection_local_drop_target.dart';
 import 'playlist_file_action.dart';
 import 'playlist_transcription_page.dart';
 import 'spotify_playlist_visibility_dialog.dart';
@@ -25,6 +26,8 @@ class CollectionWorkspace extends StatefulWidget {
       required this.controller,
       required this.onConnections,
       required this.onDownloads,
+      this.buildTabs,
+      this.importRequest = 0,
       this.active = true,
       this.keyboardOpen = false,
       this.initialPlaylist = ''});
@@ -32,7 +35,9 @@ class CollectionWorkspace extends StatefulWidget {
   final LibraryController controller;
   final VoidCallback? onConnections;
   final VoidCallback onDownloads;
+  final Widget Function(VoidCallback? onBack)? buildTabs;
   final String initialPlaylist;
+  final int importRequest;
   @override
   State<CollectionWorkspace> createState() => _CollectionWorkspaceState();
 }
@@ -41,6 +46,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   late final _url = TextEditingController(text: widget.initialPlaylist);
   final _query = TextEditingController();
   final _urlFocus = FocusNode();
+  final _collectionScroll = ScrollController();
   Timer? _timer;
   Timer? _loginTimer;
   String _lastLoginInput = '';
@@ -66,6 +72,18 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   }
 
   @override
+  void didUpdateWidget(covariant CollectionWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.importRequest == widget.importRequest) return;
+    _detail = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.active) return;
+      if (_collectionScroll.hasClients) _collectionScroll.jumpTo(0);
+      if (!widget.controller.importBlocked) _urlFocus.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
     widget.controller.removeListener(_requestInspector);
     _timer?.cancel();
@@ -73,11 +91,24 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     _url.dispose();
     _query.dispose();
     _urlFocus.dispose();
+    _collectionScroll.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final body = _buildBody();
+    final buildTabs = widget.buildTabs;
+    if (buildTabs == null) return body;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      buildTabs(_detail && widget.controller.current != null
+          ? () => setState(() => _detail = false)
+          : null),
+      Expanded(child: body),
+    ]);
+  }
+
+  Widget _buildBody() {
     final c = widget.controller;
     final collection = c.current;
     if (_detail && collection != null) {
@@ -112,62 +143,65 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                         child: TrackInspector(controller: c)))
               ],
             ]);
-            final drop = CollectionMp3DropTarget(
+            final drop = CollectionLocalDropTarget(
                 controller: c, collectionId: collection.id, child: panel);
             return drop;
           }));
     }
-    return ListView(primary: false, padding: EdgeInsets.zero, children: [
-      LinkEntryPanel(
-          title: 'Importar playlist',
-          fieldLabel: 'Link da playlist ou faixa',
-          hintText: 'Cole o link da playlist',
-          controller: _url,
-          focusNode: _urlFocus,
-          inputKey: const ValueKey('playlist-url'),
-          enabled: !c.busy,
-          onChanged: _offerLogin,
-          onSubmitted: c.busy ? null : (value) => unawaited(_import(value)),
-          actionLabel: 'Importar por link',
-          actionIcon: Icons.playlist_add_rounded,
-          onAction: c.busy ? null : () => unawaited(_import(_url.text)),
-          secondaryActions: [
-            OutlinedButton.icon(
-                onPressed: c.busy
-                    ? null
-                    : () => unawaited(_transcribe(_url.text.trim())),
-                icon: const Icon(Icons.playlist_add_check, size: 18),
-                label: const Text('Transcrever playlist')),
-            const MusicConnectionActions(),
-            if (c.importing)
-              IconButton(
-                  tooltip: 'Cancelar importação',
-                  onPressed: c.cancel,
-                  icon: const Icon(Icons.close, color: AppColors.accentActive)),
-            OutlinedButton(
-                onPressed: widget.onConnections, child: const Text('Conexões')),
-            IconButton(
-                tooltip: 'Importar arquivo (CSV ou JSON) · Ctrl+O',
-                onPressed: c.busy
-                    ? null
-                    : () => unawaited(importPlaylistFile(context, c)),
-                icon: const Icon(Icons.upload_file_outlined, size: 19)),
-          ]),
-      const SizedBox(height: 12),
-      CollectionManager(
-          library: c,
-          onOpen: (collection) {
-            _query.clear();
-            setState(() => _detail = true);
-            unawaited(c.openCollection(collection));
-          }),
-    ]);
+    return ListView(
+        controller: _collectionScroll,
+        padding: EdgeInsets.zero,
+        children: [
+          LinkEntryPanel(
+              title: 'Importar playlist',
+              fieldLabel: 'Link da playlist ou faixa',
+              hintText: 'Cole o link da playlist',
+              controller: _url,
+              focusNode: _urlFocus,
+              inputKey: const ValueKey('playlist-url'),
+              enabled: !c.importBlocked,
+              onChanged: _offerLogin,
+              onSubmitted:
+                  c.importBlocked ? null : (value) => unawaited(_import(value)),
+              actionLabel: 'Importar por link',
+              actionIcon: Icons.playlist_add_rounded,
+              onAction:
+                  c.importBlocked ? null : () => unawaited(_import(_url.text)),
+              secondaryActions: [
+                OutlinedButton.icon(
+                    onPressed: c.importBlocked
+                        ? null
+                        : () => unawaited(_transcribe(_url.text.trim())),
+                    icon: const Icon(Icons.playlist_add_check, size: 18),
+                    label: const Text('Transcrever playlist')),
+                const MusicConnectionActions(),
+                if (c.importing)
+                  IconButton(
+                      tooltip: 'Cancelar importação',
+                      onPressed: c.cancelImport,
+                      icon: const Icon(Icons.close,
+                          color: AppColors.accentActive)),
+                OutlinedButton(
+                    onPressed: widget.onConnections,
+                    child: const Text('Conexões')),
+                IconButton(
+                    tooltip: 'Importar arquivo (CSV ou JSON) · Ctrl+O',
+                    onPressed: c.importBlocked
+                        ? null
+                        : () => unawaited(importPlaylistFile(context, c)),
+                    icon: const Icon(Icons.upload_file_outlined, size: 19)),
+              ]),
+          const SizedBox(height: 12),
+          CollectionManager(
+              library: c,
+              onOpen: (collection) {
+                _query.clear();
+                setState(() => _detail = true);
+                unawaited(c.openCollection(collection));
+              }),
+        ]);
   }
 
-  Widget _back() => IconButton(
-      tooltip: 'Voltar às coleções',
-      onPressed: () => setState(() => _detail = false),
-      icon: const Icon(Icons.arrow_back, size: 18));
   Future<void> _import(String value) async {
     final library = widget.controller;
     final before = library.current?.id;
@@ -230,7 +264,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
     }
     _lastLoginInput = value;
     _loginTimer = Timer(const Duration(milliseconds: 600), () async {
-      if (!mounted || widget.controller.busy) return;
+      if (!mounted || widget.controller.importBlocked) return;
       try {
         await access.ensure(value);
       } on FormatException {
@@ -247,18 +281,15 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                   14, MediaQuery.sizeOf(context).height < 500 ? 0 : 10, 8, 0),
               child: LayoutBuilder(builder: (context, box) {
                 final selected = c.page.selectedCount;
-                final selectionLabel =
-                    '$selected ${selected == 1 ? 'selecionada' : 'selecionadas'}';
+                final preparation = c.preparationLabelFor(c.current!.id);
+                final selectionLabel = [
+                  if (selected > 0)
+                    '$selected ${selected == 1 ? 'selecionada' : 'selecionadas'}',
+                  if (preparation != null) preparation,
+                ].join(' · ');
                 return Row(children: [
-                  _back(),
-                  ArtworkThumbnail(
-                      reference: c.current!.coverPath,
-                      size: 28,
-                      placeholderColor: accent == null
-                          ? AppColors.surface
-                          : Color.alphaBlend(
-                              accent.withAlpha(42), Colors.white),
-                      icon: Icons.library_music_outlined),
+                  PlaylistCoverButton(
+                      library: c, playlist: c.current!, size: 28),
                   const SizedBox(width: 8),
                   Expanded(
                       child: Text(c.current!.name,
@@ -266,7 +297,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w600))),
-                  if (selected > 0) ...[
+                  if (selectionLabel.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: box.maxWidth / 2),
@@ -282,6 +313,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               })),
         CollectionTrackToolbar(
             controller: c,
+            accent: accent,
             query: _query,
             onDownload: () => unawaited(_startDownloads()),
             onQueryChanged: (value) {
@@ -295,8 +327,8 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               setState(_query.clear);
               unawaited(c.searchCollection(''));
             }),
-        if (c.importing || c.preparing || c.addingLinks)
-          const LinearProgressIndicator(minHeight: 2),
+        if (c.importing || c.preparingCurrent || c.addingLinks)
+          LinearProgressIndicator(minHeight: 2, color: playlistInk(accent)),
         if (c.addingLinks && c.linkProgress.isNotEmpty)
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -332,6 +364,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
             context: context,
             isScrollControlled: true,
             useSafeArea: true,
+            clipBehavior: Clip.antiAlias,
             builder: (context) => SizedBox(
                 height: MediaQuery.sizeOf(context).height * .9,
                 child: ListenableBuilder(

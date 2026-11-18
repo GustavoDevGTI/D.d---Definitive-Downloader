@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../core/platform/platform_services.dart';
 import '../domain/models.dart';
+import 'playlist_palette.dart';
 
 class TrackDownloadBadge extends StatefulWidget {
-  const TrackDownloadBadge({super.key, required this.track});
+  const TrackDownloadBadge({super.key, required this.track, this.accent});
   final Track track;
+  final Color? accent;
   @override
   State<TrackDownloadBadge> createState() => _TrackDownloadBadgeState();
 }
@@ -50,8 +52,8 @@ class _TrackDownloadBadgeState extends State<TrackDownloadBadge> {
                     TrackStatus.failed => 'Falha no download',
                     _ => 'Não baixada'
                   };
-        final color = missing
-            ? AppColors.accentActive
+        final color = missing || (!saved && t.status == TrackStatus.failed)
+            ? playlistInk(widget.accent)
             : saved
                 ? AppColors.success
                 : AppColors.muted;

@@ -48,6 +48,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       widget.initialPlaylist.isEmpty ? AppSection.home : AppSection.music;
   int _musicTab = 0, _mediaTab = 0;
   int _inspectorRequest = 0;
+  int _playlistImportRequest = 0;
   @override
   void initState() {
     super.initState();
@@ -140,7 +141,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           listenable: Listenable.merge([widget.controller, _workspace]),
           readMessage: () {
             final c = widget.controller;
-            if (!c.busy && !c.searching && c.message.isNotEmpty) {
+            if (!c.importBlocked && !c.searching && c.message.isNotEmpty) {
               return c.message;
             }
             return _workspace.message;
@@ -251,17 +252,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
     ]);
   }
 
+  Widget _musicTabs({VoidCallback? onBack}) =>
+      MediaQuery.viewInsetsOf(context).bottom > 0 &&
+              MediaQuery.sizeOf(context).height < 500
+          ? const SizedBox.shrink()
+          : CategoryTabs(
+              labels: const ['Coleções', 'Capturar áudio', 'Downloads'],
+              selected: _musicTab,
+              onBack: onBack,
+              onSelect: (tab) => _navigate(AppSection.music, tab));
+
   Widget _sections() => IndexedStack(index: _section.index, children: [
         HomeWorkspace(
             controller: _workspace,
-            onNavigate: (section, tab) => _navigate(section, tab)),
+            onNavigate: (section, tab) => _navigate(section, tab),
+            onImportPlaylist: () {
+              _playlistImportRequest++;
+              _navigate(AppSection.music);
+            }),
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (MediaQuery.viewInsetsOf(context).bottom == 0 ||
-              MediaQuery.sizeOf(context).height >= 500)
-            CategoryTabs(
-                labels: const ['Coleções', 'Capturar áudio', 'Downloads'],
-                selected: _musicTab,
-                onSelect: (tab) => _navigate(AppSection.music, tab)),
+          if (_musicTab != 0) _musicTabs(),
           Expanded(
               child: IndexedStack(index: _musicTab, children: [
             CollectionWorkspace(
@@ -269,6 +279,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 active: _section == AppSection.music && _musicTab == 0,
                 keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                 initialPlaylist: widget.initialPlaylist,
+                importRequest: _playlistImportRequest,
+                buildTabs: (onBack) => _musicTabs(onBack: onBack),
                 onConnections:
                     widget.connections == null ? null : _showConnections,
                 onDownloads: () => _navigate(AppSection.music, 2)),

@@ -9,7 +9,9 @@ class MusicLinkRepository {
   final AppDatabase database;
 
   Future<List<int>> append(int collectionId, List<ResolvedMusicLink> links,
-          {String? run, List<Track> replaced = const []}) =>
+          {String? run,
+          bool enqueue = true,
+          List<Track> replaced = const []}) =>
       database.run((db) {
         if (links.isEmpty || links.length > 10000 || (run?.length ?? 0) > 100) {
           throw ArgumentError('Lote inválido.');
@@ -88,7 +90,7 @@ class MusicLinkRepository {
               duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,selected,
               explicit,match_status,manual_url,manual_mode,queue_added,
               resolved_title,resolved_artist,resolved_album,resolved_duration_ms,resolved_cover_url,error)
-              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,'originalAudio',1,?,?,?,?,?,?)''',
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,'originalAudio',?,?,?,?,?,?,?)''',
                 [
                   ++nextId,
                   collectionId,
@@ -112,6 +114,7 @@ class MusicLinkRepository {
                               ? 'pending'
                               : 'review',
                   entry.pinned ? entry.link.url : '',
+                  enqueue || run != null ? 1 : 0,
                   source?.title ?? '',
                   source?.artist ?? '',
                   source?.album ?? '',

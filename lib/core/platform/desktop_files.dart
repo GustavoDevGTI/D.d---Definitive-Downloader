@@ -9,6 +9,10 @@ import 'media_publication.dart';
 import '../../features/downloads/download_cancellation.dart';
 
 class DesktopFiles {
+  Future<bool> isDirectory(String path) async =>
+      await FileSystemEntity.type(path, followLinks: false) ==
+      FileSystemEntityType.directory;
+
   Future<void> initializeMedia() async {}
   String displayPath(String path) => path;
   bool publicDestination(String path) => false;
