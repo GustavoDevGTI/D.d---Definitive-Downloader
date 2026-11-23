@@ -943,6 +943,10 @@ class LibraryController extends ChangeNotifier {
   Future<void> saveTranscription(PlaylistTranscription transcription) =>
       _import(() async => transcription.open(), prepareAfterImport: false);
 
+  Future<Collection?> importAudioCapture(ImportedCollection collection) =>
+      _import(() async => collection,
+          prepareAfterImport: false, announceSuccess: false);
+
   Future<int> createPlaylist(String name,
       {int? groupId, String link = ''}) async {
     if (importBlocked) {

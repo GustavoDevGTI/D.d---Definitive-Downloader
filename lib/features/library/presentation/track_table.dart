@@ -63,11 +63,13 @@ class _TrackTableState extends State<TrackTable> {
             final compact = box.maxWidth < 500;
             final accent = widget.accent;
             final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-            final extent = (MediaQuery.sizeOf(context).height < 500
-                    ? 64.0
-                    : compact
-                        ? 84.0
-                        : 76.0) *
+            final extent = (AppDensity.of(context).desktop
+                    ? AppDensity.of(context).trackExtent
+                    : MediaQuery.sizeOf(context).height < 500
+                        ? 64.0
+                        : compact
+                            ? 84.0
+                            : 76.0) *
                 scale.clamp(1, 2);
             final listingKey = (
               controller.current?.id,
@@ -130,7 +132,12 @@ class _TrackTableState extends State<TrackTable> {
                                 ? null
                                 : (_) => unawaited(controller.selectCollection(
                                     !controller.allFilteredSelected)))),
-                    SizedBox(width: compact ? 46 : 54),
+                    SizedBox(
+                        width: AppDensity.of(context).desktop
+                            ? 42
+                            : compact
+                                ? 46
+                                : 54),
                     Expanded(child: _header('Faixa / artista', TrackSort.name)),
                     SizedBox(
                         width: compact ? 88 : 104,
@@ -146,7 +153,7 @@ class _TrackTableState extends State<TrackTable> {
                               'Correspondência', TrackSort.correspondence))
                     ],
                     if (PlayerScope.of(context) != null)
-                      const SizedBox(width: 48),
+                      SizedBox(width: AppDensity.of(context).control),
                   ])),
               Expanded(
                   child: controller.page.items.isEmpty
@@ -174,7 +181,9 @@ class _TrackTableState extends State<TrackTable> {
                                       thumbVisibility: true,
                                       trackVisibility: true,
                                       interactive: true,
-                                      thickness: 8,
+                                      thickness: AppDensity.of(context).desktop
+                                          ? 6
+                                          : 8,
                                       radius: const Radius.circular(4),
                                       thumbColor: accent == null
                                           ? AppColors.accent
@@ -192,9 +201,7 @@ class _TrackTableState extends State<TrackTable> {
                                               physics: control
                                                   ? const NeverScrollableScrollPhysics()
                                                   : null,
-                                              itemExtent:
-                                                  (compact ? 84.0 : 76.0) *
-                                                      scale.clamp(1, 2),
+                                              itemExtent: extent,
                                               itemCount:
                                                   controller.page.items.length,
                                               findChildIndexCallback: (key) {
@@ -218,10 +225,7 @@ class _TrackTableState extends State<TrackTable> {
                                                     child: _interactive(
                                                         context, t,
                                                         control: control,
-                                                        rowHeight: (compact
-                                                                ? 84.0
-                                                                : 76.0) *
-                                                            scale.clamp(1, 2),
+                                                        rowHeight: extent,
                                                         width: box.maxWidth,
                                                         child: TrackRow(
                                                             track: t,
@@ -240,7 +244,9 @@ class _TrackTableState extends State<TrackTable> {
                                                                         t,
                                                                         point)),
                                                             onSelect: (v) =>
-                                                                unawaited(controller.select(t, v)))));
+                                                                unawaited(controller
+                                                                    .select(
+                                                                        t, v)))));
                                               }))))))),
             ]);
           }));
@@ -251,7 +257,7 @@ class _TrackTableState extends State<TrackTable> {
           key: ValueKey('track-sort-${sort.name}'),
           onTap: () => unawaited(controller.sortTracks(sort)),
           child: SizedBox(
-              height: 44,
+              height: AppDensity.of(context).desktop ? 32 : 44,
               child: Row(children: [
                 Flexible(
                     child: Text(label,

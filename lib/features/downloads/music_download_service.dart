@@ -7,6 +7,7 @@ import '../matching/music_candidates.dart';
 import '../matching/music_engine.dart';
 import 'download_cancellation.dart';
 import 'download_file_name.dart';
+import '../audio_capture/domain/audio_capture.dart';
 
 class MusicDownloadService {
   MusicDownloadService(this.engine, this.connection);
@@ -37,7 +38,10 @@ class MusicDownloadService {
         (track.sourceAuthorization == SourceAuthorization.manualLink ||
             (track.sourceAuthorization == SourceAuthorization.approvedVideo &&
                 candidate.isVideoRecording));
-    if (!candidate.isFullRecording && !allowedVideo) {
+    final captured = track.sourceKind == SourceKind.webAudio &&
+        track.sourceAuthorization == SourceAuthorization.manualLink &&
+        track.recordingType == 'WEB_AUDIO';
+    if (!captured && !candidate.isFullRecording && !allowedVideo) {
       throw const FormatException('Não é uma fonte musical confirmada.');
     }
     final folder = Directory(directory);
@@ -64,10 +68,12 @@ class MusicDownloadService {
         onStage(stage);
       });
       token.check();
-      final actual = parseMusicCandidate(
-          Map<String, dynamic>.from(result['actual'] as Map));
+      final actualRow = Map<String, dynamic>.from(result['actual'] as Map);
+      final actual =
+          captured ? capturedAudio(actualRow) : parseMusicCandidate(actualRow);
       final duration = result['durationMs'];
-      if ((!actual.isFullRecording &&
+      if ((!captured &&
+              !actual.isFullRecording &&
               !(allowedVideo && actual.kind == SourceKind.youtube)) ||
           actual.kind != candidate.kind ||
           actual.sourceId != candidate.sourceId ||
@@ -77,9 +83,12 @@ class MusicDownloadService {
               result['displayTitle'] != track.customTitle) ||
           actual.pageUrl != candidate.pageUrl ||
           result['decoded'] != true ||
-          result['coverEmbedded'] != true ||
+          (!captured && result['coverEmbedded'] != true) ||
           duration is! int ||
-          (duration - candidate.durationMs).abs() > 2000) {
+          duration < (captured ? 1 : 1000) ||
+          duration > const Duration(hours: 24).inMilliseconds ||
+          ((!captured || candidate.durationMs > 0) &&
+              (duration - candidate.durationMs).abs() > 2000)) {
         throw const FormatException(
             'O áudio recebido não corresponde à faixa escolhida.');
       }

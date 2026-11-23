@@ -1,134 +1,178 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+
 import '../../../app/theme.dart';
 import '../../library/domain/models.dart';
 import '../../downloads/transfer_progress.dart';
 import '../domain/workspace_models.dart';
 import '../../../core/platform/platform_services.dart';
 
-List<Widget> downloadRowCells(
-    {required DownloadEntry entry,
-    required bool selected,
-    required void Function(int, bool) onSelect,
-    required bool paused,
-    required int? activeId,
-    required double? progress,
-    required TransferProgress? live,
-    required String output}) {
+List<Widget> downloadRowCells({
+  required DownloadEntry entry,
+  bool dense = false,
+  required bool selected,
+  required void Function(int, bool) onSelect,
+  required bool paused,
+  required int? activeId,
+  required double? progress,
+  required TransferProgress? live,
+  required String output,
+}) {
   final e = entry, t = entry.track;
+  final bodyStyle = TextStyle(fontSize: dense ? 11 : 12, height: 1.2);
+  Widget metric(String text, String description) =>
+      _metric(text, description, bodyStyle);
   return [
     Checkbox(
-        shape: const CircleBorder(),
-        semanticLabel: 'Selecionar download ${t.title}',
-        value: selected,
-        onChanged: (v) => onSelect(t.id, v ?? false)),
+      materialTapTargetSize: dense ? MaterialTapTargetSize.shrinkWrap : null,
+      visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
+      shape: const CircleBorder(),
+      semanticLabel: 'Selecionar download ${t.title}',
+      value: selected,
+      onChanged: (v) => onSelect(t.id, v ?? false),
+    ),
     Tooltip(
-        message:
-            '${t.downloadName} · ${e.collectionName}${t.localPath.isEmpty ? '' : '\n${createPlatformFiles().displayPath(t.localPath)}'}',
-        child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12)),
-              if (t.downloadArtist.isNotEmpty)
-                Text(t.downloadArtist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(fontSize: 11, color: AppColors.muted)),
-              Row(children: [
+      message:
+          '${t.downloadName} · ${e.collectionName}${t.localPath.isEmpty ? '' : '\n${createPlatformFiles().displayPath(t.localPath)}'}',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t.displayTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: bodyStyle,
+          ),
+          if (t.downloadArtist.isNotEmpty)
+            Text(
+              t.downloadArtist,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: dense ? 10 : 11,
+                height: 1.2,
+                color: AppColors.muted,
+              ),
+            ),
+          if (!dense)
+            Row(
+              children: [
                 if (e.playlistColor case final rgb?) ...[
                   Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFF000000 | rgb),
-                          border: Border.all(color: Colors.black26))),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF000000 | rgb),
+                      border: Border.all(color: Colors.black26),
+                    ),
+                  ),
                   const SizedBox(width: 4),
                 ],
                 Expanded(
-                    child: Text(e.collectionName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w600))),
-              ]),
-            ])),
-    _metric(
-        e.fileBytes != null
-            ? _bytes(e.fileBytes!)
-            : live?.total == null
-                ? '—'
-                : '${live!.estimatedTotal ? '≈ ' : ''}${_bytes(live.total!)}',
-        e.fileBytes != null
-            ? 'Tamanho do arquivo salvo.'
-            : 'Tamanho da transferência; ≈ indica estimativa.'),
+                  child: Text(
+                    e.collectionName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    ),
+    metric(
+      e.fileBytes != null
+          ? _bytes(e.fileBytes!)
+          : live?.total == null
+              ? '—'
+              : '${live!.estimatedTotal ? '≈ ' : ''}${_bytes(live.total!)}',
+      e.fileBytes != null
+          ? 'Tamanho do arquivo salvo.'
+          : 'Tamanho da transferência; ≈ indica estimativa.',
+    ),
     Tooltip(
-        message: t.sourceKind.musicProviderName ?? t.sourceLabel,
-        child: Text(t.sourceKind.musicProviderName ?? t.sourceLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12))),
+      message: t.sourceKind.musicProviderName ?? t.sourceLabel,
+      child: Text(
+        t.sourceKind.musicProviderName ?? t.sourceLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: bodyStyle,
+      ),
+    ),
     Tooltip(
-        message: t.error.isEmpty ? e.statusLabel : t.error,
-        child: Text(
-            t.id == activeId && paused ? 'Pausado · 10 KiB/s' : e.statusLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12))),
-    _metric(
-        live?.bytesPerSecond == null || paused || live!.processing
-            ? '—'
-            : '${_bytes(live.bytesPerSecond!.round())}/s',
-        'Velocidade medida nesta transferência.'),
-    _metric(
-        live?.processing == true
-            ? 'Processando'
-            : paused || live?.remaining == null
-                ? '—'
-                : _remaining(live!.remaining!),
-        'Estimativa para receber o áudio; validação e capa acontecem depois.'),
-    _metric(
-        live != null
-            ? _bytes(live.received)
-            : e.fileBytes != null
-                ? _bytes(e.fileBytes!)
-                : '—',
-        live != null
-            ? 'Dados de áudio recebidos nesta tentativa.'
-            : 'Dados no arquivo final salvo; podem diferir da transferência original.'),
+      message: t.error.isEmpty ? e.statusLabel : t.error,
+      child: Text(
+        t.id == activeId && paused ? 'Pausado · 10 KiB/s' : e.statusLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: bodyStyle,
+      ),
+    ),
+    metric(
+      live?.bytesPerSecond == null || paused || live!.processing
+          ? '—'
+          : '${_bytes(live.bytesPerSecond!.round())}/s',
+      'Velocidade medida nesta transferência.',
+    ),
+    metric(
+      live?.processing == true
+          ? 'Processando'
+          : paused || live?.remaining == null
+              ? '—'
+              : _remaining(live!.remaining!),
+      'Estimativa para receber o áudio; validação e capa acontecem depois.',
+    ),
+    metric(
+      live != null
+          ? _bytes(live.received)
+          : e.fileBytes != null
+              ? _bytes(e.fileBytes!)
+              : '—',
+      live != null
+          ? 'Dados de áudio recebidos nesta tentativa.'
+          : 'Dados no arquivo final salvo; podem diferir da transferência original.',
+    ),
     t.status == TrackStatus.completed
-        ? const Text('Concluído',
+        ? Text(
+            'Concluído',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12))
+            style: bodyStyle,
+          )
         : t.id == activeId
             ? LinearProgressIndicator(value: progress, minHeight: 6)
-            : const Text('—'),
+            : Text('—', style: bodyStyle),
     Tooltip(
-        message: e.downloadedAt == null
-            ? 'Sem registro de conclusão.'
-            : 'Concluído em ${_completionLabel(e.downloadedAt!)} (horário local)',
-        child: Text(
-            e.downloadedAt == null ? '—' : _completionLabel(e.downloadedAt!),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12))),
+      message: e.downloadedAt == null
+          ? 'Sem registro de conclusão.'
+          : 'Concluído em ${_completionLabel(e.downloadedAt!)} (horário local)',
+      child: Text(
+        e.downloadedAt == null ? '—' : _completionLabel(e.downloadedAt!),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: bodyStyle,
+      ),
+    ),
     Tooltip(
-        message: createPlatformFiles()
-            .displayPath(t.localPath.isEmpty ? output : p.dirname(t.localPath)),
-        child: Text(
-            createPlatformFiles().displayPath(
-                t.localPath.isEmpty ? output : p.dirname(t.localPath)),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12))),
+      message: createPlatformFiles().displayPath(
+        t.localPath.isEmpty ? output : p.dirname(t.localPath),
+      ),
+      child: Text(
+        createPlatformFiles().displayPath(
+          t.localPath.isEmpty ? output : p.dirname(t.localPath),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: bodyStyle,
+      ),
+    ),
   ];
 }
 
@@ -138,12 +182,11 @@ String _completionLabel(DateTime date) {
   return '${two(local.day)}/${two(local.month)}/${local.year} ${two(local.hour)}:${two(local.minute)}';
 }
 
-Widget _metric(String text, String description) => Tooltip(
-    message: '$text · $description',
-    child: Text(text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12)));
+Widget _metric(String text, String description, TextStyle style) => Tooltip(
+      message: '$text · $description',
+      child: Text(text,
+          maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+    );
 
 String _bytes(int bytes) {
   if (bytes < 1024) return '$bytes B';

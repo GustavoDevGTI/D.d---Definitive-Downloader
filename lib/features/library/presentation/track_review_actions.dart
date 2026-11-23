@@ -45,11 +45,11 @@ class TrackReviewActions extends StatelessWidget {
                   style: FilledButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
-                      minimumSize: const Size(0, 48),
+                      minimumSize: Size(0, AppDensity.of(context).control),
                       visualDensity: VisualDensity.standard,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10))),
+                          borderRadius: BorderRadius.circular(AppDensity.of(context).radius))),
                   icon: const Icon(Icons.check_rounded, size: 21),
                   label: Text(candidate.isVideoRecording
                       ? 'Aprovar videoclipe'

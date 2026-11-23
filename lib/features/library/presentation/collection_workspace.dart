@@ -168,28 +168,66 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               onAction:
                   c.importBlocked ? null : () => unawaited(_import(_url.text)),
               secondaryActions: [
-                OutlinedButton.icon(
-                    onPressed: c.importBlocked
-                        ? null
-                        : () => unawaited(_transcribe(_url.text.trim())),
-                    icon: const Icon(Icons.playlist_add_check, size: 18),
-                    label: const Text('Transcrever playlist')),
-                const MusicConnectionActions(),
+                PopupMenuButton<String>(
+                    key: const ValueKey('playlist-import-options'),
+                    tooltip: 'Opções de importação',
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'file':
+                          unawaited(importPlaylistFile(context, c));
+                        case 'transcribe':
+                          unawaited(_transcribe(_url.text.trim()));
+                        case 'connections':
+                          widget.onConnections?.call();
+                      }
+                    },
+                    itemBuilder: (_) => [
+                          PopupMenuItem(
+                              value: 'file',
+                              enabled: !c.importBlocked,
+                              child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.upload_file_outlined),
+                                  title: Text('Importar arquivo'),
+                                  subtitle: Text('CSV ou JSON · Ctrl+O'))),
+                          PopupMenuItem(
+                              value: 'transcribe',
+                              enabled: !c.importBlocked,
+                              child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.playlist_add_check),
+                                  title: Text('Transcrever playlist'))),
+                          PopupMenuItem(
+                              value: 'connections',
+                              enabled: widget.onConnections != null,
+                              child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.settings_input_component),
+                                  title: Text('Conexões'))),
+                        ],
+                    child: SizedBox(
+                        height: AppDensity.of(context).control,
+                        child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              Flexible(child: Text('Outras opções',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.secondary))),
+                              SizedBox(width: 6),
+                              Icon(Icons.keyboard_arrow_down,
+                                  size: 18, color: AppColors.secondary),
+                            ])))),
+                const MusicConnectionActions(showLabel: true),
                 if (c.importing)
                   IconButton(
                       tooltip: 'Cancelar importação',
                       onPressed: c.cancelImport,
                       icon: const Icon(Icons.close,
                           color: AppColors.accentActive)),
-                OutlinedButton(
-                    onPressed: widget.onConnections,
-                    child: const Text('Conexões')),
-                IconButton(
-                    tooltip: 'Importar arquivo (CSV ou JSON) · Ctrl+O',
-                    onPressed: c.importBlocked
-                        ? null
-                        : () => unawaited(importPlaylistFile(context, c)),
-                    icon: const Icon(Icons.upload_file_outlined, size: 19)),
               ]),
           const SizedBox(height: 12),
           CollectionManager(
@@ -296,7 +334,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600))),
+                              fontSize: 14, fontWeight: FontWeight.w600))),
                   if (selectionLabel.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     ConstrainedBox(

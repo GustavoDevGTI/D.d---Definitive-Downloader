@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import '../../audio_capture/domain/audio_capture.dart';
 import 'dart:isolate';
 import '../../../core/network/bounded_http.dart';
 import '../../../core/storage/database.dart';
@@ -61,13 +62,23 @@ class PlayerLibrary {
   final DesktopFiles? files;
   final AppDatabase database;
   final BoundedHttp http;
-  String referenceFor(Track t) => t.sourceKind == SourceKind.preview
-      ? '' // Legacy excerpts did not retain the catalog version's page URL.
-      : publicReference(t.mediaUrl).isNotEmpty
-          ? publicReference(t.mediaUrl)
-          : t.sourceKind == SourceKind.none
-              ? publicReference(t.sourceUrl)
-              : '';
+  String referenceFor(Track t) {
+    if (t.sourceKind == SourceKind.webAudio) {
+      try {
+        return captureUrl(t.mediaUrl).toString();
+      } on FormatException {
+        return '';
+      }
+    }
+    return t.sourceKind == SourceKind.preview
+        ? '' // Legacy excerpts did not retain the catalog version's page URL.
+        : publicReference(t.mediaUrl).isNotEmpty
+            ? publicReference(t.mediaUrl)
+            : t.sourceKind == SourceKind.none
+                ? publicReference(t.sourceUrl)
+                : '';
+  }
+
   String referenceForCandidate(Candidate c) => publicReference(c.pageUrl);
   AudioItem local(Track t) => AudioItem(
       id: 'track-${t.id}',
@@ -75,7 +86,7 @@ class PlayerLibrary {
       artist: t.artist,
       uri: Uri.file(t.localPath).toString(),
       reference: t.redownloadState.isEmpty && t.sourceKind != SourceKind.preview
-          ? publicReference(t.mediaUrl)
+          ? referenceFor(t)
           : '',
       collectionId: t.collectionId,
       isPreview: t.sourceKind == SourceKind.preview,

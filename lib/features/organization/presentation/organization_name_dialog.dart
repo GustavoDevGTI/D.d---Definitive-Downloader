@@ -130,10 +130,10 @@ class OrganizationNameDialogState extends State<OrganizationNameDialog> {
                           initialValue: _groupId ?? 0,
                           isExpanded: true,
                           menuMaxHeight: 300,
-                          decoration: const InputDecoration(labelText: 'Grupo'),
+                          decoration: const InputDecoration(labelText: 'Pasta'),
                           items: [
                             const DropdownMenuItem(
-                                value: 0, child: Text('Sem grupo')),
+                                value: 0, child: Text('Sem pasta')),
                             for (final g in widget.groups!)
                               DropdownMenuItem(
                                   value: g.id,

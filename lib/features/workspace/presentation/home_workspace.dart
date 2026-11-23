@@ -141,10 +141,10 @@ class HomeWorkspace extends StatelessWidget {
                   child: InkWell(
                       onTap: action,
                       child: Padding(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(12),
                           child: Row(children: [
-                            Icon(icon, size: 30, color: color),
-                            const SizedBox(width: 18),
+                            Icon(icon, size: 20, color: color),
+                            const SizedBox(width: 12),
                             Expanded(
                                 child: Column(
                                     crossAxisAlignment:
@@ -152,7 +152,7 @@ class HomeWorkspace extends StatelessWidget {
                                     children: [
                                   Text(title,
                                       style: const TextStyle(
-                                          fontSize: 15,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w700)),
                                   const SizedBox(height: 5),
                                   Text(subtitle,

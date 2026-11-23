@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'density.dart';
+export 'density.dart';
 
 abstract final class AppColors {
   // Exact brand palette supplied by the user, 29/10/2026.
@@ -17,7 +20,13 @@ abstract final class AppColors {
   static const success = Color(0xFF326B5D);
 }
 
-ThemeData appTheme() {
+ThemeData appTheme({TargetPlatform? platform}) {
+  final density = AppDensity(platform ?? defaultTargetPlatform);
+  final desktop = density.desktop;
+  final buttonShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(density.radius));
+  const controlText = TextStyle(
+      fontFamily: 'Manrope', fontSize: 12, height: 1.2, fontWeight: FontWeight.w600);
   final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.accent,
       brightness: Brightness.light,
@@ -43,25 +52,77 @@ ThemeData appTheme() {
       surfaceTint: Colors.transparent);
   return ThemeData(
     useMaterial3: true,
+    platform: platform,
     fontFamily: 'Manrope',
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.background,
-    textTheme: const TextTheme(
-        bodyMedium: TextStyle(fontSize: 13, color: AppColors.ink),
-        bodySmall: TextStyle(fontSize: 11, color: AppColors.muted)),
+    textTheme: TextTheme(
+        bodyLarge: TextStyle(fontSize: density.body, height: 1.3, color: AppColors.ink),
+        labelLarge: controlText,
+        bodyMedium: TextStyle(fontSize: density.body, color: AppColors.ink),
+        bodySmall: const TextStyle(fontSize: 11, color: AppColors.muted),
+        titleLarge:
+            TextStyle(fontSize: desktop ? 18 : 22, fontWeight: FontWeight.w600),
+        titleMedium:
+            const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+    iconTheme: IconThemeData(size: density.icon),
+    iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+            minimumSize: Size.square(density.control),
+            iconSize: density.icon,
+            padding: const EdgeInsets.all(8),
+            visualDensity: VisualDensity.standard,
+            tapTargetSize: desktop
+                ? MaterialTapTargetSize.shrinkWrap
+                : MaterialTapTargetSize.padded,
+            shape: buttonShape)),
+    popupMenuTheme: PopupMenuThemeData(
+        iconSize: density.icon,
+        textStyle: const TextStyle(
+            fontFamily: 'Manrope', fontSize: 12, color: AppColors.ink),
+        shape: buttonShape),
+    listTileTheme: ListTileThemeData(
+        dense: true,
+        minTileHeight: desktop ? 44 : 48,
+        horizontalTitleGap: desktop ? 8 : 12,
+        titleTextStyle: TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: density.body,
+            color: AppColors.ink),
+        subtitleTextStyle: const TextStyle(
+            fontFamily: 'Manrope', fontSize: 11, color: AppColors.muted)),
+    dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(desktop ? 12 : 20)),
+        titleTextStyle: TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: desktop ? 18 : 22,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ink),
+        contentTextStyle: TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: density.body,
+            height: 1.4,
+            color: AppColors.ink)),
     dividerColor: AppColors.line,
     dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1),
     visualDensity: VisualDensity.compact,
     checkboxTheme: CheckboxThemeData(
+        materialTapTargetSize: desktop ? MaterialTapTargetSize.shrinkWrap : MaterialTapTargetSize.padded,
+        visualDensity: desktop ? VisualDensity.compact : VisualDensity.standard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
         side: const BorderSide(color: AppColors.secondary, width: 1.2)),
     filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                minimumSize: Size(0, density.control),
+                visualDensity: VisualDensity.standard,
+                tapTargetSize: desktop
+                    ? MaterialTapTargetSize.shrinkWrap
+                    : MaterialTapTargetSize.padded,
+                padding: EdgeInsets.symmetric(
+                    horizontal: desktop ? 12 : 18, vertical: desktop ? 8 : 16),
+                shape: buttonShape,
                 textStyle: const TextStyle(
                     fontFamily: 'Manrope',
                     fontWeight: FontWeight.w600,
@@ -82,32 +143,47 @@ ThemeData appTheme() {
         style: OutlinedButton.styleFrom(
             side: const BorderSide(color: AppColors.line),
             foregroundColor: AppColors.ink,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)))),
+            minimumSize: Size(0, density.control),
+            visualDensity: VisualDensity.standard,
+            tapTargetSize: desktop
+                ? MaterialTapTargetSize.shrinkWrap
+                : MaterialTapTargetSize.padded,
+            textStyle: controlText,
+            padding: EdgeInsets.symmetric(
+                horizontal: 12, vertical: desktop ? 8 : 14),
+            shape: buttonShape)),
     textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+            minimumSize: Size(0, density.control),
+            visualDensity: VisualDensity.standard,
+            tapTargetSize: desktop
+                ? MaterialTapTargetSize.shrinkWrap
+                : MaterialTapTargetSize.padded,
             textStyle: const TextStyle(
                 fontFamily: 'Manrope',
                 fontSize: 12,
                 fontWeight: FontWeight.w600),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4)))),
+            shape: buttonShape)),
     inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
         isDense: true,
+        constraints: BoxConstraints(minHeight: density.control),
+        prefixIconConstraints: BoxConstraints(
+            minWidth: density.control, minHeight: density.control),
+        suffixIconConstraints: BoxConstraints(
+            minWidth: density.control, minHeight: density.control),
         hintStyle: const TextStyle(fontSize: 12, color: AppColors.muted),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+            EdgeInsets.symmetric(horizontal: 12, vertical: desktop ? 10 : 15),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(density.radius),
             borderSide: const BorderSide(color: AppColors.line)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(density.radius),
             borderSide: const BorderSide(color: AppColors.line)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(density.radius),
             borderSide: const BorderSide(color: AppColors.accent, width: 1.4))),
     tooltipTheme:
         const TooltipThemeData(waitDuration: Duration(milliseconds: 500)),

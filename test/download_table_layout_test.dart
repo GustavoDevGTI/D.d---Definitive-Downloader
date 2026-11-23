@@ -152,7 +152,8 @@ void main() {
         }
       });
       await capture(tester, captureKey, 'table-top-${width.toInt()}');
-      if (width > 600) expect(before.width, closeTo(width - 12, .01));
+      if (width > 600) expect(before.width, closeTo(width - 8, .01));
+      expect(before.height, 32);
       final firstRow = find.byKey(const ValueKey('download-row-1'));
       final selectedRow = tester.widget<Container>(find.descendant(
           of: firstRow,
@@ -166,7 +167,12 @@ void main() {
               .left
               .color,
           playlistAccent);
-      expect(find.descendant(of: firstRow, matching: find.text('Fixture')),
+      expect(tester.getSize(firstRow).height, 40);
+      expect(
+          find.descendant(
+              of: firstRow,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Tooltip && (w.message?.contains(' · Fixture') ?? false))),
           findsOneWidget);
       final otherPlaylistRow = tester.widget<Container>(find.descendant(
           of: find.byKey(const ValueKey('download-row-4')),

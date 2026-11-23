@@ -47,7 +47,8 @@ class CollectionTrackToolbar extends StatelessWidget {
             key: ValueKey('track-filter-${c.view}'),
             initialValue: c.view,
             isExpanded: true,
-            style: const TextStyle(fontSize: 12, color: AppColors.ink),
+            style: const TextStyle(
+                fontFamily: 'Manrope', fontSize: 12, color: AppColors.ink),
             menuMaxHeight: 280,
             decoration: const InputDecoration(
                 labelText: 'Mostrar',
@@ -89,18 +90,49 @@ class CollectionTrackToolbar extends StatelessWidget {
                 ]);
         final conference = OutlinedButton.icon(
             key: const ValueKey('start-playlist-conference'),
-            icon: const Icon(Icons.manage_search_rounded, size: 20),
+            icon: const Icon(Icons.fact_check_outlined, size: 20),
             label: const Text('Iniciar conferência'),
             style: OutlinedButton.styleFrom(
-                foregroundColor: playlistInk(accent),
-                backgroundColor: playlistReviewSurface(accent),
-                side: BorderSide(color: playlistInk(accent).withAlpha(100)),
+                minimumSize: Size(0, AppDensity.of(context).control),
+                visualDensity: VisualDensity.standard,
+                foregroundColor: AppColors.navigation,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: AppColors.secondary),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDensity.of(context).radius)),
+                textStyle: const TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
             onPressed: c.busy || c.isExample || c.music?.available != true
                 ? null
                 : () => unawaited(c.prepareMusic()));
-        if (box.maxWidth >= 760) {
+        final density = AppDensity.of(context);
+        final player = PlayerScope.of(context);
+        final commandCount = 3 +
+            (player != null && c.current!.completedCount > 0 ? 1 : 0) +
+            (c.downloading ? 1 : 0);
+        final commandWidth =
+            commandCount * density.control + (commandCount - 1) * 4 + 4;
+        final conferenceText = TextPainter(
+            text: const TextSpan(
+                text: 'Iniciar conferência',
+                style: TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            textScaler: MediaQuery.textScalerOf(context),
+            textDirection: Directionality.of(context))
+          ..layout();
+        final conferenceWidth = conferenceText.width + 48;
+        conferenceText.dispose();
+        // Reserve useful input width, including both search/clear icons.
+        final inlineWidth =
+            commandWidth + 16 + 140 + 104 + density.control + conferenceWidth;
+        if (box.maxWidth >= inlineWidth) {
           return Row(children: [
             _commands(context),
             const SizedBox(width: 8),
@@ -112,12 +144,17 @@ class CollectionTrackToolbar extends StatelessWidget {
           ]);
         }
         return Column(children: [
-          Row(children: [
-            Expanded(child: search),
-            const SizedBox(width: 8),
-            SizedBox(width: 104, child: filter),
-            sort
-          ]),
+          if (box.maxWidth < 140 + 8 + 104 + density.control) ...[
+            search,
+            const SizedBox(height: 8),
+            Row(children: [SizedBox(width: 104, child: filter), sort]),
+          ] else
+            Row(children: [
+              Expanded(child: search),
+              const SizedBox(width: 8),
+              SizedBox(width: 104, child: filter),
+              sort
+            ]),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _commands(context)),
@@ -134,7 +171,7 @@ class CollectionTrackToolbar extends StatelessWidget {
         DownloadActionButton(
             label: 'Ouvir playlist',
             icon: Icons.play_arrow_rounded,
-            color: playlistInk(accent),
+            color: AppColors.navigation,
             primary: true,
             onPressed: () => unawaited(player.playCollection(c.current!.id))),
       DownloadActionButton(

@@ -14,7 +14,7 @@ def run_ffmpeg(ffmpeg, arguments):
         raise MusicError('Não foi possível validar o áudio recebido.')
 
 
-def finish(source, actual, directory, ffmpeg, expected_ms, output_title=''):
+def finish(source, actual, directory, ffmpeg, expected_ms, output_title='', require_cover=True):
     emit('stage', message='Conferindo áudio completo e metadados')
     source = Path(source)
     if not source.is_file() or source.stat().st_size < 1024:
@@ -22,12 +22,19 @@ def finish(source, actual, directory, ffmpeg, expected_ms, output_title=''):
     target = Path(directory) / 'verified.mp3'
     if target.exists():
         raise MusicError('O arquivo temporário já existe.')
-    run_ffmpeg(ffmpeg, ['-i', str(source), '-map', '0:a:0', '-vn', '-c:a', 'libmp3lame', '-q:a', '2', str(target)])
+    run_ffmpeg(ffmpeg, ['-protocol_whitelist', 'file,pipe', '-i', str(source),
+                       '-map', '0:a:0', '-vn', '-c:a', 'libmp3lame', '-q:a', '2', str(target)])
     media = MP3(target)
     duration = round(media.info.length * 1000)
-    check_duration(duration, expected_ms)
-    cover = public_bytes(actual.get('coverUrl', ''))
-    if not (cover.startswith(b'\xff\xd8') or cover.startswith(b'\x89PNG\r\n\x1a\n')):
+    if require_cover:
+        check_duration(duration, expected_ms)
+    elif not 0 < duration <= 24 * 60 * 60 * 1000:
+        raise MusicError('O arquivo não contém uma duração de áudio válida.')
+    elif expected_ms and abs(duration - expected_ms) > 2000:
+        raise MusicError('A duração do áudio mudou. Analise a página novamente.')
+    cover = public_bytes(actual['coverUrl']) if actual.get('coverUrl') else b''
+    cover_valid = cover.startswith(b'\xff\xd8') or cover.startswith(b'\x89PNG\r\n\x1a\n')
+    if require_cover and not cover_valid:
         raise MusicError('Não foi recebida uma capa válida para a faixa.')
     if media.tags is None:
         media.add_tags()
@@ -37,11 +44,13 @@ def finish(source, actual, directory, ffmpeg, expected_ms, output_title=''):
     if actual.get('isrc'):
         media.tags.add(TSRC(encoding=3, text=actual['isrc']))
     media.tags.add(TXXX(encoding=3, desc='Actual source', text=actual['pageUrl']))
-    media.tags.add(APIC(encoding=3, mime='image/png' if cover.startswith(b'\x89PNG') else 'image/jpeg',
-                        type=3, desc='Cover', data=cover))
+    if cover_valid:
+        media.tags.add(APIC(encoding=3, mime='image/png' if cover.startswith(b'\x89PNG') else 'image/jpeg',
+                            type=3, desc='Cover', data=cover))
     media.save(v2_version=3)
-    run_ffmpeg(ffmpeg, ['-xerror', '-i', str(target), '-map', '0:a:0', '-f', 'null', '-'])
-    if len(MP3(target).tags.getall('APIC')) != 1:
+    run_ffmpeg(ffmpeg, ['-xerror', '-protocol_whitelist', 'file,pipe',
+                       '-i', str(target), '-map', '0:a:0', '-f', 'null', '-'])
+    if require_cover and len(MP3(target).tags.getall('APIC')) != 1:
         raise MusicError('A capa não foi vinculada ao MP3.')
     return {'path': str(target.resolve()), 'actual': actual, 'durationMs': duration,
-            'bytes': target.stat().st_size, 'coverEmbedded': True, 'decoded': True, 'displayTitle': output_title or actual['title']}
+            'bytes': target.stat().st_size, 'coverEmbedded': cover_valid, 'decoded': True, 'displayTitle': output_title or actual['title']}

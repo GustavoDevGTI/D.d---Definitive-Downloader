@@ -78,7 +78,11 @@ class TrackRow extends StatelessWidget {
                           placeholderColor: accent == null
                               ? AppColors.accentSoft
                               : playlistReviewSurface(accent),
-                          size: compact ? 36 : 44)),
+                          size: AppDensity.of(context).desktop
+                              ? AppDensity.of(context).artwork
+                              : compact
+                                  ? 36
+                                  : 44)),
                   Expanded(
                       child: Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -87,10 +91,11 @@ class TrackRow extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('${t.position}. ${t.displayTitle}',
-                                    maxLines: 2,
+                                    maxLines:
+                                        AppDensity.of(context).desktop ? 1 : 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: AppDensity.of(context).body,
                                         fontWeight: FontWeight.w600,
                                         color: t.needsReview
                                             ? ink
@@ -98,8 +103,11 @@ class TrackRow extends StatelessWidget {
                                 Text(t.artist,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 12, color: AppColors.muted)),
+                                    style: TextStyle(
+                                        fontSize: AppDensity.of(context).desktop
+                                            ? 11
+                                            : 12,
+                                        color: AppColors.muted)),
                               ]))),
                   SizedBox(
                       width: compact ? 88 : 104,
@@ -139,7 +147,7 @@ class TrackRow extends StatelessWidget {
                                 ? Icons.play_arrow_rounded
                                 : Icons.open_in_new_rounded,
                             color: ink,
-                            size: 21)),
+                            size: AppDensity.of(context).icon)),
                 ]))));
   }
 }

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import '../domain/workspace_models.dart';
 import 'link_entry_panel.dart';
+import '../../audio_capture/presentation/audio_capture_panel.dart';
+import '../../library/application/library_controller.dart';
 
 class CaptureWorkspace extends StatefulWidget {
-  const CaptureWorkspace({super.key, required this.category});
+  const CaptureWorkspace(
+      {super.key, required this.category, this.library, this.onDownloads});
   final ContentCategory category;
+  final LibraryController? library;
+  final VoidCallback? onDownloads;
   @override
   State<CaptureWorkspace> createState() => _CaptureWorkspaceState();
 }
@@ -20,6 +25,10 @@ class _CaptureWorkspaceState extends State<CaptureWorkspace> {
   @override
   Widget build(BuildContext context) {
     final audio = widget.category == ContentCategory.music;
+    if (audio && widget.library != null) {
+      return AudioCapturePanel(
+          library: widget.library!, onDownloads: widget.onDownloads);
+    }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
       LinkEntryPanel(
           title:

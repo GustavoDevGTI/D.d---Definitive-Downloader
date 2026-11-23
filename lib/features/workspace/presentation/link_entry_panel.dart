@@ -40,9 +40,9 @@ class LinkEntryPanel extends StatelessWidget {
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(title,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
+        SizedBox(height: AppDensity.of(context).desktop ? 8 : 12),
         WorkspacePanel(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(AppDensity.of(context).panelInset),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -66,14 +66,16 @@ class LinkEntryPanel extends StatelessWidget {
                   OutlinedButtonTheme(
                       data: OutlinedButtonThemeData(
                           style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 48),
+                              minimumSize:
+                                  Size(0, AppDensity.of(context).control),
                               visualDensity: VisualDensity.standard,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
+                                  horizontal: 12, vertical: 8),
                               foregroundColor: AppColors.ink,
                               side: const BorderSide(color: AppColors.line),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(
+                                      AppDensity.of(context).radius)),
                               textStyle: const TextStyle(
                                   fontFamily: 'Manrope',
                                   fontSize: 12,
@@ -81,7 +83,8 @@ class LinkEntryPanel extends StatelessWidget {
                       child: IconButtonTheme(
                           data: IconButtonThemeData(
                               style: IconButton.styleFrom(
-                                  minimumSize: const Size(48, 48),
+                                  minimumSize: Size.square(
+                                      AppDensity.of(context).control),
                                   visualDensity: VisualDensity.standard,
                                   foregroundColor: AppColors.secondary)),
                           child: Wrap(
@@ -92,10 +95,11 @@ class LinkEntryPanel extends StatelessWidget {
                                 FilledButton.icon(
                                     key: actionKey,
                                     style: FilledButton.styleFrom(
-                                        minimumSize: const Size(0, 48),
+                                        minimumSize: Size(
+                                            0, AppDensity.of(context).control),
                                         visualDensity: VisualDensity.standard,
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 12)),
+                                            horizontal: 12, vertical: 8)),
                                     onPressed: onAction,
                                     icon: Icon(actionIcon, size: 18),
                                     label: Text(actionLabel)),

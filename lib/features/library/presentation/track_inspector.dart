@@ -54,7 +54,7 @@ class _TrackInspectorState extends State<TrackInspector> {
           else ...[
             Expanded(
                 child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(AppDensity.of(context).panelInset),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -210,14 +210,16 @@ class _TrackInspectorState extends State<TrackInspector> {
               : Color.alphaBlend(accent.withAlpha(24), Colors.white),
           border: const Border(bottom: BorderSide(color: AppColors.line))),
       child: Padding(
-          padding: const EdgeInsets.fromLTRB(15, 12, 15, 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: AppDensity.of(context).desktop ? 8 : 12),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               const Expanded(
                   child: Text('Conferência',
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600))),
+                          fontSize: 14, fontWeight: FontWeight.w600))),
               if (Navigator.of(context).canPop())
                 IconButton(
                     tooltip: 'Fechar conferência',

@@ -80,7 +80,7 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Não foi possível carregar as coleções.');
+        setState(() => _error = 'Não foi possível carregar as playlists.');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -154,7 +154,8 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                         key: ValueKey('links-collection-$_collectionId'),
                         initialValue: _collectionId,
                         isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Coleção'),
+                        decoration:
+                            const InputDecoration(labelText: 'Playlist'),
                         items: [
                           if (widget.received)
                             const DropdownMenuItem(
@@ -181,13 +182,13 @@ class _AddMusicLinksDialogState extends State<AddMusicLinksDialog> {
                   if (_offset > 0 || _collections.length >= 30)
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                       IconButton(
-                          tooltip: 'Coleções anteriores',
+                          tooltip: 'Playlists anteriores',
                           onPressed: !_saving && !_loading && _offset > 0
                               ? () => _page(-1)
                               : null,
                           icon: const Icon(Icons.chevron_left)),
                       IconButton(
-                          tooltip: 'Mais coleções',
+                          tooltip: 'Mais playlists',
                           onPressed:
                               !_saving && !_loading && _collections.length >= 30
                                   ? () => _page(1)

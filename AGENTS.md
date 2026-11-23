@@ -2,6 +2,10 @@
 
 ## Produto e prioridades
 
+- Revisões em fila, solicitado em 23/11/2026: aplicar primeiro todas as alterações enviadas na fila e executar os testes somente depois, em uma rodada consolidada de essenciais e focados. Não iniciar uma nova bateria entre mensagens de ajustes do mesmo lote.
+
+- Publicação 0.1.94 solicitada em 23/11/2026: consolidar o lote e publicar os pacotes Windows e Android da mesma versão, sem executar testes no emulador. O foco de desenvolvimento continua no Windows; a geração dos APKs desta release não declara paridade ou validação mobile concluída.
+
 - Fluxo posterior à 0.1.56: Spotify continua autenticado para importar. Na oferta de Deezer após Spotify, **Fazer login depois** deixa a importação prosseguir e adia a conferência automática que dependa da conta Deezer. A escolha vale durante a sessão do app. Cancelar continua abortando a operação pendente. Links que exigem Deezer, conferência solicitada e download dessa fonte ainda podem pedir a conta. O atalho Deezer permanece disponível até conectar, em Windows e Android.
 
 - Windows/Android 0.1.56 local em `docs/VERSAO_LOCAL_0_1_56.md`: login obrigatório Spotify seguido de Deezer no fluxo principal; leitor Spotify anônimo/parcial desativado. Login Deezer em WebView privado do app, captura automática de ARL da origem HTTPS e validação no motor antes de aceitar/persistir; nenhum campo ARL ou acesso a perfis externos. Atalhos das conexões pendentes na importação/conferência, desaparecendo ao conectar. YT Music público conforme resposta explícita, sem simular login Google para conteúdo restrito. Native cookie HttpOnly sintético passou em Android e Windows Release, sem conta real; 43 essenciais/focados e rodada final sobreposta de 27 passaram. Cancelar Deezer não cancela Spotify. Ambas instalações atualizadas; Windows conservou schema 16/2 coleções/242 faixas com backup privado. WebView 6.2.0-beta.3 travado (estável incompatível com AGP 9); NuGet local verificado e estágio Windows curto Ddb. Sem release/tag; paridade/contas reais continuam no checklist e testes humanos APK adiados.

@@ -16,7 +16,7 @@ class SettingsWorkspace extends StatelessWidget {
   Widget build(BuildContext context) =>
       ListView(primary: false, padding: EdgeInsets.zero, children: [
         WorkspacePanel(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(AppDensity.of(context).panelInset),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -33,15 +33,18 @@ class SettingsWorkspace extends StatelessWidget {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(
+                                  AppDensity.of(context).radius),
                               borderSide:
                                   const BorderSide(color: AppColors.line)),
                           enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(
+                                  AppDensity.of(context).radius),
                               borderSide:
                                   const BorderSide(color: AppColors.line)),
                           disabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(
+                                  AppDensity.of(context).radius),
                               borderSide:
                                   const BorderSide(color: AppColors.line))),
                       items: const [
@@ -79,7 +82,7 @@ class SettingsWorkspace extends StatelessWidget {
                   _row(
                       'Preferências de captura',
                       () => _info(context, 'Preferências de captura',
-                          'A análise de páginas, extração de áudio e captura de vídeos e imagens ainda não estão integradas.')),
+                          'Em Músicas → Capturar áudio, analise uma URL, selecione os áudios encontrados e baixe em MP3. A disponibilidade depende da página. A captura de vídeos e imagens está em preparação.')),
                   _row(
                       'Dados locais e histórico',
                       () => _info(context, 'Dados locais e histórico',
@@ -90,14 +93,15 @@ class SettingsWorkspace extends StatelessWidget {
             child: Text('${AppIdentity.name} · ${AppIdentity.version} · local',
                 style: TextStyle(fontSize: 11, color: AppColors.muted))),
       ]);
-  Widget _row(String label, VoidCallback? onTap) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: WorkspacePanel(
-          child: ListTile(
-              dense: true,
-              title: Text(label, style: const TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.chevron_right, size: 18),
-              onTap: onTap)));
+  Widget _row(String label, VoidCallback? onTap) => Column(children: [
+        ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(label, style: const TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: onTap),
+        const Divider(height: 1)
+      ]);
   void _info(BuildContext context, String title, String message) =>
       unawaited(showDialog<void>(
           context: context,

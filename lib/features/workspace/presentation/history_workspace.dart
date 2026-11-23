@@ -127,7 +127,10 @@ class _HistoryWorkspaceState extends State<HistoryWorkspace> {
                   total: c.history.total,
                   onPage: (v) => unawaited(c.turnHistory(v))),
               OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                  style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                              AppDensity.of(context).radius))),
                   onPressed: () => unawaited(c.library.openOutput()),
                   icon: const Icon(Icons.folder_open_outlined, size: 18),
                   label: const Text('Pasta principal')),

@@ -159,7 +159,7 @@ void main() {
       await tester.pumpAndSettle();
       final playlistUrl = find.byKey(const ValueKey('playlist-url'));
       expect(tester.widget<TextField>(playlistUrl).focusNode!.hasFocus, isTrue);
-      expect(find.text('Minhas coleções'), findsOneWidget);
+      expect(find.text('Playlists'), findsOneWidget);
       await ioUntil(
           tester,
           () => find
@@ -200,7 +200,9 @@ void main() {
         await pointer.removePointer();
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Conexões'));
+      await tester.tap(find.byKey(const ValueKey('playlist-import-options')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Conexões'));
       await tester.pumpAndSettle();
       expect(find.text('Conectar Trackhop'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Entrar na Deezer'),
@@ -766,7 +768,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Capturar áudio'));
       await tester.pumpAndSettle();
-      expect(find.text('Capturador de áudio'), findsOneWidget);
+      expect(find.text('Capturar áudio'), findsWidgets);
       await capture(tester, captureKey, 'audio-capture-${width.toInt()}');
       await tester.tap(find.descendant(
           of: nav,

@@ -16,23 +16,36 @@ class MusicConnectionsScope extends InheritedWidget {
 
 /// Offers the Deezer connection while it can expand the music search.
 class MusicConnectionActions extends StatelessWidget {
-  const MusicConnectionActions({super.key, this.onConnected});
+  const MusicConnectionActions(
+      {super.key, this.onConnected, this.showLabel = false});
   final Future<void> Function()? onConnected;
+  final bool showLabel;
   @override
   Widget build(BuildContext context) {
     final access = MusicConnectionsScope.of(context);
     if (access == null || access.connected(MusicAccount.deezer)) {
       return const SizedBox.shrink();
     }
+    Future<void> connect() async {
+      if (await access.connect(MusicAccount.deezer)) {
+        await onConnected?.call();
+      }
+    }
+
+    if (showLabel) {
+      return TextButton.icon(
+          onPressed: connect,
+          icon: const _DeezerMark(),
+          label: const Text('Conectar Deezer'),
+          style: TextButton.styleFrom(
+              foregroundColor: AppColors.accentActive,
+              minimumSize: Size(0, AppDensity.of(context).control)));
+    }
     return Padding(
       padding: const EdgeInsets.only(left: 6),
       child: IconButton.outlined(
         tooltip: 'Entrar no Deezer · ampliar busca',
-        onPressed: () async {
-          if (await access.connect(MusicAccount.deezer)) {
-            await onConnected?.call();
-          }
-        },
+        onPressed: connect,
         style: IconButton.styleFrom(
             foregroundColor: AppColors.accentActive,
             side: const BorderSide(color: AppColors.line)),

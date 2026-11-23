@@ -177,6 +177,8 @@ void main() {
         });
         await tester.pumpAndSettle();
       }
+      await tester.tap(find.byKey(ValueKey('collection-menu-$originalId')));
+      await tester.pumpAndSettle();
       await tester
           .tap(find.byKey(ValueKey('collection-new-group-$originalId')));
       await tester.pumpAndSettle();
@@ -184,6 +186,8 @@ void main() {
           find.byKey(const ValueKey('organization-name')), 'Viagens');
       await tester.tap(find.text('Salvar'));
       await ioUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
+      await tester.tap(find.byKey(ValueKey('collection-menu-$originalId')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey('collection-move-$originalId')));
       await tester.pumpAndSettle();
       await tester.tap(find.descendant(
@@ -194,6 +198,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Salvar'));
       await ioUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
+      await tester.tap(find.byKey(ValueKey('collection-menu-$originalId')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey('collection-rename-$originalId')));
       await ioUntil(
           tester, () => find.text('Cor da playlist').evaluate().isNotEmpty);
@@ -265,7 +271,7 @@ void main() {
       await tester.pumpAndSettle();
       await ioUntil(
           tester, () => find.text('Uma seleção nova').evaluate().isEmpty);
-      await tester.tap(find.byTooltip('Renomear grupo'));
+      await tester.tap(find.byTooltip('Renomear pasta'));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('organization-name')), 'Viagens favoritas');
@@ -275,9 +281,9 @@ void main() {
           () =>
               find.byType(AlertDialog).evaluate().isEmpty &&
               find.text('Viagens favoritas (1)').evaluate().isNotEmpty);
-      await tester.tap(find.byTooltip('Remover grupo'));
+      await tester.tap(find.byTooltip('Remover pasta'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Remover grupo'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Remover pasta'));
       await ioUntil(
           tester, () => find.text('Uma seleção nova').evaluate().isNotEmpty);
       await tester.runAsync(() async {

@@ -5,7 +5,8 @@ param(
     [switch]$ListOnly,
     [string]$WorkspaceRoot=(Split-Path $PSScriptRoot -Parent),
     [string]$FlutterPath='',
-    [string]$PythonPath=''
+    [string]$PythonPath='',
+    [ValidateRange(1,32)][int]$Concurrency=2
 )
 $ErrorActionPreference='Stop'
 # Android build/test caches live in the existing profile-quota exclusion.
@@ -79,8 +80,8 @@ foreach($name in $optional) {
 }
 Push-Location $workspace
 try {
-    if($Profile -eq 'Regression') { & $FlutterPath test --no-pub }
-    else { & $FlutterPath test --no-pub @files }
+    if($Profile -eq 'Regression') { & $FlutterPath test --no-pub "--concurrency=$Concurrency" }
+    else { & $FlutterPath test --no-pub "--concurrency=$Concurrency" @files }
     if($LASTEXITCODE -ne 0) { throw "Testes Flutter falharam (código $LASTEXITCODE)." }
     if($worker) {
         & $PythonPath -m unittest discover -s runtime/music_worker -p 'test_*.py'

@@ -80,7 +80,7 @@ void main() {
             const StandardMethodCodec()
                 .encodeMethodCall(MethodCall(method, args)),
             (_) {});
-    final point = tester.getCenter(find.text('Minhas coleções'));
+    final point = tester.getCenter(find.text('Playlists'));
     await drop('entered', [point.dx, point.dy]);
     await tester.runAsync(() => drop('performOperation', [input.parent.path]));
     await ioUntil(tester, () => opened != null);

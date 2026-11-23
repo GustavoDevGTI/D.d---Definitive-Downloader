@@ -30,13 +30,13 @@ class ListeningActions extends StatelessWidget {
                 foregroundColor: ink,
                 hoverColor:
                     accent == null ? AppColors.accentSoft : ink.withAlpha(24),
-                minimumSize: const Size(36, 36),
-                fixedSize: const Size(36, 36),
+                minimumSize: Size.square(AppDensity.of(context).control),
+                fixedSize: Size.square(AppDensity.of(context).control),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.all(6),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6))),
-            icon: Icon(icon, size: 18));
+                    borderRadius: BorderRadius.circular(AppDensity.of(context).radius))),
+            icon: Icon(icon, size: AppDensity.of(context).icon));
     return Wrap(
         spacing: 3,
         alignment: WrapAlignment.start,
@@ -46,11 +46,12 @@ class ListeningActions extends StatelessWidget {
             TextButton.icon(
                 style: TextButton.styleFrom(
                     foregroundColor: ink,
-                    minimumSize: const Size(36, 36),
+                    minimumSize: Size(0, AppDensity.of(context).control),
                     padding: const EdgeInsets.symmetric(horizontal: 6),
-                    fixedSize: const Size.fromHeight(36),
+                    fixedSize: Size.fromHeight(AppDensity.of(context).control),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle: const TextStyle(fontSize: 11)),
+                    textStyle:
+                        const TextStyle(fontFamily: 'Manrope', fontSize: 12)),
                 icon: const Icon(Icons.play_arrow_rounded, size: 18),
                 label: Text(version == null
                     ? player.trackListenLabel(track)

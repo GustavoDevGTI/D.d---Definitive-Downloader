@@ -23,17 +23,17 @@ class CollectionGroupStrip extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: Row(children: [
                     _tab('Todas', null),
-                    _tab('Sem grupo', 0),
+                    _tab('Sem pasta', 0),
                     for (final g in groups)
                       _tab('${g.name} (${g.count})', g.id),
                   ]))),
           if (selected != null && selected! > 0) ...[
             IconButton(
-                tooltip: 'Renomear grupo',
+                tooltip: 'Renomear pasta',
                 onPressed: onRename,
                 icon: const Icon(Icons.edit_outlined, size: 18)),
             IconButton(
-                tooltip: 'Remover grupo',
+                tooltip: 'Remover pasta',
                 onPressed: onRemove,
                 icon: const Icon(Icons.folder_delete_outlined, size: 19)),
           ]
@@ -54,7 +54,7 @@ class CollectionGroupStrip extends StatelessWidget {
           style: TextButton.styleFrom(
               foregroundColor:
                   selected == id ? AppColors.accentActive : AppColors.muted,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: const RoundedRectangleBorder()),
           child: Text(text,
               style: TextStyle(

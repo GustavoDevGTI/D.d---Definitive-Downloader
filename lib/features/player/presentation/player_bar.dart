@@ -30,8 +30,7 @@ class PlayerBar extends StatelessWidget {
                     child: Padding(
                         key: const ValueKey('music-player-bar'),
                         padding: EdgeInsets.symmetric(
-                            horizontal: compact ? 12 : 24,
-                            vertical: compact ? 8 : 10),
+                            horizontal: compact ? 12 : 14, vertical: 8),
                         child: compact
                             ? Column(mainAxisSize: MainAxisSize.min, children: [
                                 Row(children: [
@@ -63,7 +62,7 @@ class PlayerBar extends StatelessWidget {
                                                   color: AppColors.accent))),
                               ])
                             : Row(children: [
-                                Expanded(flex: 3, child: _metadata(52)),
+                                Expanded(flex: 3, child: _metadata(40)),
                                 const SizedBox(width: 16),
                                 Expanded(
                                     flex: 5,
@@ -72,7 +71,7 @@ class PlayerBar extends StatelessWidget {
                                         children: [
                                           controls,
                                           SizedBox(
-                                              height: 28,
+                                              height: 20,
                                               child: PlayerSeek(player: player))
                                         ])),
                                 const SizedBox(width: 16),
@@ -225,6 +224,7 @@ class PlayerIcon extends StatelessWidget {
                   tooltip: label,
                   onPressed: onPressed,
                   style: IconButton.styleFrom(
+                      shape: const CircleBorder(),
                       backgroundColor:
                           primary ? Colors.white : Colors.transparent,
                       foregroundColor: primary
@@ -238,9 +238,16 @@ class PlayerIcon extends StatelessWidget {
                       hoverColor:
                           primary ? AppColors.accentSoft : Colors.white12,
                       highlightColor: AppColors.accent.withAlpha(60),
-                      minimumSize: Size(primary ? 42 : 36, primary ? 42 : 36),
+                      minimumSize: AppDensity.of(context).desktop
+                          ? const Size(40, 40)
+                          : Size(primary ? 42 : 36, primary ? 42 : 36),
                       padding: const EdgeInsets.all(6)),
-                  icon: Icon(icon, size: primary ? 26 : 21)))));
+                  icon: Icon(icon,
+                      size: AppDensity.of(context).desktop
+                          ? 20
+                          : primary
+                              ? 26
+                              : 21)))));
 }
 
 class PlayerTransport extends StatelessWidget {

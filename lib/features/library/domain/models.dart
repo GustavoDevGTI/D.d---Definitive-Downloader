@@ -26,7 +26,8 @@ enum SourceKind {
   deezerFull,
   youtubeMusic,
   youtube,
-  soundcloud
+  soundcloud,
+  webAudio
 }
 
 extension MusicSourceName on SourceKind {
@@ -36,6 +37,7 @@ extension MusicSourceName on SourceKind {
         SourceKind.youtube => 'YouTube',
         SourceKind.soundcloud => 'SoundCloud',
         SourceKind.localFile => 'Arquivo local',
+        SourceKind.webAudio => 'Página web',
         _ => null,
       };
   String get musicProviderSuffix =>
@@ -218,6 +220,7 @@ class Track {
         SourceKind.youtubeMusic => 'YouTube Music · faixa',
         SourceKind.youtube => 'YouTube · áudio escolhido',
         SourceKind.soundcloud => 'SoundCloud · faixa',
+        SourceKind.webAudio => 'Áudio capturado',
       };
 }
 

@@ -19,7 +19,7 @@ class TrackIdentity extends StatelessWidget {
                 : track.resolvedCoverUrl,
             audioPath: track.localPath,
             borderColor: accent,
-            size: 112);
+            size: AppDensity.of(context).desktop ? 80 : 112);
         final identity = Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment:
@@ -27,8 +27,9 @@ class TrackIdentity extends StatelessWidget {
             children: [
               Text(track.displayTitle,
                   textAlign: beside ? TextAlign.start : TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                      fontSize: AppDensity.of(context).desktop ? 15 : 17,
+                      fontWeight: FontWeight.w600)),
               const SizedBox(height: 5),
               Text(track.artist,
                   textAlign: beside ? TextAlign.start : TextAlign.center,

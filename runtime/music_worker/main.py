@@ -9,6 +9,7 @@ import deezer
 import youtube_music
 import soundcloud_catalog
 import soundcloud_audio
+import capture_audio
 from audio_files import finish
 from transfer_control import TransferControl
 from runtime_paths import ffmpeg_path, android_health
@@ -18,6 +19,8 @@ logging.disable(logging.CRITICAL)
 
 def execute(request, control=None):
     operation = request.get('operation')
+    if operation == 'captureAnalyze':
+        return capture_audio.analyze(request.get('url'))
     if operation == 'health':
         return {'ready': True, 'protocol': 1, **android_health()}
     if operation == 'deezerConnect':
@@ -52,6 +55,12 @@ def execute(request, control=None):
         if not isinstance(output_title, str) or len(output_title) > 400 or any(ord(c)<32 for c in output_title):
             raise MusicError('Nome de saída inválido.')
         expected = int(candidate.get('durationMs') or 0)
+        if candidate.get('kind') == 'webAudio':
+            if not 0 <= expected <= capture_audio.MAX_DURATION:
+                raise MusicError('Duração de captura inválida.')
+            source, actual = capture_audio.download(candidate, directory, control)
+            return finish(source, actual, directory, ffmpeg, expected, output_title,
+                          require_cover=False)
         if not 1000 <= expected <= 3600000:
             raise MusicError('Duração da faixa não confirmada.')
         if candidate.get('kind') in ('youtubeMusic', 'youtube'):

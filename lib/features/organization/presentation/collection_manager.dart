@@ -78,80 +78,99 @@ class _CollectionManagerState extends State<CollectionManager> {
                 children: [
                   Row(children: [
                     const Expanded(
-                        child: Text('Minhas coleções',
+                        child: Text('Playlists',
                             style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w600))),
-                    TextButton.icon(
-                        key: const ValueKey('create-playlist'),
-                        onPressed: !widget.library.importBlocked && !c.saving
-                            ? () => _editPlaylist()
-                            : null,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Nova playlist')),
-                  ]),
-                  if (defaultTargetPlatform == TargetPlatform.android)
-                    Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                            key: const ValueKey('import-audio-folder'),
-                            onPressed: !widget.library.importBlocked &&
-                                    !c.saving
-                                ? () async {
-                                    final playlist = await widget.library
-                                        .chooseLocalFolder(groupId: group?.id);
-                                    if (mounted && playlist != null) {
-                                      widget.onOpen(playlist);
-                                    }
+                                fontSize: 18, fontWeight: FontWeight.w700))),
+                    if (defaultTargetPlatform == TargetPlatform.android)
+                      IconButton(
+                          key: const ValueKey('import-audio-folder'),
+                          tooltip: 'Importar pasta de áudio',
+                          onPressed: !widget.library.importBlocked && !c.saving
+                              ? () async {
+                                  final playlist = await widget.library
+                                      .chooseLocalFolder(groupId: group?.id);
+                                  if (mounted && playlist != null) {
+                                    widget.onOpen(playlist);
                                   }
-                                : null,
-                            icon: const Icon(Icons.folder_open, size: 18),
-                            label: const Text('Importar pasta'))),
-                  if (defaultTargetPlatform == TargetPlatform.windows)
-                    const Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: Text(
-                            'Arraste uma pasta de áudio para criar uma playlist',
-                            style: TextStyle(
-                                fontSize: 11, color: AppColors.muted))),
-                  const SizedBox(height: 8),
-                  TextField(
-                      key: const ValueKey('search-playlists'),
-                      controller: _search,
-                      maxLength: 160,
-                      decoration: InputDecoration(
-                          hintText: 'Buscar playlists',
-                          counterText: '',
-                          prefixIcon: const Icon(Icons.search, size: 19),
-                          suffixIcon: _search.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Limpar busca',
-                                  icon: const Icon(Icons.close, size: 18),
-                                  onPressed: () {
-                                    _timer?.cancel();
-                                    _search.clear();
-                                    unawaited(c.filter('', c.groupId));
-                                  })),
-                      onChanged: (value) {
-                        setState(() {});
-                        _timer?.cancel();
-                        _timer = Timer(const Duration(milliseconds: 300),
-                            () => unawaited(c.filter(value, c.groupId)));
-                      }),
+                                }
+                              : null,
+                          icon:
+                              const Icon(Icons.folder_open_outlined, size: 22)),
+                  ]),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                      builder: (context, box) => Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                SizedBox(
+                                    width: box.maxWidth < 480
+                                        ? box.maxWidth
+                                        : box.maxWidth - 160,
+                                    child: TextField(
+                                        key: const ValueKey('search-playlists'),
+                                        controller: _search,
+                                        maxLength: 160,
+                                        decoration: InputDecoration(
+                                            hintText: 'Buscar playlists',
+                                            counterText: '',
+                                            prefixIcon: const Icon(Icons.search,
+                                                size: 19),
+                                            suffixIcon: _search.text.isEmpty
+                                                ? null
+                                                : IconButton(
+                                                    tooltip: 'Limpar busca',
+                                                    icon: const Icon(
+                                                        Icons.close,
+                                                        size: 18),
+                                                    onPressed: () {
+                                                      _timer?.cancel();
+                                                      _search.clear();
+                                                      unawaited(c.filter(
+                                                          '', c.groupId));
+                                                    })),
+                                        onChanged: (value) {
+                                          setState(() {});
+                                          _timer?.cancel();
+                                          _timer = Timer(
+                                              const Duration(milliseconds: 300),
+                                              () => unawaited(
+                                                  c.filter(value, c.groupId)));
+                                        })),
+                                FilledButton.icon(
+                                    key: const ValueKey('create-playlist'),
+                                    onPressed: !widget.library.importBlocked &&
+                                            !c.saving
+                                        ? () => _editPlaylist()
+                                        : null,
+                                    style: FilledButton.styleFrom(
+                                        minimumSize: Size(
+                                            0, AppDensity.of(context).control),
+                                        visualDensity: VisualDensity.standard,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10))),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Nova playlist')),
+                              ])),
                   const SizedBox(height: 10),
-                  CollectionGroupStrip(
-                      groups: c.groups,
-                      selected: c.groupId,
-                      onSelect: (id) {
-                        _timer?.cancel();
-                        unawaited(c.filter(_search.text, id));
-                      },
-                      onRename: enabled && group != null
-                          ? () => unawaited(_editGroup(group))
-                          : null,
-                      onRemove: enabled && group != null
-                          ? () => unawaited(_removeGroup(group))
-                          : null),
+                  if (c.groups.isNotEmpty)
+                    CollectionGroupStrip(
+                        groups: c.groups,
+                        selected: c.groupId,
+                        onSelect: (id) {
+                          _timer?.cancel();
+                          unawaited(c.filter(_search.text, id));
+                        },
+                        onRename: enabled && group != null
+                            ? () => unawaited(_editGroup(group))
+                            : null,
+                        onRemove: enabled && group != null
+                            ? () => unawaited(_removeGroup(group))
+                            : null),
                   const SizedBox(height: 12),
                   if (c.loading && c.listing.items.isEmpty)
                     const Text('Carregando playlists…',
@@ -171,7 +190,7 @@ class _CollectionManagerState extends State<CollectionManager> {
                                 ? 'Nenhuma playlist encontrada.'
                                 : c.groupId == null
                                     ? 'Crie uma playlist ou importe por link.'
-                                    : 'Nenhuma playlist neste grupo.',
+                                    : 'Nenhuma playlist nesta pasta.',
                             style: const TextStyle(
                                 fontSize: 12, color: AppColors.muted))),
                   for (final item in c.listing.items)
@@ -203,8 +222,9 @@ class _CollectionManagerState extends State<CollectionManager> {
                                       if (progress != null)
                                         '${progress.checked}/${progress.total} conferidas',
                                     ].join(' · '),
-                                    leading:
-                                        const SizedBox(width: 44, height: 44),
+                                    leading: SizedBox.square(
+                                        dimension:
+                                            AppDensity.of(context).control),
                                     icon: Icons.library_music_outlined,
                                     accent: accent,
                                     onPressed: () => widget.onOpen(item)),
@@ -215,56 +235,15 @@ class _CollectionManagerState extends State<CollectionManager> {
                                     child: Center(
                                         child: PlaylistCoverButton(
                                             library: widget.library,
-                                            playlist: item))),
+                                            playlist: item,
+                                            size: AppDensity.of(context)
+                                                .control))),
                               ]));
-                          final actions =
-                              Row(mainAxisSize: MainAxisSize.min, children: [
-                            _action(
-                                'Novo grupo com esta playlist',
-                                Icons.create_new_folder_outlined,
-                                enabled
-                                    ? () => unawaited(_editGroup(null, item))
-                                    : null,
-                                item.id,
-                                'new-group'),
-                            _action(
-                                'Editar playlist',
-                                Icons.edit_outlined,
-                                enabled
-                                    ? () => unawaited(_editPlaylist(item))
-                                    : null,
-                                item.id,
-                                'rename'),
-                            _action(
-                                'Mover para grupo',
-                                Icons.drive_file_move_outline,
-                                enabled ? () => unawaited(_move(item)) : null,
-                                item.id,
-                                'move'),
-                            _action(
-                                'Excluir playlist',
-                                Icons.delete_outline,
-                                enabled
-                                    ? () => unawaited(_removePlaylist(item))
-                                    : null,
-                                item.id,
-                                'delete'),
+                          return Row(children: [
+                            Expanded(child: tile),
+                            const SizedBox(width: 8),
+                            _playlistMenu(item, enabled, box.maxWidth >= 600),
                           ]);
-                          return box.maxWidth < 600
-                              ? Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                      tile,
-                                      Align(
-                                          alignment: Alignment.centerRight,
-                                          child: actions)
-                                    ])
-                              : Row(children: [
-                                  Expanded(child: tile),
-                                  const SizedBox(width: 8),
-                                  actions
-                                ]);
                         })),
                   if (c.listing.total > 0)
                     PageControls(
@@ -277,14 +256,58 @@ class _CollectionManagerState extends State<CollectionManager> {
                 ]));
       });
 
-  Widget _action(String label, IconData icon, VoidCallback? onPressed, int id,
-          String action) =>
-      IconButton(
-          key: ValueKey('collection-$action-$id'),
-          tooltip: label,
-          onPressed: onPressed,
-          color: AppColors.accentActive,
-          icon: Icon(icon, size: 19));
+  Widget _playlistMenu(Collection item, bool enabled, bool showLabel) =>
+      PopupMenuButton<String>(
+          key: ValueKey('collection-menu-${item.id}'),
+          tooltip: 'Gerenciar playlist',
+          enabled: enabled,
+          onSelected: (action) {
+            switch (action) {
+              case 'rename':
+                unawaited(_editPlaylist(item));
+              case 'new-group':
+                unawaited(_editGroup(null, item));
+              case 'move':
+                unawaited(_move(item));
+              case 'delete':
+                unawaited(_removePlaylist(item));
+            }
+          },
+          itemBuilder: (_) => [
+                for (final action in const [
+                  ('rename', Icons.edit_outlined, 'Editar playlist'),
+                  (
+                    'new-group',
+                    Icons.create_new_folder_outlined,
+                    'Nova pasta com esta playlist'
+                  ),
+                  ('move', Icons.drive_file_move_outline, 'Mover para pasta'),
+                  ('delete', Icons.delete_outline, 'Excluir playlist'),
+                ])
+                  PopupMenuItem(
+                      key: ValueKey('collection-${action.$1}-${item.id}'),
+                      value: action.$1,
+                      child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(action.$2,
+                              color: action.$1 == 'delete'
+                                  ? AppColors.accentActive
+                                  : AppColors.secondary),
+                          title: Text(action.$3))),
+              ],
+          child: Padding(
+              padding: EdgeInsets.all(AppDensity.of(context).desktop ? 10 : 14),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.tune_rounded,
+                    size: 20, color: AppColors.secondary),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  const Text('Gerenciar',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.secondary)),
+                ],
+              ])));
   Future<void> _removePlaylist(Collection item) async {
     final approved = await showDialog<bool>(
         context: context,
@@ -374,7 +397,7 @@ class _CollectionManagerState extends State<CollectionManager> {
     await showDialog<bool>(
         context: context,
         builder: (_) => OrganizationNameDialog(
-            title: group == null ? 'Novo grupo' : 'Renomear grupo',
+            title: group == null ? 'Nova pasta' : 'Renomear pasta',
             name: group?.name ?? '',
             maxLength: 80,
             onSave: (name, _, __) => _controller.mutate(() async {
@@ -392,16 +415,16 @@ class _CollectionManagerState extends State<CollectionManager> {
     final remove = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Remover grupo?'),
+                title: const Text('Remover pasta?'),
                 content: Text(
-                    'As playlists de “${group.name}” ficarão sem grupo. As faixas e os arquivos serão preservados.'),
+                    'Remover a pasta “${group.name}” da organização das playlists?'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
                       child: const Text('Cancelar')),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Remover grupo'))
+                      child: const Text('Remover pasta'))
                 ]));
     if (remove != true || !mounted) return;
     final error = await _controller.mutate(() async {
@@ -417,7 +440,7 @@ class _CollectionManagerState extends State<CollectionManager> {
     await showDialog<bool>(
         context: context,
         builder: (_) => OrganizationNameDialog(
-            title: 'Mover para grupo',
+            title: 'Mover para pasta',
             name: item.name,
             groups: _controller.groups,
             groupId: item.groupId,
