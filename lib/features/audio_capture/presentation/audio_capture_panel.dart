@@ -55,7 +55,7 @@ class _AudioCapturePanelState extends State<AudioCapturePanel> {
           LinkEntryPanel(
               title: 'Capturar áudio',
               fieldLabel: 'Endereço da página ou mídia',
-              hintText: 'Cole o link',
+              hintText: '',
               controller: _url,
               inputKey: const ValueKey('capture-url-music'),
               actionKey: const ValueKey('capture-analyze-music'),

@@ -2,6 +2,8 @@
 
 ## Produto e prioridades
 
+- Refino visual 0.1.95: hover e foco dos controles mantêm a geometria e destacam a cor; pressão por ponteiro usa escala 0,97/160 ms, com tokens em `lib/app/motion.dart`. Ativação por teclado, movimento reduzido e controles desabilitados não recebem transformação. Esta decisão substitui a ampliação no hover da 0.1.16. Publicação Windows e APKs Android da mesma versão solicitada em 23/11/2026, sem iniciar emulador ou executar testes nele.
+
 - Revisões em fila, solicitado em 23/11/2026: aplicar primeiro todas as alterações enviadas na fila e executar os testes somente depois, em uma rodada consolidada de essenciais e focados. Não iniciar uma nova bateria entre mensagens de ajustes do mesmo lote.
 
 - Publicação 0.1.94 solicitada em 23/11/2026: consolidar o lote e publicar os pacotes Windows e Android da mesma versão, sem executar testes no emulador. O foco de desenvolvimento continua no Windows; a geração dos APKs desta release não declara paridade ou validação mobile concluída.

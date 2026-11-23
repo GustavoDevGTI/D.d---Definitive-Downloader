@@ -656,9 +656,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 40));
       final midWidth = tester.getRect(startButton).width;
-      expect(midWidth, greaterThan(restingBounds.width));
+      expect(midWidth, closeTo(restingBounds.width, .01));
       await tester.pumpAndSettle();
-      expect(tester.getRect(startButton).width, greaterThan(midWidth));
+      expect(tester.getRect(startButton).width,
+          closeTo(restingBounds.width, .01));
       expect(tester.widget<Material>(startMaterial).color, isNot(restingColor));
       await capture(tester, captureKey, 'music-play-hover-${width.toInt()}');
       final addButton = find.descendant(

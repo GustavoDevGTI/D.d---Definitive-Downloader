@@ -25,31 +25,25 @@ class HomeWorkspace extends StatelessWidget {
             return Wrap(spacing: 14, runSpacing: 12, children: [
               _shortcut(
                   width,
-                  Icons.playlist_add_rounded,
                   'Importar playlist',
-                  'Cole o link da playlist.',
                   AppColors.accentActive,
                   AppColors.accentSoft,
                   onImportPlaylist),
               _shortcut(
                   width,
-                  Icons.headphones_rounded,
                   'Minhas coleções',
-                  'Playlists, faixas e fontes.',
                   AppColors.music,
                   AppColors.musicSoft,
                   () => onNavigate(AppSection.music, 0)),
               _shortcut(
                   width,
-                  Icons.folder_open_rounded,
                   'Meus arquivos',
-                  'O que já foi baixado.',
                   AppColors.ink,
                   AppColors.musicSoft,
                   () => onNavigate(AppSection.files, 0)),
             ]);
           }),
-          const SizedBox(height: 30),
+          const SizedBox(height: 32),
           const Text('Visão geral',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
@@ -92,7 +86,7 @@ class HomeWorkspace extends StatelessWidget {
               '${summary.active} em andamento',
               () => onNavigate(AppSection.music, 2)),
           _queue('Vídeos e fotos', Icons.perm_media_outlined,
-              'Ver fila de mídias', () => onNavigate(AppSection.media, 1)),
+              null, () => onNavigate(AppSection.media, 1)),
           const SizedBox(height: 24),
           Row(children: [
             const Expanded(
@@ -124,12 +118,11 @@ class HomeWorkspace extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.muted)),
-                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
                   onTap: () => onNavigate(AppSection.files, 0)),
         ]);
       });
-  Widget _shortcut(double width, IconData icon, String title, String subtitle,
-          Color color, Color background, VoidCallback action) =>
+  Widget _shortcut(double width, String title, Color color, Color background,
+          VoidCallback action) =>
       SizedBox(
           width: width,
           child: Semantics(
@@ -142,29 +135,11 @@ class HomeWorkspace extends StatelessWidget {
                       onTap: action,
                       child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Row(children: [
-                            Icon(icon, size: 20, color: color),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(title,
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 5),
-                                  Text(subtitle,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.muted,
-                                          height: 1.4)),
-                                ])),
-                            const SizedBox(width: 8),
-                            Icon(Icons.north_east_rounded,
-                                size: 19, color: color),
-                          ]))))));
+                          child: Text(title,
+                              style: TextStyle(
+                                  color: color,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)))))));
   Widget _stat(
           double width, String label, String value, IconData icon, Color color,
           {bool compact = false}) =>
@@ -201,7 +176,7 @@ class HomeWorkspace extends StatelessWidget {
                       ])),
                 ]));
   Widget _queue(
-          String title, IconData icon, String subtitle, VoidCallback action) =>
+          String title, IconData icon, String? subtitle, VoidCallback action) =>
       ListTile(
           contentPadding: EdgeInsets.zero,
           minVerticalPadding: 10,
@@ -209,8 +184,7 @@ class HomeWorkspace extends StatelessWidget {
           title: Text(title,
               style:
                   const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          subtitle: Text(subtitle,
+          subtitle: subtitle == null ? null : Text(subtitle,
               style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-          trailing: const Icon(Icons.chevron_right_rounded, size: 21),
           onTap: action);
 }

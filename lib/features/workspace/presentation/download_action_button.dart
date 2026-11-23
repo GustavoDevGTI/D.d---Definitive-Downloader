@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/button_hover_motion.dart';
+import '../../../app/motion.dart';
 
 abstract final class DownloadActionColors {
   static const start = Color(0xFF1764D5);
@@ -24,7 +25,7 @@ ButtonStyle downloadActionStyle(
         }.contains(s),
       );
   return ButtonStyle(
-    animationDuration: const Duration(milliseconds: 140),
+    animationDuration: AppMotion.hoverDuration,
     foregroundColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.disabled)) return color.withAlpha(165);
       return primary || active || highlighted(states) ? Colors.white : color;

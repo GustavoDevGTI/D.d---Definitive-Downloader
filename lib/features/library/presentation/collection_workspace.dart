@@ -155,7 +155,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
           LinkEntryPanel(
               title: 'Importar playlist',
               fieldLabel: 'Link da playlist ou faixa',
-              hintText: 'Cole o link da playlist',
+              hintText: '',
               controller: _url,
               focusNode: _urlFocus,
               inputKey: const ValueKey('playlist-url'),
