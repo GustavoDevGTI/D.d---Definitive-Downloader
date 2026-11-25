@@ -24,6 +24,7 @@ import 'package:definitive_downloader/app/theme.dart';
 import 'package:definitive_downloader/features/library/presentation/collection_track_toolbar.dart';
 import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
 import 'package:definitive_downloader/features/library/presentation/track_table.dart';
+import 'package:definitive_downloader/features/organization/presentation/collection_manager.dart';
 import 'widget_io.dart';
 
 const fixturePlaylistUrl =
@@ -185,6 +186,93 @@ void main() {
   });
 
   testWidgets(
+      'excluir playlist interrompe sua conferência e preserva mídia e histórico',
+      (tester) async {
+    tester.view.physicalSize = const Size(1360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    late LibraryController c;
+    late int id;
+    late File media;
+    await tester.runAsync(() async {
+      id = await repository.importCollection(ImportedCollection(
+          name: 'Excluir salva',
+          source: 'Spotify',
+          sourceUrl: fixturePlaylistUrl,
+          tracks: Stream.fromIterable(const [
+            TrackDraft(title: 'Salva', artist: 'Pessoa'),
+            TrackDraft(title: 'Pendente', artist: 'Pessoa'),
+          ])));
+      media = await File('${temp.path}/preservar.mp3').writeAsBytes([1, 2, 3]);
+      await repository.setStatus(
+          (await repository.page(id)).items.first.id, TrackStatus.completed,
+          localPath: media.path);
+      resolver.gate = Completer<void>();
+      c = controller(const []);
+      await c.openCollection((await repository.collectionById(id))!);
+      await resolver.started.future;
+    });
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme(platform: TargetPlatform.windows),
+        home: Scaffold(body: CollectionManager(library: c, onOpen: (_) {}))));
+    final menu = find.byKey(ValueKey('collection-menu-$id'));
+    await ioUntil(tester, () => menu.evaluate().isNotEmpty);
+    expect(tester.widget<PopupMenuButton<String>>(menu).enabled, isTrue,
+        reason: 'A conferência não deve impedir excluir a própria playlist.');
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('collection-delete-$id')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Excluir playlist'));
+    await ioUntil(tester, () => c.preparationStopping);
+    resolver.gate!.complete();
+    await ioUntil(tester, () => c.collections.every((item) => item.id != id));
+    await tester.runAsync(() async {
+      await c.preparationDone;
+      expect(await repository.collectionById(id), isNull);
+      expect(await media.readAsBytes(), [1, 2, 3]);
+      expect(
+          await repository.database.run((db) => db
+              .select('SELECT track_id FROM download_history')
+              .single['track_id']),
+          isNull);
+    });
+    expect(c.current, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('excluir playlist na fila de conferência não cancela a busca de outra',
+      () async {
+    Future<int> saved(String name) =>
+        repository.importCollection(ImportedCollection(
+            name: name,
+            source: 'Spotify',
+            sourceUrl: fixturePlaylistUrl,
+            tracks: Stream.value(const TrackDraft(
+                title: 'Faixa', artist: 'Pessoa', durationMs: 180000))));
+    final first = await saved('Primeira');
+    final second = await saved('Segunda');
+    resolver.gate = Completer<void>();
+    final c = controller(const []);
+    await c.openCollection((await repository.collectionById(first))!);
+    await resolver.started.future;
+    await c.openCollection((await repository.collectionById(second))!);
+    expect(c.waitingPreparations, 1);
+    await c.removeCollection(second);
+    expect(await repository.collectionById(second), isNull);
+    expect(c.waitingPreparations, 0);
+    expect(c.preparingCollection!.id, first);
+    expect(c.preparationStopping, isFalse);
+    resolver.gate!.complete();
+    await finishMatching(c);
+    expect(resolver.calls, hasLength(1));
+    expect(
+        (await repository.page(first)).items.single.status, TrackStatus.ready);
+  });
+
+  testWidgets(
       'playlist salva aceita cliques e checkboxes durante conferência pendente',
       (tester) async {
     tester.view.physicalSize = const Size(1360, 800);
@@ -264,7 +352,8 @@ void main() {
               artist: 'Pessoa',
               sourceKind: SourceKind.directMp3,
               mediaUrl: 'http://127.0.0.1:${server.port}/tone.mp3'),
-          const TrackDraft(title: 'Pendente', artist: 'Pessoa', durationMs: 180000),
+          const TrackDraft(
+              title: 'Pendente', artist: 'Pessoa', durationMs: 180000),
         ])));
     final before = (await repository.page(id)).items;
     await repository.select(before.first.id, true);

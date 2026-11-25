@@ -260,7 +260,7 @@ class _CollectionManagerState extends State<CollectionManager> {
       PopupMenuButton<String>(
           key: ValueKey('collection-menu-${item.id}'),
           tooltip: 'Gerenciar playlist',
-          enabled: enabled,
+          enabled: !widget.library.importBlocked && !_controller.saving,
           onSelected: (action) {
             switch (action) {
               case 'rename':
@@ -287,6 +287,7 @@ class _CollectionManagerState extends State<CollectionManager> {
                   PopupMenuItem(
                       key: ValueKey('collection-${action.$1}-${item.id}'),
                       value: action.$1,
+                      enabled: action.$1 == 'delete' || enabled,
                       child: ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(action.$2,
@@ -325,11 +326,7 @@ class _CollectionManagerState extends State<CollectionManager> {
                 ]));
     if (approved != true || !mounted) return;
     final error = await _controller.mutate(() async {
-      if (widget.library.busy) {
-        throw const FormatException('Aguarde a operação em andamento.');
-      }
-      await _controller.repository.remove(item.id);
-      await widget.library.refresh();
+      await widget.library.removeCollection(item.id);
     });
     if (error != null && mounted) await showAppNotice(context, message: error);
   }

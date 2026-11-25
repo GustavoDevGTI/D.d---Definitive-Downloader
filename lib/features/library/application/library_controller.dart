@@ -153,6 +153,33 @@ class LibraryController extends ChangeNotifier {
       repository.collections(offset: offset);
   Future<Collection?> collectionChoice(int id) => repository.collectionById(id);
 
+  Future<void> removeCollection(int id) async {
+    if (importBlocked) {
+      throw const FormatException('Aguarde a operação em andamento.');
+    }
+    editing = true;
+    notifyListeners();
+    try {
+      _preparationQueue.remove(id);
+      if (_preparingCollection?.id == id) {
+        final finished = _preparingFinished;
+        cancelPreparation();
+        try {
+          await finished?.future.timeout(const Duration(seconds: 15));
+        } on TimeoutException {
+          throw const FormatException(
+              'A conferência ainda está sendo interrompida. Tente excluir novamente em instantes.');
+        }
+      }
+      if (_disposed) return;
+      await CollectionOrganizationRepository(repository.database).remove(id);
+      await refresh();
+    } finally {
+      editing = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> addLinks(int collectionId, String input,
       {bool enqueue = false,
       ChooseDuplicate? chooseDuplicate,
@@ -698,6 +725,7 @@ class LibraryController extends ChangeNotifier {
   Future<void>? _preparation;
   DownloadCancellation? _preparationCancellation;
   Collection? _preparingCollection;
+  Completer<void>? _preparingFinished;
   bool _preparingOnlyPending = true;
   Collection? get preparingCollection => _preparingCollection;
   PreparationProgress? _preparationProgress;
@@ -779,6 +807,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _prepareMusic(Collection collection,
       {required bool onlyPending, required String importNotice}) async {
+    final finished = _preparingFinished = Completer<void>();
     final token = _preparationCancellation = DownloadCancellation();
     _preparingOnlyPending = onlyPending;
     _preparingCollection = collection;
@@ -857,6 +886,8 @@ class LibraryController extends ChangeNotifier {
         _preparingCollection = null;
         _preparationCancellation = null;
         _preparationProgress = null;
+        _preparingFinished = null;
+        finished.complete();
       }
     }
   }

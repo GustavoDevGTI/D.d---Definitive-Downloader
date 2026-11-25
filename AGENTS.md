@@ -2,6 +2,8 @@
 
 ## Produto e prioridades
 
+- Biblioteca Windows 0.1.103: SQLite passa a `%LOCALAPPDATA%/Definitive Downloader/Library`, copiando primeiro a biblioteca D.d anterior de Roaming e, na ausência dela, a biblioteca histórica Trama. Snapshot pela API de backup SQLite com origem somente leitura, incluindo WAL confirmado; validar antes de publicar, conservar originais e nunca substituir destino existente. Publicação Windows por MoveFileExW sem replace, com lock entre migrações. Excluir uma playlist pode interromper somente a conferência dela e remover seu item da fila; aguardar o trabalho terminar antes do DELETE e conservar arquivos/histórico. Ver `docs/RELEASE_0_1_103.md`.
+
 - Interação de playlists 0.1.102: a retomada automática de correspondências pendentes é trabalho de fundo e não bloqueia clique/checkbox/seleção total/Ctrl + arraste. Seleção tem guarda própria, distinta da edição. Fontes prontas podem baixar em paralelo com conferência somente de pendentes; reconferência completa continua excluída do início de download. Preservar snapshot da execução, fontes manuais, concluídos e nomes/posições protegidos. Não apagar a seleção ou a biblioteca como recuperação do bloqueio. Ver `docs/RELEASE_0_1_102.md`.
 
 - Publicação 0.1.101 solicitada em 25/11/2026: consolidar as entregas Windows 0.1.96–0.1.101, com código, tag, instalador e SHA-256. Android continua pausado; não gerar APK nem executar emulador nesta publicação. Regressão offline Dart/motor e limites constam em `docs/RELEASE_0_1_101.md`.

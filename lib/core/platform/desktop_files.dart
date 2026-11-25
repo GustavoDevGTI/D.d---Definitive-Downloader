@@ -51,9 +51,23 @@ class DesktopFiles {
 
   Future<String> dataDirectory() async =>
       (await getApplicationSupportDirectory()).path;
+  Future<String> localLibraryDirectory() async {
+    final local = Platform.environment['LOCALAPPDATA'];
+    if (local == null || !p.isAbsolute(local)) {
+      throw const FileSystemException(
+          'A pasta local de dados do Windows não está disponível.');
+    }
+    return p.join(local, AppIdentity.name, 'Library');
+  }
+
   Future<String> databasePath() async {
-    final destination =
+    final previous =
         p.join(await dataDirectory(), 'definitive_downloader.sqlite3');
+    if (!Platform.isWindows) return previous;
+    final destination =
+        p.join(await localLibraryDirectory(), 'definitive_downloader.sqlite3');
+    await migrateLegacyLibrary(
+        sourcePath: previous, destinationPath: destination);
     final roaming = Platform.environment['APPDATA'];
     if (Platform.isWindows && roaming != null) {
       await migrateLegacyLibrary(

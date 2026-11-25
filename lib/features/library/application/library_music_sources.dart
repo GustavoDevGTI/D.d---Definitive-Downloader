@@ -66,6 +66,7 @@ class LibraryMusicSources {
           final found = await resolver.search(
               track, '${track.artist} ${track.title}',
               cancellation: token);
+          token.check();
           await repository.saveCandidates(track.id, found);
           final choice = resolver.automaticChoice(track, found);
           if (choice != null) {
