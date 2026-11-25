@@ -329,7 +329,9 @@ class LibraryController extends ChangeNotifier {
   Future<void> _selectionWrites = Future<void>.value();
   Future<void> selectSweep(List<int> ids) {
     final owner = current?.id;
-    if (owner == null || busy || ids.isEmpty) return Future<void>.value();
+    if (owner == null || selectionBlocked || ids.isEmpty) {
+      return Future<void>.value();
+    }
     final request = _selectionWrites.then((_) async {
       await repository.selectSweep(owner, ids);
       await refresh();
@@ -342,7 +344,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<bool> clickTrack(Track track, {required bool extend}) async {
-    if (busy || current?.id != track.collectionId) return false;
+    if (selectionBlocked || current?.id != track.collectionId) return false;
     await repository.selectFromClick(track.collectionId, track.id,
         extend: extend);
     await refresh();
@@ -467,6 +469,15 @@ class LibraryController extends ChangeNotifier {
       _startingRun ||
       _checkingDownloads;
   bool get busy => importBlocked || preparing;
+  // Selection does not change a source or the persisted download snapshot.
+  bool get selectionBlocked => importBlocked;
+  // Automatic pending-only matching cannot touch already prepared sources.
+  // A full recheck can; retain its exclusion from transfer startup.
+  bool get downloadBlocked =>
+      importBlocked ||
+      (preparing &&
+          (!_preparingOnlyPending ||
+              _preparationQueue.values.any((job) => !job.onlyPending)));
   bool get reorderingBusy =>
       importing ||
       preparing ||
@@ -615,7 +626,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> selectCollection(bool value) async {
-    if (current == null || busy) return;
+    if (current == null || selectionBlocked) return;
     await repository.selectCollection(current!.id, value,
         query: collectionQuery, filter: view == 'collections' ? '' : view);
     await refresh();
@@ -687,6 +698,7 @@ class LibraryController extends ChangeNotifier {
   Future<void>? _preparation;
   DownloadCancellation? _preparationCancellation;
   Collection? _preparingCollection;
+  bool _preparingOnlyPending = true;
   Collection? get preparingCollection => _preparingCollection;
   PreparationProgress? _preparationProgress;
   PreparationProgress? get preparationProgress => _preparationProgress;
@@ -768,6 +780,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> _prepareMusic(Collection collection,
       {required bool onlyPending, required String importNotice}) async {
     final token = _preparationCancellation = DownloadCancellation();
+    _preparingOnlyPending = onlyPending;
     _preparingCollection = collection;
     _preparationStatus = '${collection.name} · Conferindo correspondências…';
     var resultMessage = '';
@@ -1238,7 +1251,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<bool> _checkDownloadSelection(
       {List<int>? queueIds, bool failedOnly = false}) async {
-    if (busy || (current == null && queueIds == null)) return false;
+    if (downloadBlocked || (current == null && queueIds == null)) return false;
     _checkingDownloads = true;
     notifyListeners();
     try {
@@ -1295,7 +1308,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> _downloadSelected(
       {List<int>? queueIds, bool failedOnly = false}) async {
     final collection = current;
-    if ((collection == null && queueIds == null) || busy) return;
+    if ((collection == null && queueIds == null) || downloadBlocked) return;
     downloading = true;
     progress = null;
     _startingRun = true;

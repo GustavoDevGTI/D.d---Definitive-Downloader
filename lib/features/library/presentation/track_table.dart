@@ -129,7 +129,7 @@ class _TrackTableState extends State<TrackTable> {
                                 : controller.page.filteredSelectedCount > 0
                                     ? null
                                     : false,
-                            onChanged: controller.busy ||
+                            onChanged: controller.selectionBlocked ||
                                     controller.page.total == 0
                                 ? null
                                 : (_) => unawaited(controller.selectCollection(
@@ -167,7 +167,7 @@ class _TrackTableState extends State<TrackTable> {
                           scroll: _scroll,
                           extent: extent,
                           count: controller.page.items.length,
-                          enabled: !controller.busy,
+                          enabled: !controller.selectionBlocked,
                           viewKey: listingKey,
                           onSelect: (indices) => unawaited(controller
                                   .selectSweep([
@@ -236,7 +236,7 @@ class _TrackTableState extends State<TrackTable> {
                                                             compact: compact,
                                                             selectionEnabled:
                                                                 !controller
-                                                                    .busy,
+                                                                    .selectionBlocked,
                                                             onTap: () =>
                                                                 unawaited(
                                                                     _click(t)),
@@ -247,8 +247,8 @@ class _TrackTableState extends State<TrackTable> {
                                                                         point)),
                                                             onSelect: (v) =>
                                                                 unawaited(controller
-                                                                    .select(
-                                                                        t, v)))));
+                                                                    .select(t,
+                                                                        v)))));
                                               }))))))),
             ]);
           }));

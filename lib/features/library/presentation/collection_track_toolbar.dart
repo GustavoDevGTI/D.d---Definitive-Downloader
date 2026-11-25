@@ -185,7 +185,9 @@ class CollectionTrackToolbar extends StatelessWidget {
           icon: Icons.download_rounded,
           color: DownloadActionColors.start,
           primary: true,
-          onPressed: c.busy || c.page.selectedCount == 0 ? null : onDownload),
+          onPressed: c.downloadBlocked || c.page.selectedCount == 0
+              ? null
+              : onDownload),
       DownloadActionButton(
           label: 'Adicionar links',
           icon: Icons.add_link_rounded,

@@ -23,6 +23,7 @@ import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
 import 'package:definitive_downloader/app/theme.dart';
 import 'package:definitive_downloader/features/library/presentation/collection_track_toolbar.dart';
 import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
+import 'package:definitive_downloader/features/library/presentation/track_table.dart';
 import 'widget_io.dart';
 
 const fixturePlaylistUrl =
@@ -144,6 +145,175 @@ void main() {
   tearDown(() async {
     connection.dispose();
     await temp.delete(recursive: true);
+  });
+
+  test('playlist salva continua selecionável durante retomada da conferência',
+      () async {
+    final id = await repository.importCollection(ImportedCollection(
+        name: 'Playlist salva',
+        source: 'Spotify',
+        sourceUrl: fixturePlaylistUrl,
+        tracks: Stream.fromIterable(const [
+          TrackDraft(title: 'Primeira', artist: 'Pessoa', durationMs: 180000),
+          TrackDraft(title: 'Segunda', artist: 'Pessoa', durationMs: 180000),
+        ])));
+    final saved = (await repository.page(id)).items;
+    await repository.select(saved.first.id, true);
+    await repository.database.initialize(); // Reopen the persisted library.
+    resolver.gate = Completer<void>();
+    final c = controller(const []);
+    await c.openCollection((await repository.collectionById(id))!);
+    await resolver.started.future.timeout(const Duration(seconds: 5));
+    expect(c.preparingCurrent, isTrue);
+    expect(c.page.items.first.selected, isTrue);
+    expect(await c.clickTrack(c.page.items.last, extend: false), isTrue,
+        reason:
+            'Busca em segundo plano não pode prender a seleção restaurada.');
+    expect(c.page.items.first.selected, isFalse);
+    expect(c.page.items.last.selected, isTrue);
+    await c.select(c.page.items.last, false);
+    expect(c.page.selectedCount, 0);
+    await c.selectCollection(true);
+    expect(c.page.selectedCount, 2);
+    c.togglePreparationPause();
+    await c.selectCollection(false);
+    expect(c.page.selectedCount, 0);
+    await c.selectSweep([saved.first.id]);
+    expect(c.page.selectedCount, 1);
+    expect(c.page.items.first.selected, isTrue);
+    expect(c.preparingCurrent, isTrue);
+  });
+
+  testWidgets(
+      'playlist salva aceita cliques e checkboxes durante conferência pendente',
+      (tester) async {
+    tester.view.physicalSize = const Size(1360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    late LibraryController c;
+    await tester.runAsync(() async {
+      final id = await repository.importCollection(ImportedCollection(
+          name: 'Playlist salva',
+          source: 'Spotify',
+          sourceUrl: fixturePlaylistUrl,
+          tracks: Stream.fromIterable(const [
+            TrackDraft(title: 'Primeira', artist: 'Pessoa'),
+            TrackDraft(title: 'Segunda', artist: 'Pessoa'),
+          ])));
+      await repository.select((await repository.page(id)).items.first.id, true);
+      await repository.database.initialize();
+      resolver.gate = Completer<void>();
+      c = controller(const []);
+      await c.openCollection((await repository.collectionById(id))!);
+      await resolver.started.future;
+    });
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme(platform: TargetPlatform.windows),
+        home: Scaffold(
+            body: ListenableBuilder(
+                listenable: c,
+                builder: (_, __) =>
+                    TrackTable(controller: c, onFocus: c.focus)))));
+    await tester.pumpAndSettle();
+    final second = c.page.items.last.id;
+    final row = find.byKey(ValueKey('track-row-$second'));
+    final check = find.descendant(of: row, matching: find.byType(Checkbox));
+    expect(tester.widget<Checkbox>(check).onChanged, isNotNull,
+        reason:
+            'A conferência automática não pode desabilitar as caixas de seleção.');
+    await tester.tap(row);
+    await ioUntil(tester,
+        () => c.page.items.last.selected && !c.page.items.first.selected);
+    await tester.tap(check);
+    await ioUntil(tester, () => c.page.selectedCount == 0);
+    await tester.tap(find.byKey(const ValueKey('select-all-collection')));
+    await ioUntil(tester, () => c.page.selectedCount == 2);
+    c.togglePreparationPause();
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('select-all-collection')));
+    await ioUntil(tester, () => c.page.selectedCount == 0);
+    expect(c.preparingCurrent, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test(
+      'faixa pronta da playlist salva pode baixar enquanto outra aguarda conferência',
+      () async {
+    final previousHttp = HttpOverrides.current;
+    HttpOverrides.global =
+        null; // Requests are restricted to this loopback fixture.
+    addTearDown(() => HttpOverrides.global = previousHttp);
+    final bytes =
+        (await rootBundle.load('assets/demo/tone.mp3')).buffer.asUint8List();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      request.response.headers.contentType = ContentType('audio', 'mpeg');
+      request.response.add(bytes);
+      await request.response.close();
+    });
+    addTearDown(() => server.close(force: true));
+    final id = await repository.importCollection(ImportedCollection(
+        name: 'Playlist salva',
+        source: 'Spotify',
+        sourceUrl: fixturePlaylistUrl,
+        tracks: Stream.fromIterable([
+          TrackDraft(
+              title: 'Pronta',
+              artist: 'Pessoa',
+              sourceKind: SourceKind.directMp3,
+              mediaUrl: 'http://127.0.0.1:${server.port}/tone.mp3'),
+          const TrackDraft(title: 'Pendente', artist: 'Pessoa', durationMs: 180000),
+        ])));
+    final before = (await repository.page(id)).items;
+    await repository.select(before.first.id, true);
+    resolver.gate = Completer<void>();
+    final c = controller(const [])..outputDirectory = '${temp.path}/output';
+    await c.openCollection((await repository.collectionById(id))!);
+    await resolver.started.future;
+    await c.downloadSelected();
+    final after = (await repository.page(id)).items;
+    expect(after.first.status, TrackStatus.completed,
+        reason:
+            'Uma busca pendente não deve bloquear o download de uma fonte já pronta.');
+    expect(await File(after.first.localPath).exists(), isTrue);
+    expect(after.last.status, TrackStatus.pending);
+    expect(after.last.localPath, isEmpty);
+    expect(c.preparingCurrent, isTrue);
+    resolver.gate!.complete();
+    await finishMatching(c);
+    final finished = (await repository.page(id)).items;
+    expect(finished.first.status, TrackStatus.completed);
+    expect(finished.first.localPath, after.first.localPath);
+    expect(finished.last.status, TrackStatus.ready);
+    expect(finished.last.localPath, isEmpty);
+  });
+
+  test(
+      'reconferência completa conserva bloqueio de download sem prender seleção',
+      () async {
+    final id = await repository.importCollection(ImportedCollection(
+        name: 'Salva pronta',
+        source: 'Spotify',
+        sourceUrl: fixturePlaylistUrl,
+        tracks: Stream.value(const TrackDraft(
+            title: 'Pronta',
+            artist: 'Pessoa',
+            mediaUrl: 'https://example.org/fixture.mp3',
+            sourceKind: SourceKind.directMp3))));
+    await repository.select((await repository.page(id)).items.first.id, true);
+    resolver.gate = Completer<void>();
+    final c = controller(const []);
+    await c.openCollection((await repository.collectionById(id))!);
+    unawaited(c.prepareMusic(onlyPending: false));
+    await resolver.started.future;
+    expect(c.downloadBlocked, isTrue);
+    expect(c.selectionBlocked, isFalse);
+    expect(c.busy, isTrue); // Source/name editing remains protected.
+    await c.selectCollection(false);
+    expect(c.page.selectedCount, 0);
+    expect((await repository.page(id)).items.single.status, TrackStatus.ready);
   });
 
   test('estimativa usa amostras da busca e descarta faixas já conferidas', () {

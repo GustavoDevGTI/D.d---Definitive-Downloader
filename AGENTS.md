@@ -2,6 +2,8 @@
 
 ## Produto e prioridades
 
+- Interação de playlists 0.1.102: a retomada automática de correspondências pendentes é trabalho de fundo e não bloqueia clique/checkbox/seleção total/Ctrl + arraste. Seleção tem guarda própria, distinta da edição. Fontes prontas podem baixar em paralelo com conferência somente de pendentes; reconferência completa continua excluída do início de download. Preservar snapshot da execução, fontes manuais, concluídos e nomes/posições protegidos. Não apagar a seleção ou a biblioteca como recuperação do bloqueio. Ver `docs/RELEASE_0_1_102.md`.
+
 - Publicação 0.1.101 solicitada em 25/11/2026: consolidar as entregas Windows 0.1.96–0.1.101, com código, tag, instalador e SHA-256. Android continua pausado; não gerar APK nem executar emulador nesta publicação. Regressão offline Dart/motor e limites constam em `docs/RELEASE_0_1_101.md`.
 
 - Conexão Deezer 0.1.101: na oferta opcional após inserir playlist Spotify/Deezer, a ação secundária é **Deixar para mais tarde**, retornando adiamento e preservando a importação; não exibir Cancelar adicional. Na abertura manual por Conectar Deezer, manter **Cancelar** e a decisão de cancelamento. Usar o contexto `allowLater`, não o título ou a URL da janela. Ver `docs/VERSAO_LOCAL_0_1_101.md`.
