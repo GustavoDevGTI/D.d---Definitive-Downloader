@@ -68,7 +68,7 @@ class ContinuousTrackRepository {
           return ContinuousTrackSnapshot(
               revision, ids, existing, changed, selected, filtered);
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

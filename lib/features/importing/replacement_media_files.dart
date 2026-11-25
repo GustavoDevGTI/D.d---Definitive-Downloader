@@ -7,6 +7,7 @@ import '../library/data/library_repository.dart';
 import '../library/domain/models.dart';
 import '../../core/platform/desktop_files.dart';
 import '../../core/platform/platform_services.dart';
+import 'local_audio_formats.dart';
 
 /// Reversible removal with a relational crash journal; never touches originals
 /// imported from outside the collection or files shared by another occurrence.
@@ -27,7 +28,8 @@ class ReplacementMediaFiles {
         final expected = '${safeSegment(owner.outputFolderName)} [${owner.id}]';
         if (!p.isAbsolute(file.path) ||
             p.basename(file.parent.path) != expected ||
-            p.extension(file.path).toLowerCase() != '.mp3') {
+            !localAudioExtensions
+                .contains(p.extension(file.path).toLowerCase())) {
           throw const FormatException(
               'O arquivo antigo está fora da pasta da playlist. Nada foi excluído.');
         }
@@ -60,7 +62,8 @@ class ReplacementMediaFiles {
               'O arquivo antigo não é uma mídia local regular.');
         }
         final folder = await file.parent.createTemp('.dd-replace-');
-        final staged = p.join(folder.path, 'media.mp3');
+        final staged =
+            p.join(folder.path, 'media${p.extension(file.path).toLowerCase()}');
         final canonicalFolder = await file.parent.resolveSymbolicLinks();
         await repository.database.run((db) => db.execute(
             'INSERT INTO music_replacement_files VALUES(?,?,?,?,?,?)',
@@ -102,7 +105,10 @@ class ReplacementMediaFiles {
             !p.isWithin(original.parent.path, parent.path) ||
             p.dirname(parent.path) != original.parent.path ||
             !p.basename(parent.path).startsWith('.dd-replace-') ||
-            p.basename(staged.path) != 'media.mp3') {
+            !localAudioExtensions
+                .contains(p.extension(original.path).toLowerCase()) ||
+            p.basename(staged.path) !=
+                'media${p.extension(original.path).toLowerCase()}') {
           throw const FormatException('Diário local inválido.');
         }
         if (await original.parent.exists() &&

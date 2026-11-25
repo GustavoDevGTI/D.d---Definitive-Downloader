@@ -7,6 +7,7 @@ import '../app_identity.dart';
 import '../storage/legacy_library_migration.dart';
 import 'media_publication.dart';
 import '../../features/downloads/download_cancellation.dart';
+import '../../features/importing/local_audio_formats.dart';
 
 class DesktopFiles {
   Future<bool> isDirectory(String path) async =>
@@ -81,13 +82,21 @@ class DesktopFiles {
   Future<void> releaseAudioFolder(String path) async {}
   Future<List<String>> chooseMp3Files() async =>
       (await openFiles(acceptedTypeGroups: [
-        const XTypeGroup(
-            label: 'Músicas MP3',
-            extensions: ['mp3'],
-            mimeTypes: ['audio/mpeg'])
+        XTypeGroup(
+            label: 'Arquivos de áudio',
+            extensions: localAudioExtensions
+                .map((extension) => extension.substring(1))
+                .toList())
       ]))
           .map((file) => file.path)
           .toList();
+  Future<String?> chooseMp3Destination(String suggestedName) async =>
+      (await getSaveLocation(
+              suggestedName: suggestedName,
+              acceptedTypeGroups: const [
+            XTypeGroup(label: 'MP3', extensions: ['mp3'])
+          ]))
+          ?.path;
   Future<String?> chooseCover() async => (await openFile(acceptedTypeGroups: [
         const XTypeGroup(
             label: 'Capa da playlist',

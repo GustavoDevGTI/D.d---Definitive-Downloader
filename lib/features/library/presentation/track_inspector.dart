@@ -9,6 +9,8 @@ import 'edit_track_dialog.dart';
 import 'track_identity.dart';
 import 'playlist_palette.dart';
 import '../../player/presentation/listening_actions.dart';
+import '../../audio_conversion/application/audio_conversion_controller.dart';
+import '../../audio_conversion/presentation/audio_conversion_dialog.dart';
 
 class TrackInspector extends StatefulWidget {
   const TrackInspector({super.key, required this.controller});
@@ -38,9 +40,11 @@ class _TrackInspectorState extends State<TrackInspector> {
     if (_trackId != t?.id ||
         _revision != c.inspectorRevision ||
         (_status != t?.status && t?.status == TrackStatus.completed)) {
+      final openReview =
+          _revision != c.inspectorRevision && c.inspectorReviewRequested;
       _trackId = t?.id;
       _revision = c.inspectorRevision;
-      _tab = t?.status == TrackStatus.completed ? 1 : 0;
+      _tab = t?.status == TrackStatus.completed && !openReview ? 1 : 0;
       _query.text = t == null ? '' : '${t.artist} ${t.title}';
     }
     _status = t?.status;
@@ -142,6 +146,14 @@ class _TrackInspectorState extends State<TrackInspector> {
                             if (t.localPath.isNotEmpty)
                               _line('Último arquivo',
                                   c.files.displayPath(t.localPath)),
+                            if (AudioConversionController.canOffer(t))
+                              TextButton.icon(
+                                  onPressed: c.busy
+                                      ? null
+                                      : () => unawaited(showAudioConversion(
+                                          context, t, c.files)),
+                                  icon: const Icon(Icons.transform, size: 18),
+                                  label: const Text('Converter para MP3')),
                             if (t.hasManualSource)
                               _line('Link manual', t.manualUrl),
                           ] else ...[
@@ -153,8 +165,9 @@ class _TrackInspectorState extends State<TrackInspector> {
                               SelectableText(t.manualUrl,
                                   style: const TextStyle(fontSize: 12)),
                             ],
-                            if ((!t.hasManualSource || t.redownloadReview) &&
-                                t.status != TrackStatus.completed) ...[
+                            if (c.inspectorReviewRequested ||
+                                ((!t.hasManualSource || t.redownloadReview) &&
+                                    t.status != TrackStatus.completed)) ...[
                               TextField(
                                   controller: _query,
                                   decoration: InputDecoration(
@@ -183,7 +196,13 @@ class _TrackInspectorState extends State<TrackInspector> {
                                 padding: const EdgeInsets.all(4),
                                 child: TrackReviewActions(
                                     controller: c, accent: ink)),
-                            if ((!t.hasManualSource || t.redownloadReview) &&
+                            if (c.inspectorReviewRequested &&
+                                (t.status == TrackStatus.completed ||
+                                    (t.hasManualSource && !t.redownloadReview)))
+                              for (final candidate in c.candidates)
+                                _option(candidate, ink, readOnly: true)
+                            else if ((!t.hasManualSource ||
+                                    t.redownloadReview) &&
                                 t.status != TrackStatus.completed)
                               RadioGroup<Candidate>(
                                   groupValue: c.selectedCandidate,
@@ -267,8 +286,30 @@ class _TrackInspectorState extends State<TrackInspector> {
           Expanded(child: detail),
         ]);
       }));
-  Widget _option(Candidate candidate, Color ink) {
+  Widget _option(Candidate candidate, Color ink, {bool readOnly = false}) {
     final assessment = widget.controller.assess(candidate);
+    final title = Text(candidate.title, style: const TextStyle(fontSize: 12));
+    final subtitle =
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(
+          '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}',
+          style: const TextStyle(fontSize: 11)),
+      Text(
+          assessment.needsReview
+              ? assessment.reason
+              : 'Correspondência provável',
+          style: TextStyle(
+              fontSize: 11, color: assessment.needsReview ? ink : null)),
+      ListeningActions(
+          track: widget.controller.focused!, candidate: candidate, accent: ink),
+    ]);
+    if (readOnly) {
+      return ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: title,
+          subtitle: subtitle);
+    }
     return RadioListTile<Candidate>(
         dense: true,
         contentPadding: EdgeInsets.zero,
@@ -277,22 +318,7 @@ class _TrackInspectorState extends State<TrackInspector> {
         selected: widget.controller.selectedCandidate == candidate,
         selectedTileColor: Color.alphaBlend(ink.withAlpha(16), Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text(candidate.title, style: const TextStyle(fontSize: 12)),
-        subtitle:
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-              '${candidate.artist}\n${candidate.isVideoRecording ? 'Videoclipe · ' : ''}${candidate.kind.musicProviderName ?? 'Prévia Deezer'} · ${formatDuration(candidate.durationMs)}',
-              style: const TextStyle(fontSize: 11)),
-          Text(
-              assessment.needsReview
-                  ? assessment.reason
-                  : 'Correspondência provável',
-              style: TextStyle(
-                  fontSize: 11, color: assessment.needsReview ? ink : null)),
-          ListeningActions(
-              track: widget.controller.focused!,
-              candidate: candidate,
-              accent: ink),
-        ]));
+        title: title,
+        subtitle: subtitle);
   }
 }

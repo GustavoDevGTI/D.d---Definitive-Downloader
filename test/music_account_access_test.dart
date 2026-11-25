@@ -2,6 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:definitive_downloader/features/connections/application/trackhop_connection.dart';
 import 'trackhop_fixture.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
@@ -361,43 +363,89 @@ void main() {
         isFalse);
   });
   for (final width in [390.0, 1360.0]) {
-    testWidgets('Deixar para depois cabe no diálogo a $width px',
-        (tester) async {
-      tester.view.physicalSize = Size(width, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final spotify =
-          TrackhopConnection(const FlutterSecureStorage(), localDesktop: true);
-      final deezer =
-          DeezerConnectionController(_SessionStore(), _LoginEngine());
-      MusicAccountDecision? decision;
-      await tester.pumpWidget(MaterialApp(
-          home: Builder(
-              builder: (context) => Scaffold(
-                  body: TextButton(
-                      onPressed: () async {
-                        decision = await showDialog<MusicAccountDecision>(
-                            context: context,
-                            builder: (_) => AccountRequestDialog(
-                                account: MusicAccount.deezer,
-                                trackhop: spotify,
-                                deezer: deezer,
-                                allowLater: true));
-                      },
-                      child: const Text('Abrir'))))));
-      await tester.tap(find.text('Abrir'));
-      await tester.pumpAndSettle();
-      expect(find.text('Entrar na Deezer'), findsOneWidget);
-      await tester.tap(find.text('Deixar para depois'));
-      await tester.pumpAndSettle();
-      expect(decision, MusicAccountDecision.later);
-      expect(deezer.connected, isFalse);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      spotify.dispose();
-      deezer.dispose();
-    });
+    for (final allowLater in [true, false]) {
+      testWidgets('pedido Deezer permite adiar=$allowLater a $width px',
+          (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final spotify = TrackhopConnection(const FlutterSecureStorage(),
+            localDesktop: true);
+        final deezer =
+            DeezerConnectionController(_SessionStore(), _LoginEngine());
+        MusicAccountDecision? decision;
+        final captureKey = GlobalKey();
+        final output = Platform.environment['DD_DEEZER_DIALOG_OUTPUT'];
+        if (output != null) {
+          await (FontLoader('Manrope')
+                ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+              .load();
+        }
+        await tester.pumpWidget(RepaintBoundary(
+            key: captureKey,
+            child: MaterialApp(
+                theme: appTheme(platform: TargetPlatform.windows),
+                home: Builder(
+                    builder: (context) => Scaffold(
+                        body: TextButton(
+                            onPressed: () async {
+                              decision = await showDialog<MusicAccountDecision>(
+                                  context: context,
+                                  builder: (_) => AccountRequestDialog(
+                                      account: MusicAccount.deezer,
+                                      trackhop: spotify,
+                                      deezer: deezer,
+                                      allowLater: allowLater));
+                            },
+                            child: const Text('Abrir')))))));
+        await tester.tap(find.text('Abrir'));
+        await tester.pumpAndSettle();
+        expect(find.text('Entrar na Deezer'), findsOneWidget);
+        expect(find.text('Deezer'), findsNothing);
+        expect(find.text('Fonte principal de download'), findsNothing);
+        final dismissLabel = allowLater ? 'Deixar para mais tarde' : 'Cancelar';
+        expect(find.text(allowLater ? 'Cancelar' : 'Deixar para mais tarde'),
+            findsNothing);
+        if (width > 600) {
+          final primary = tester
+              .getRect(find.widgetWithText(FilledButton, 'Entrar na Deezer'));
+          final cancel =
+              tester.getRect(find.widgetWithText(TextButton, dismissLabel));
+          expect(primary.center.dy, closeTo(cancel.center.dy, 1));
+          final title = tester.getRect(find.text('Conectar Deezer'));
+          expect(primary.bottom - title.top, lessThan(190));
+        }
+        if (output != null) {
+          await tester.runAsync(() async {
+            final boundary = captureKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+            final image = await boundary.toImage();
+            try {
+              final bytes =
+                  await image.toByteData(format: ui.ImageByteFormat.png);
+              await Directory(output).create(recursive: true);
+              await File('$output/deezer-${width.toInt()}-$allowLater.png')
+                  .writeAsBytes(bytes!.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+        }
+        await tester.tap(find.text(dismissLabel));
+        await tester.pumpAndSettle();
+        expect(
+            decision,
+            allowLater
+                ? MusicAccountDecision.later
+                : MusicAccountDecision.cancelled);
+        expect(deezer.connected, isFalse);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        spotify.dispose();
+        deezer.dispose();
+      });
+    }
     testWidgets('atalho Deezer aparece até conectar a $width px',
         (tester) async {
       tester.view.physicalSize = Size(width, 800);

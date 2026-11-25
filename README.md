@@ -2,7 +2,7 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, um aplicativo em Flutter/Dart para Windows e Android com foco inicial em playlists e arquivos musicais.
 
-A [pré-release 0.1.75](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.75) reúne o instalador Windows x64 e os APKs Android de teste para ARM64 e x86-64. Confira as [notas da versão](docs/VERSAO_LOCAL_0_1_75.md).
+A [pré-release 0.1.101 para Windows](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.101) reúne as correções da biblioteca, o suporte ampliado a áudio local, a conversão para MP3 e os ajustes da conexão Deezer. Confira as [notas da versão](docs/RELEASE_0_1_101.md). O desenvolvimento Android está pausado; os últimos APKs publicados estão na [0.1.95](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.95).
 
 ## Histórico da interface
 

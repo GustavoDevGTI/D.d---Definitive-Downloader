@@ -253,7 +253,7 @@ void main() {
           tester.getCenter(find.byKey(const ValueKey('track-search')));
       await platform('entered', [point.dx, point.dy]);
       await tester.pumpAndSettle();
-      expect(find.text('Adicionar MP3 à playlist'), findsOneWidget);
+      expect(find.text('Adicionar áudios à playlist'), findsOneWidget);
       await tester.runAsync(() => platform('performOperation', [input, input]));
       await ioUntil(tester,
           () => !library.addingLinks && library.current?.trackCount == 4);
@@ -269,7 +269,7 @@ void main() {
                 .length,
             2);
       });
-      final button = find.byTooltip('Adicionar MP3');
+      final button = find.byTooltip('Adicionar arquivos de áudio');
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       await tester.tap(button);

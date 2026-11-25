@@ -75,7 +75,8 @@ class LocalMediaImporter {
       void Function(String)? onProgress}) async {
     final folderImport = sourceRoot != null;
     if (paths.isEmpty || paths.length > (folderImport ? 10000 : 100)) {
-      throw const FormatException('Adicione de 1 a 100 arquivos MP3 por vez.');
+      throw const FormatException(
+          'Adicione de 1 a 100 arquivos de áudio por vez.');
     }
     final extensions =
         paths.map((path) => p.extension(path).toLowerCase()).toList();
@@ -83,22 +84,20 @@ class LocalMediaImporter {
     for (final path in paths) {
       cancellation.check();
       if (!p.isAbsolute(path) ||
-          !(folderImport
-              ? localAudioExtensions.contains(p.extension(path).toLowerCase())
-              : p.extension(path).toLowerCase() == '.mp3') ||
+          !localAudioExtensions.contains(p.extension(path).toLowerCase()) ||
           path.contains('\x00')) {
-        throw const FormatException('Arraste somente arquivos MP3.');
+        throw const FormatException('Selecione arquivos de áudio compatíveis.');
       }
       final stat = await File(path).stat();
       if (stat.type != FileSystemEntityType.file ||
           stat.size < 64 ||
-          stat.size > 200 * 1024 * 1024) {
+          stat.size > maximumLocalAudioBytes) {
         throw const FormatException(
-            'Arquivo indisponível ou fora do limite de 200 MB por áudio.');
+            'Arquivo indisponível ou fora do limite de 2 GB por áudio.');
       }
       total += stat.size;
-      if (total > 1024 * 1024 * 1024) {
-        throw const FormatException('O lote de áudio ultrapassa 1 GB.');
+      if (total > maximumLocalAudioBatchBytes) {
+        throw const FormatException('O lote de áudio ultrapassa 10 GB.');
       }
     }
     final storage = LocalMediaRepository(repository.database);
@@ -136,7 +135,7 @@ class LocalMediaImporter {
           await for (final chunk in original.openRead()) {
             cancellation.check();
             bytes += chunk.length;
-            if (bytes > before.size || bytes > 200 * 1024 * 1024) {
+            if (bytes > before.size || bytes > maximumLocalAudioBytes) {
               throw const FormatException('O arquivo mudou durante a cópia.');
             }
             await sink.writeFrom(chunk);
@@ -202,7 +201,7 @@ class LocalMediaImporter {
       }
       final imported = folderImport
           ? 'Playlist criada com ${copies.length} faixa(s).'
-          : '${copies.length} MP3(s) adicionado(s) à playlist.';
+          : '${copies.length} áudio(s) adicionado(s) à playlist.';
       try {
         await PlaylistExporter(repository, files: destinationFiles)
             .export(collectionId, folderPath);

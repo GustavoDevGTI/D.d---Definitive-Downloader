@@ -52,28 +52,48 @@ class _AccountRequestDialogState extends State<AccountRequestDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-          title: Text(widget.account == MusicAccount.spotify
-              ? 'Conectar Trackhop'
-              : 'Conectar ${widget.account.label}'),
-          content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                  child: widget.account == MusicAccount.deezer
-                      ? DeezerConnectionPane(
-                          controller: widget.deezer, allowChanges: true)
-                      : TrackhopConnectionPane(connection: widget.trackhop))),
-          actions: [
-            TextButton(
-                onPressed: () =>
-                    Navigator.pop(context, MusicAccountDecision.cancelled),
-                child: const Text('Cancelar')),
-            if (widget.account == MusicAccount.deezer && widget.allowLater)
-              TextButton(
-                  onPressed: widget.deezer.busy || _closing
-                      ? null
-                      : () =>
-                          Navigator.pop(context, MusicAccountDecision.later),
-                  child: const Text('Deixar para depois')),
-          ]);
+  Widget build(BuildContext context) {
+    final isDeezer = widget.account == MusicAccount.deezer;
+    final canDefer = isDeezer && widget.allowLater;
+    return AlertDialog(
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        actionsOverflowButtonSpacing: 8,
+        buttonPadding: const EdgeInsets.symmetric(horizontal: 4),
+        title: Text(widget.account == MusicAccount.spotify
+            ? 'Conectar Trackhop'
+            : 'Conectar ${widget.account.label}'),
+        content: SizedBox(
+            width: isDeezer ? 360 : 420,
+            child: SingleChildScrollView(
+                child: isDeezer
+                    ? Semantics(
+                        liveRegion: true,
+                        child: Text(
+                            widget.deezer.message.isEmpty
+                                ? 'Use sua conta para buscar e baixar músicas.'
+                                : widget.deezer.message,
+                            style: TextStyle(
+                                color: widget.deezer.message.isNotEmpty &&
+                                        !widget.deezer.busy &&
+                                        !widget.deezer.connected
+                                    ? Theme.of(context).colorScheme.error
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant)))
+                    : TrackhopConnectionPane(connection: widget.trackhop))),
+        actions: [
+          TextButton(
+              onPressed: canDefer && (widget.deezer.busy || _closing)
+                  ? null
+                  : () => Navigator.pop(
+                      context,
+                      canDefer
+                          ? MusicAccountDecision.later
+                          : MusicAccountDecision.cancelled),
+              child: Text(canDefer ? 'Deixar para mais tarde' : 'Cancelar')),
+          if (isDeezer)
+            DeezerConnectionButton(
+                controller: widget.deezer, allowChanges: !_closing),
+        ]);
+  }
 }

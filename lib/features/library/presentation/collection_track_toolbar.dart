@@ -88,10 +88,13 @@ class CollectionTrackToolbar extends StatelessWidget {
                         child: Text(
                             '${item.$2}${c.trackSort == item.$1 ? c.trackDescending ? ' ↓' : ' ↑' : ''}')),
                 ]);
+        final conferenceLabel = c.singleSelectedTrack != null
+            ? 'Rever correspondência'
+            : 'Iniciar conferência';
         final conference = OutlinedButton.icon(
             key: const ValueKey('start-playlist-conference'),
             icon: const Icon(Icons.fact_check_outlined, size: 20),
-            label: const Text('Iniciar conferência'),
+            label: Text(conferenceLabel),
             style: OutlinedButton.styleFrom(
                 minimumSize: Size(0, AppDensity.of(context).control),
                 visualDensity: VisualDensity.standard,
@@ -107,7 +110,10 @@ class CollectionTrackToolbar extends StatelessWidget {
                     fontWeight: FontWeight.w600),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-            onPressed: c.busy || c.isExample || c.music?.available != true
+            onPressed: c.busy ||
+                    c.searching ||
+                    c.isExample ||
+                    c.music?.available != true
                 ? null
                 : () => unawaited(c.prepareMusic()));
         final density = AppDensity.of(context);
@@ -118,9 +124,9 @@ class CollectionTrackToolbar extends StatelessWidget {
         final commandWidth =
             commandCount * density.control + (commandCount - 1) * 4 + 4;
         final conferenceText = TextPainter(
-            text: const TextSpan(
-                text: 'Iniciar conferência',
-                style: TextStyle(
+            text: TextSpan(
+                text: conferenceLabel,
+                style: const TextStyle(
                     fontFamily: 'Manrope',
                     fontSize: 12,
                     fontWeight: FontWeight.w600)),
@@ -188,7 +194,7 @@ class CollectionTrackToolbar extends StatelessWidget {
               ? null
               : () => unawaited(showAddMusicLinks(context, c))),
       DownloadActionButton(
-          label: 'Adicionar MP3',
+          label: 'Adicionar arquivos de áudio',
           icon: Icons.audio_file_outlined,
           color: DownloadActionColors.add,
           onPressed:

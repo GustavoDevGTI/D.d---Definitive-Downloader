@@ -139,6 +139,7 @@ class LibraryController extends ChangeNotifier {
   bool _startingRun = false;
   bool _checkingDownloads = false;
   int inspectorRequest = 0, inspectorRevision = 0;
+  bool inspectorReviewRequested = false;
   Completer<void>? _additionDone;
   DownloadCancellation? _additionCancellation;
   bool _holdQueueForReview = false;
@@ -583,8 +584,9 @@ class LibraryController extends ChangeNotifier {
     await refresh();
   }
 
-  void focus(Track track) {
+  void focus(Track track, {bool review = false}) {
     inspectorRevision++;
+    inspectorReviewRequested = review;
     focused = track;
     candidates = [];
     selectedCandidate = null;
@@ -707,10 +709,28 @@ class LibraryController extends ChangeNotifier {
   Future<void> prepareMusic(
       {bool onlyPending = true, String importNotice = ''}) {
     final collection = current;
-    if (busy || collection == null) return preparationDone;
+    if (busy ||
+        searching ||
+        collection == null ||
+        isExample ||
+        music?.available != true) {
+      return preparationDone;
+    }
+    final selected = singleSelectedTrack;
+    if (onlyPending && importNotice.isEmpty && selected != null) {
+      message = '';
+      inspectorRequest++;
+      focus(selected, review: true);
+      return search('${selected.artist} ${selected.title}',
+          announceResults: false);
+    }
     return _queuePreparation(collection,
         onlyPending: onlyPending, importNotice: importNotice);
   }
+
+  Track? get singleSelectedTrack => page.selectedCount == 1
+      ? page.items.where((track) => track.selected).firstOrNull
+      : null;
 
   Future<void> _queuePreparation(Collection collection,
       {required bool onlyPending, String importNotice = ''}) {
@@ -767,6 +787,11 @@ class LibraryController extends ChangeNotifier {
           onlyPending: onlyPending,
           deezerConnected: music!.connection.connected);
       token.check();
+      if (counts.pending == 0) {
+        resultMessage =
+            'Não há faixas pendentes de conferência nesta playlist.';
+        return;
+      }
       _preparationProgress = PreparationProgress(
           total: counts.total,
           checked: counts.total - counts.pending,
@@ -1108,7 +1133,7 @@ class LibraryController extends ChangeNotifier {
     return null;
   }
 
-  Future<void> search(String query) async {
+  Future<void> search(String query, {bool announceResults = true}) async {
     if (searching || focused == null) return;
     final requestedTrack = focused!.id;
     if (!await _authorizePrimary() ||
@@ -1129,9 +1154,11 @@ class LibraryController extends ChangeNotifier {
         selectedCandidate = null;
         message = found.isEmpty
             ? 'Nenhum resultado. Tente ajustar título ou artista.'
-            : music == null
-                ? 'A Deezer oferece prévias nesta integração; os resultados não habilitam download de faixa completa.'
-                : 'Fontes em Deezer, YouTube Music e SoundCloud; videoclipes só como última alternativa e com aprovação.';
+            : !announceResults
+                ? ''
+                : music == null
+                    ? 'A Deezer oferece prévias nesta integração; os resultados não habilitam download de faixa completa.'
+                    : 'Fontes em Deezer, YouTube Music e SoundCloud; videoclipes só como última alternativa e com aprovação.';
         if (music != null && focused != null) {
           await repository.saveCandidates(focused!.id, found);
         }

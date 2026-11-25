@@ -52,6 +52,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   int _musicTab = 0, _mediaTab = 0;
   int _inspectorRequest = 0;
   int _playlistImportRequest = 0;
+  VoidCallback? _returnFromPlaylist;
   @override
   void initState() {
     super.initState();
@@ -143,6 +144,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     } else {
       unawaited(_workspace.refresh());
     }
+  }
+
+  void _returnToCollections() {
+    final back = _returnFromPlaylist;
+    _returnFromPlaylist = null;
+    back?.call();
+    _navigate(AppSection.music);
   }
 
   @override
@@ -319,7 +327,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_musicTab != 0) _musicTabs(),
+              if (_musicTab != 0)
+                _musicTabs(
+                    onBack: _returnFromPlaylist == null
+                        ? null
+                        : _returnToCollections),
               Expanded(
                 child: IndexedStack(
                   index: _musicTab,
@@ -330,7 +342,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                       initialPlaylist: widget.initialPlaylist,
                       importRequest: _playlistImportRequest,
-                      buildTabs: (onBack) => _musicTabs(onBack: onBack),
+                      buildTabs: (onBack) {
+                        _returnFromPlaylist = onBack;
+                        return _musicTabs(onBack: onBack);
+                      },
                       onConnections:
                           widget.connections == null ? null : _showConnections,
                       onDownloads: () => _navigate(AppSection.music, 2),

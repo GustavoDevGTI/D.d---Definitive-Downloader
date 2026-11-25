@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../app/theme.dart';
 import '../data/deezer_web_login.dart';
 import '../domain/deezer_login_policy.dart';
+import 'deezer_login_controls.dart';
 
 Future<String?> showDeezerLogin(BuildContext context,
         {required Future<bool> Function(String) verifySession}) =>
@@ -166,6 +168,12 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
 
   Widget _browser() => InAppWebView(
         webViewEnvironment: _login.environment,
+        initialUserScripts: UnmodifiableListView([
+          UserScript(
+              source: deezerLoginControls,
+              injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+              forMainFrameOnly: true),
+        ]),
         initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
             incognito: true,
@@ -236,7 +244,7 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
           });
           _watchLoad();
         },
-        onLoadStop: (_, url) async {
+        onLoadStop: (view, url) async {
           final page = url?.uriValue;
           if (_finished ||
               !mounted ||
@@ -246,6 +254,13 @@ class _DeezerLoginDialogState extends State<DeezerLoginDialog> {
           _loadTimeout?.cancel();
           _blockedNavigation = false;
           _page = page;
+          try {
+            await view.evaluateJavascript(source: deezerLoginControls);
+          } catch (_) {
+            _loadFailed('Não foi possível preparar o formulário da Deezer. Tente novamente.');
+            return;
+          }
+          if (!mounted || _finished) return;
           if (_loading) setState(() => _loading = false);
           await _observe();
         },

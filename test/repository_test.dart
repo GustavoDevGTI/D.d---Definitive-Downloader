@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/domain/models.dart';
@@ -23,6 +24,24 @@ void main() {
       sourceUrl: '',
       tracks: Stream.fromIterable(List.generate(count,
           (i) => const TrackDraft(title: 'Repetida', artist: 'Pessoa')))));
+
+  test(
+      'falha que encerra transação conserva o erro original e permite nova importação',
+      () async {
+    await repository.database
+        .run((db) => db.execute('''CREATE TRIGGER fail_import
+      BEFORE INSERT ON tracks BEGIN
+      SELECT RAISE(ROLLBACK,'Falha original de armazenamento'); END'''));
+    await expectLater(
+        seed(2),
+        throwsA(isA<SqliteException>().having((error) => error.message,
+            'erro original', contains('Falha original de armazenamento'))));
+    expect(await repository.collections(), isEmpty);
+    await repository.database
+        .run((db) => db.execute('DROP TRIGGER fail_import'));
+    final id = await seed(2);
+    expect((await repository.page(id)).total, 2);
+  });
 
   test('pagina sem remover ocorrências repetidas e persiste seleção', () async {
     final id = await seed(85);

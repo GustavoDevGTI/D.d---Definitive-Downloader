@@ -64,7 +64,7 @@ class RedownloadRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -93,7 +93,7 @@ class RedownloadRepository {
               [id]);
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

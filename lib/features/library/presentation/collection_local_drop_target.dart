@@ -73,7 +73,7 @@ class _CollectionLocalDropTargetState extends State<CollectionLocalDropTarget> {
                                   color: AppColors.accentSoft,
                                   child: Padding(
                                       padding: EdgeInsets.all(12),
-                                      child: Text('Adicionar MP3 à playlist',
+                                      child: Text('Adicionar áudios à playlist',
                                           style: TextStyle(
                                               color: AppColors.accentActive,
                                               fontWeight:

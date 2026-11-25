@@ -169,7 +169,7 @@ class MusicLinkRepository {
           db.execute('COMMIT');
           return ids;
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -273,7 +273,7 @@ class MusicLinkRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

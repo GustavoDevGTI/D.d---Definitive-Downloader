@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 import '../player/data/audio_tags.dart';
 import '../player/domain/playback.dart';
 import '../player/data/android_audio_engine.dart';
+import 'local_audio_formats.dart';
+export 'local_audio_formats.dart';
 
 class LocalAudioMetadata {
   const LocalAudioMetadata(
@@ -20,16 +22,6 @@ class LocalAudioMetadata {
 abstract interface class LocalAudioInspector {
   Future<LocalAudioMetadata> inspect(String path);
 }
-
-const localAudioExtensions = {
-  '.mp3',
-  '.wav',
-  '.flac',
-  '.m4a',
-  '.aac',
-  '.ogg',
-  '.opus'
-};
 
 /// A silent decoder probe, with structural validation for MP3.
 class MediaKitLocalAudioInspector implements LocalAudioInspector {
@@ -52,7 +44,7 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       throw const FormatException('Formato de áudio indisponível.');
     }
     if (extension == '.mp3') {
-      await validateMp3Frames(path, maximumBytes: 500 * 1024 * 1024);
+      await validateMp3Frames(path, maximumBytes: maximumLocalAudioBytes);
     }
     final tags = await _tags(path);
     if (Platform.isAndroid) {
@@ -62,7 +54,8 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       if (duration < 1 ||
           duration > const Duration(hours: 24).inMilliseconds ||
           metadata?['hasVideo'] == true ||
-          !_androidMimeTypes[extension]!.contains(metadata?['mime'])) {
+          !(_androidMimeTypes[extension]?.contains(metadata?['mime']) ??
+              false)) {
         throw FormatException(
           'O arquivo não contém áudio $extension utilizável.',
         );
@@ -100,7 +93,11 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
       final value = player.state.duration > Duration.zero
           ? player.state.duration
           : await duration.future.timeout(const Duration(seconds: 12));
-      final tracks = player.state.tracks;
+      final tracks = player.state.tracks.audio.any((t) => t.codec != null)
+          ? player.state.tracks
+          : await player.stream.tracks
+              .firstWhere((tracks) => tracks.audio.any((t) => t.codec != null))
+              .timeout(const Duration(seconds: 5));
       final audio = tracks.audio.any((t) => switch (extension) {
             '.mp3' => t.codec == 'mp3' || t.codec == 'mp3float',
             '.wav' => t.codec?.startsWith('pcm_') == true ||
@@ -110,6 +107,16 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
             '.aac' => t.codec == 'aac',
             '.ogg' => const {'vorbis', 'opus', 'flac'}.contains(t.codec),
             '.opus' => t.codec == 'opus',
+            '.wma' => const {
+                'wmav1',
+                'wmav2',
+                'wmapro',
+                'wmalossless',
+                'wmavoice'
+              }.contains(t.codec),
+            '.aif' || '.aiff' => t.codec?.startsWith('pcm_') == true,
+            '.ape' => t.codec == 'ape',
+            '.wv' => t.codec == 'wavpack',
             _ => false,
           });
       final video = tracks.video
@@ -121,11 +128,22 @@ class MediaKitLocalAudioInspector implements LocalAudioInspector {
         throw FormatException(
             'O arquivo não contém áudio $extension utilizável.');
       }
+      final native = player.platform;
+      Future<String> metadata(String key) async {
+        if (native is! mk.NativePlayer) return '';
+        var text = await native.getProperty('metadata/by-key/$key');
+        if (text.isEmpty) {
+          text =
+              await native.getProperty('metadata/by-key/${key.toUpperCase()}');
+        }
+        return text.length > 400 ? text.substring(0, 400) : text;
+      }
+
       return LocalAudioMetadata(
           durationMs: value.inMilliseconds,
-          title: tags.title,
-          artist: tags.artist,
-          album: tags.album);
+          title: tags.title.isEmpty ? await metadata('title') : tags.title,
+          artist: tags.artist.isEmpty ? await metadata('artist') : tags.artist,
+          album: tags.album.isEmpty ? await metadata('album') : tags.album);
     } on TimeoutException {
       throw const FormatException(
           'Não foi possível conferir o áudio no tempo limite.');

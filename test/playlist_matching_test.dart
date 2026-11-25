@@ -20,6 +20,10 @@ import 'package:definitive_downloader/features/library/presentation/library_oper
 import 'package:definitive_downloader/features/matching/deezer_catalog.dart';
 import 'package:definitive_downloader/features/matching/music_resolver.dart';
 import 'music_resolver_test.dart' show EmptyEngine, EmptySession;
+import 'package:definitive_downloader/app/theme.dart';
+import 'package:definitive_downloader/features/library/presentation/collection_track_toolbar.dart';
+import 'package:definitive_downloader/features/library/presentation/track_inspector.dart';
+import 'widget_io.dart';
 
 const fixturePlaylistUrl =
     'https://open.spotify.com/playlist/0123456789012345678901';
@@ -151,6 +155,90 @@ void main() {
         total: 10, checked: 6, measured: 0, elapsed: Duration.zero);
     expect(resuming.remaining, isNull);
   });
+
+  test(
+      'refazer conferência da única selecionada pesquisa sem alterar o arquivo baixado',
+      () async {
+    final c = controller(const [
+      TrackDraft(title: 'Baixada', artist: 'Pessoa', durationMs: 180000),
+      TrackDraft(title: 'Outra', artist: 'Pessoa', durationMs: 180000),
+    ]);
+    await c.importSpotify(fixturePlaylistUrl);
+    await finishMatching(c);
+    final first = (await repository.page(c.current!.id)).items.first;
+    final file = File('${temp.path}/original.mp3');
+    await file.writeAsString('arquivo preservado');
+    await repository.setStatus(first.id, TrackStatus.completed,
+        localPath: file.path);
+    await repository.select(first.id, true);
+    await c.refresh();
+    final downloaded = c.page.items.first;
+    c.focus(downloaded);
+    final before = resolver.calls.length;
+    await c.prepareMusic();
+    expect(resolver.calls.length, before + 1);
+    expect(resolver.calls.last, downloaded.id);
+    expect(c.candidates, isNotEmpty);
+    expect(c.message, isNot(contains('0 faixa(s) preparada')));
+    final after = (await repository.page(c.current!.id)).items.first;
+    expect(after.status, TrackStatus.completed);
+    expect(after.localPath, downloaded.localPath);
+    expect(after.mediaUrl, downloaded.mediaUrl);
+    expect(after.redownloadState, isEmpty);
+    expect(await file.readAsString(), 'arquivo preservado');
+  });
+
+  for (final width in [900.0, 390.0]) {
+    testWidgets(
+        'rever baixada abre comparação sem controles de substituição a $width',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 820);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final c = controller(const [
+        TrackDraft(title: 'Baixada', artist: 'Pessoa', durationMs: 180000),
+      ]);
+      await tester.runAsync(() async {
+        await c.importSpotify(fixturePlaylistUrl);
+        await finishMatching(c);
+        final track = c.page.items.single;
+        await repository.setStatus(track.id, TrackStatus.completed,
+            localPath: '${temp.path}/original.mp3');
+        await repository.select(track.id, true);
+        await c.refresh();
+        c.focus(c.page.items.single);
+      });
+      final query = TextEditingController();
+      await tester.pumpWidget(MaterialApp(
+          theme: appTheme(platform: TargetPlatform.windows),
+          home: Scaffold(
+              body: ListenableBuilder(
+                  listenable: c,
+                  builder: (context, _) => Column(children: [
+                        CollectionTrackToolbar(
+                            controller: c,
+                            query: query,
+                            onQueryChanged: (_) {},
+                            onClear: () {},
+                            onDownload: () {}),
+                        Expanded(child: TrackInspector(controller: c)),
+                      ])))));
+      await tester.pumpAndSettle();
+      expect(find.text('Buscar outras versões'), findsNothing);
+      expect(find.text('Rever correspondência'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('start-playlist-conference')));
+      await ioUntil(tester, () => resolver.calls.length == 2 && !c.searching);
+      expect(find.text('Buscar outras versões'), findsOneWidget);
+      expect(c.candidates, isNotEmpty);
+      expect(find.byType(RadioListTile<Candidate>), findsNothing);
+      expect(find.text('Usar esta versão'), findsNothing);
+      expect(c.message, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      query.dispose();
+    });
+  }
 
   testWidgets('painel da conferência exibe contagem, barra e previsão',
       (tester) async {

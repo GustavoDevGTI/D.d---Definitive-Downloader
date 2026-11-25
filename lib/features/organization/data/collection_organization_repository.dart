@@ -122,7 +122,7 @@ class CollectionOrganizationRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -174,7 +174,7 @@ class CollectionOrganizationRepository {
         }
         db.execute('COMMIT');
       } catch (_) {
-        db.execute('ROLLBACK');
+        rollbackAfterFailure(db);
         rethrow;
       }
     });

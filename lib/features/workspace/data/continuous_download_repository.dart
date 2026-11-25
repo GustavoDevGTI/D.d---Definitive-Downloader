@@ -99,7 +99,7 @@ class ContinuousDownloadRepository {
           return DownloadListingSnapshot(
               revision, ids, existing, changed, colors);
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

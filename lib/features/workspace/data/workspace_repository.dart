@@ -119,7 +119,7 @@ class WorkspaceRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -165,7 +165,7 @@ class WorkspaceRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -185,7 +185,7 @@ class WorkspaceRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -236,7 +236,7 @@ class WorkspaceRepository {
             SELECT track_id FROM download_run_additions WHERE run=?)''', [run]);
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -289,7 +289,7 @@ class WorkspaceRepository {
           db.execute('COMMIT');
           return track;
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -390,7 +390,7 @@ class WorkspaceRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

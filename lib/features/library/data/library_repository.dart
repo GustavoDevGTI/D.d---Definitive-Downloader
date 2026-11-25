@@ -132,7 +132,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         } finally {
           statement.dispose();
@@ -224,7 +224,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -250,7 +250,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -318,7 +318,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -427,7 +427,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -535,7 +535,7 @@ class LibraryRepository {
           }
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

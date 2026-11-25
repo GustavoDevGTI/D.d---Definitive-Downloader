@@ -106,6 +106,24 @@ void main() {
               .byKey(ValueKey('track-row-${track.id}'))
               .evaluate()
               .isNotEmpty);
+      for (final tab in ['Capturar áudio', 'Downloads']) {
+        expect(find.byTooltip('Voltar às coleções'), findsOneWidget);
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Voltar às coleções'), findsOneWidget);
+        await tester.tap(find.byTooltip('Voltar às coleções'));
+        await ioUntil(tester, () => open.evaluate().isNotEmpty);
+        expect(find.byTooltip('Voltar às coleções'), findsNothing);
+        expect(find.byKey(ValueKey('track-row-${track.id}')), findsNothing);
+        await tester.ensureVisible(open);
+        await tester.tap(open);
+        await ioUntil(
+            tester,
+            () => find
+                .byKey(ValueKey('track-row-${track.id}'))
+                .evaluate()
+                .isNotEmpty);
+      }
       if (width >= 1360) {
         final viewport = tester.getRect(find.descendant(
             of: find.byType(TrackTable), matching: find.byType(ListView)));

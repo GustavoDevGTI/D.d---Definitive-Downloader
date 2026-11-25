@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import '../domain/playback.dart';
+import 'flac_tags.dart';
 
 /// Bounded ID3v2.3/v2.4 reader. Never rewrites the user's audio.
 Future<AudioTags> readAudioTags(String path) async {
@@ -9,6 +10,14 @@ Future<AudioTags> readAudioTags(String path) async {
   try {
     file = await File(path).open();
     final header = await file.read(10);
+    if (header.length >= 4 &&
+        header[0] == 102 &&
+        header[1] == 76 &&
+        header[2] == 97 &&
+        header[3] == 67) {
+      await file.setPosition(4);
+      return await readFlacTags(file);
+    }
     if (header.length != 10 ||
         ascii.decode(header.take(3).toList(), allowInvalid: true) != 'ID3' ||
         ![3, 4].contains(header[3]) ||

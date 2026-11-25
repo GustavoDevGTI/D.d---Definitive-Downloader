@@ -1,8 +1,8 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'transaction_cleanup.dart';
+export 'transaction_cleanup.dart' show rollbackAfterFailure;
 
 class AppDatabase {
   const AppDatabase(this.path);
@@ -11,10 +11,8 @@ class AppDatabase {
   Future<T> run<T>(T Function(Database database) action) {
     final filePath = path;
     return Isolate.run(() {
-      if (Platform.isWindows) {
-        open.overrideFor(OperatingSystem.windows,
-            () => DynamicLibrary.open('winsqlite3.dll'));
-      }
+      // package:sqlite3 prefers the SQLite shipped with the app on Windows.
+      // Do not force the OS copy, whose capabilities vary across computers.
       final db = sqlite3.open(filePath);
       try {
         db.execute('PRAGMA foreign_keys = ON');
@@ -60,7 +58,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 1');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -74,7 +72,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 2');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -88,7 +86,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 3');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -108,7 +106,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 4');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -124,7 +122,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 5');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -180,7 +178,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 6');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -196,7 +194,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 7');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -212,7 +210,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 8');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -236,7 +234,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 9');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -255,7 +253,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 10');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -267,7 +265,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 11');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -279,7 +277,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version = 12');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -325,7 +323,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version=13');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -350,7 +348,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version=14');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -370,7 +368,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version=16');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }
@@ -398,7 +396,7 @@ class AppDatabase {
           db.execute('PRAGMA user_version=17');
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       }

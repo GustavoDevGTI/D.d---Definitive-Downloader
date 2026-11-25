@@ -81,7 +81,7 @@ class LocalMediaRepository {
               [completeImport ? 1 : 0, id]);
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });

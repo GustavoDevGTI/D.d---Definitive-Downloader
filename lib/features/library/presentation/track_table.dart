@@ -13,6 +13,8 @@ import 'edit_track_dialog.dart';
 import 'track_row.dart';
 import 'playlist_palette.dart';
 import '../../player/presentation/player_scope.dart';
+import '../../audio_conversion/application/audio_conversion_controller.dart';
+import '../../audio_conversion/presentation/audio_conversion_dialog.dart';
 
 class TrackTable extends StatefulWidget {
   const TrackTable(
@@ -303,10 +305,18 @@ class _TrackTableState extends State<TrackTable> {
               enabled: _editable,
               child: Text(controller.current?.editingLocked == true
                   ? 'Edição bloqueada após o início'
-                  : 'Editar faixa'))
+                  : 'Editar faixa')),
+          if (AudioConversionController.canOffer(track))
+            PopupMenuItem(
+                value: 'convert',
+                enabled: !controller.busy,
+                child: const Text('Converter para MP3')),
         ]);
     if (result == 'edit' && mounted && _editable) {
       await showEditTrack(context, controller, track);
+    }
+    if (result == 'convert' && mounted && !controller.busy) {
+      await showAudioConversion(context, track, controller.files);
     }
   }
 

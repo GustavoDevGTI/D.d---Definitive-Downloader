@@ -1,6 +1,13 @@
 #ifndef AppVersion
   #error AppVersion must be supplied by the build script
 #endif
+
+#ifndef ProductAppId
+  #define ProductAppId "{{C3BE3755-786D-4F55-9282-C58896FB6D7C}"
+#endif
+#ifndef ProductName
+  #define ProductName "Definitive Downloader"
+#endif
 #ifndef PackageDir
   #error PackageDir must be supplied by the build script
 #endif
@@ -9,12 +16,19 @@
 #endif
 
 [Setup]
-AppId={{C3BE3755-786D-4F55-9282-C58896FB6D7C}
-AppName=Definitive Downloader
+AppId={#ProductAppId}
+AppName={#ProductName}
 AppVersion={#AppVersion}
 AppPublisher=Definitive Downloader
 DefaultDirName={localappdata}\Programs\Definitive Downloader
-DefaultGroupName=Definitive Downloader
+DefaultGroupName={#ProductName}
+UsePreviousAppDir=yes
+UsePreviousTasks=yes
+DisableDirPage=auto
+Uninstallable=yes
+CreateUninstallRegKey=yes
+UpdateUninstallLogAppName=yes
+UninstallDisplayName={#ProductName}
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -39,8 +53,9 @@ Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; Flags:
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"
-Name: "{autodesktop}\Definitive Downloader"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"; Tasks: desktopicon
+Name: "{autoprograms}\{#ProductName}"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"
+Name: "{autodesktop}\{#ProductName}"; Filename: "{app}\definitive_downloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\data\flutter_assets\assets\brand\dd-app-icon.ico"; Tasks: desktopicon
+Name: "{autoprograms}\Desinstalar {#ProductName}"; Filename: "{uninstallexe}"
 
 [Run]
 Filename: "{app}\definitive_downloader.exe"; Description: "Abrir o Definitive Downloader"; Flags: nowait postinstall skipifsilent

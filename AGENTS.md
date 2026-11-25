@@ -2,6 +2,18 @@
 
 ## Produto e prioridades
 
+- Publicação 0.1.101 solicitada em 25/11/2026: consolidar as entregas Windows 0.1.96–0.1.101, com código, tag, instalador e SHA-256. Android continua pausado; não gerar APK nem executar emulador nesta publicação. Regressão offline Dart/motor e limites constam em `docs/RELEASE_0_1_101.md`.
+
+- Conexão Deezer 0.1.101: na oferta opcional após inserir playlist Spotify/Deezer, a ação secundária é **Deixar para mais tarde**, retornando adiamento e preservando a importação; não exibir Cancelar adicional. Na abertura manual por Conectar Deezer, manter **Cancelar** e a decisão de cancelamento. Usar o contexto `allowLater`, não o título ou a URL da janela. Ver `docs/VERSAO_LOCAL_0_1_101.md`.
+
+- Áudio local 0.1.99 Windows: unificar formatos aceitos pelo seletor, arraste e pastas (FLAC, WAV, M4A, AAC, OGG, Opus, WMA, AIFF, APE, WV e MP3), mantendo cópia numerada e original intacto. Converter para MP3 é exportação opcional pelo FFmpeg distribuído, sem substituir a playlist ou sobrescrever destino existente. Leitura FLAC limitada inclui comentários/capa; não editar tags originais. Nesta etapa validar somente com fixtures geradas, sem arquivos reais do usuário ou ensaio Android. Ver `docs/VERSAO_LOCAL_0_1_99.md`.
+
+- Navegação 0.1.98: enquanto houver uma playlist aberta, a seta **Voltar às coleções** persiste em Coleções, Capturar áudio e Downloads. Nas duas últimas, a ação fecha o detalhe e retorna à lista de coleções; não criar retorno sem contexto. Ver `docs/VERSAO_LOCAL_0_1_98.md`.
+
+- Conferência individual 0.1.97: com uma única faixa selecionada e visível, a ação manual **Rever correspondência** pesquisa alternativas daquela ocorrência e abre Correspondência. Não tratar essa ação como a retomada automática de pendentes. Concluídas e fontes manuais têm comparação sem substituição automática; não alterar arquivo, fonte ou recuperação ao pesquisar. Abrir concluída normalmente continua em Informações. Sem pendências, informar isso em vez de mostrar 0 preparadas/0 revisão. Ver `docs/VERSAO_LOCAL_0_1_97.md`.
+
+- Correções Windows 0.1.96: usar o carregador SQLite do pacote, priorizando a DLL distribuída, sem forçar `winsqlite3.dll`. Rollbacks de limpeza usam `rollbackAfterFailure` e nunca substituem a exceção original. Preservar AppId do instalador e diretório registrado; desinstalação tem atalho próprio e não remove biblioteca/mídias pessoais. Na janela Deezer, entrada social permanece desabilitada no DOM e na navegação; e-mail/senha e recuperação continuam disponíveis. Evidências e limitações em `docs/VERSAO_LOCAL_0_1_96.md`.
+
 - Refino visual 0.1.95: hover e foco dos controles mantêm a geometria e destacam a cor; pressão por ponteiro usa escala 0,97/160 ms, com tokens em `lib/app/motion.dart`. Ativação por teclado, movimento reduzido e controles desabilitados não recebem transformação. Esta decisão substitui a ampliação no hover da 0.1.16. Publicação Windows e APKs Android da mesma versão solicitada em 23/11/2026, sem iniciar emulador ou executar testes nele.
 
 - Revisões em fila, solicitado em 23/11/2026: aplicar primeiro todas as alterações enviadas na fila e executar os testes somente depois, em uma rodada consolidada de essenciais e focados. Não iniciar uma nova bateria entre mensagens de ajustes do mesmo lote.

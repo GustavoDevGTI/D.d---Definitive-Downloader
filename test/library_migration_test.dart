@@ -5,6 +5,8 @@ import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/core/storage/legacy_library_migration.dart';
 import 'package:definitive_downloader/features/library/data/library_repository.dart';
 import 'package:definitive_downloader/features/library/domain/models.dart';
+import 'package:definitive_downloader/features/library/data/playlist_editor.dart';
+import 'package:definitive_downloader/features/organization/data/collection_organization_repository.dart';
 
 void main() {
   late Directory directory;
@@ -118,6 +120,22 @@ void main() {
     final rows = (await restored.page(id)).items;
     expect(rows[0].artist, 'Laboratório D.d');
     expect(rows[1].artist, 'Laboratório Trama');
+    expect(rows.map((row) => row.position), [1, 2]);
+    await CollectionOrganizationRepository(restored.database)
+        .rename(id, 'Playlist antiga atualizada');
+    await PlaylistEditor(restored.database)
+        .edit(rows[1].id, name: 'Faixa editada após atualizar', position: 2);
+    await restored.select(rows[1].id, true);
+    final editable = (await restored.page(id)).items;
+    expect((await restored.collectionById(id))!.name,
+        'Playlist antiga atualizada');
+    expect(editable[1].displayTitle, 'Faixa editada após atualizar');
+    expect(editable[1].selected, isTrue);
+    expect(editable[1].id, rows[1].id);
+    expect(
+        await restored.database
+            .run((db) => db.select('PRAGMA quick_check').single.values.single),
+        'ok');
     expect(
         await source.database.run((db) => db.select(
             'SELECT artist FROM tracks WHERE collection_id=? ORDER BY position LIMIT 1',

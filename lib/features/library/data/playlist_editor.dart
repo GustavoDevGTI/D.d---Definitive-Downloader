@@ -137,7 +137,7 @@ class PlaylistEditor {
           db.execute('COMMIT');
           return newPositions[trackId]!;
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
@@ -197,7 +197,7 @@ class PlaylistEditor {
               [title == requested ? '' : title, trackId]);
           db.execute('COMMIT');
         } catch (_) {
-          db.execute('ROLLBACK');
+          rollbackAfterFailure(db);
           rethrow;
         }
       });
