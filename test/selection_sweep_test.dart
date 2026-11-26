@@ -67,6 +67,10 @@ void main() {
       final ids = c.page.items.map((t) => t.id).toList();
       Finder row(int i) => find.byKey(ValueKey('track-row-${ids[i]}'));
       await tester.tap(row(0));
+      await ioUntil(tester, () => c.focused?.id == ids[0]);
+      expect(c.page.selectedCount, 0);
+      await tester
+          .tap(find.descendant(of: row(0), matching: find.byType(Checkbox)));
       await ioUntil(tester, () => c.page.selectedCount == 1);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.pump();

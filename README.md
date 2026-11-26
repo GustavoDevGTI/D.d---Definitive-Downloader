@@ -2,7 +2,7 @@
 
 **D.d** é a abreviação oficial de **Definitive Downloader**, um aplicativo em Flutter/Dart para Windows e Android com foco inicial em playlists e arquivos musicais.
 
-A [pré-release 0.1.104 para Windows](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.104) alinha a cota do serviço de importação de playlists Spotify ao ciclo mensal do RapidAPI: 1.000 chamadas, renovadas todo dia 12. Confira as [notas](docs/RELEASE_0_1_104.md). Inclui a correção da biblioteca e da exclusão de playlists da [0.1.103](docs/RELEASE_0_1_103.md), mantém a interação durante busca da [0.1.102](docs/RELEASE_0_1_102.md) e as melhorias de áudio local, MP3 e Deezer da [0.1.101](docs/RELEASE_0_1_101.md). O desenvolvimento Android está pausado; os últimos APKs publicados estão na [0.1.95](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.95).
+A [pré-release 0.1.105](https://github.com/GustavoDevGTI/D.d---Definitive-Downloader/releases/tag/v0.1.105) traz de volta os APKs Android junto com o instalador Windows. Mostra o carregamento da importação de playlists, separa o clique na faixa da caixa de seleção e volta a pedir a conta Deezer quando a conferência é iniciada depois de adiá-la. Confira as [notas](docs/RELEASE_0_1_105.md). A [0.1.104](docs/RELEASE_0_1_104.md) alinhou a cota do serviço de playlists Spotify ao ciclo mensal do RapidAPI (1.000 chamadas, renovadas todo dia 12). Inclui a correção da biblioteca e da exclusão de playlists da [0.1.103](docs/RELEASE_0_1_103.md), a interação durante busca da [0.1.102](docs/RELEASE_0_1_102.md) e as melhorias de áudio local, MP3 e Deezer da [0.1.101](docs/RELEASE_0_1_101.md).
 
 ## Histórico da interface
 

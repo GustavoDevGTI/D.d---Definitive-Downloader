@@ -20,7 +20,7 @@
     "ui_collections": ["test/collection_manager_test.dart", "test/collection_composition_layout_test.dart", "test/track_interaction_test.dart", "test/selection_sweep_test.dart"],
     "ui_downloads": ["test/desktop_download_density_test.dart", "test/download_table_layout_test.dart", "test/download_scroll_test.dart", "test/selection_sweep_test.dart"],
     "ui_player": ["test/music_player_layout_test.dart", "test/audio_slider_test.dart", "test/listening_actions_test.dart"],
-    "ui_common": ["test/app_notice_test.dart", "test/button_hover_motion_test.dart", "test/capture_layout_test.dart", "test/continuous_scroll_test.dart"],
+    "ui_common": ["test/app_notice_test.dart", "test/link_entry_panel_test.dart", "test/button_hover_motion_test.dart", "test/capture_layout_test.dart", "test/continuous_scroll_test.dart"],
     "worker": ["test/music_resolver_test.dart", "test/music_policy_test.dart", "test/soundcloud_source_test.dart"]
   },
   "regression_only": ["test/layout_test.dart", "test/update_cost_test.dart"]

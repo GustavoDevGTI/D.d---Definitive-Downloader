@@ -163,8 +163,10 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
               onChanged: _offerLogin,
               onSubmitted:
                   c.importBlocked ? null : (value) => unawaited(_import(value)),
-              actionLabel: 'Importar por link',
+              actionLabel: c.importing ? 'Importando…' : 'Importar por link',
               actionIcon: Icons.playlist_add_rounded,
+              busy: c.importing,
+              busyLabel: c.importing ? c.message : null,
               onAction:
                   c.importBlocked ? null : () => unawaited(_import(_url.text)),
               secondaryActions: [
@@ -211,12 +213,13 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                             padding: EdgeInsets.symmetric(horizontal: 12),
                             child:
                                 Row(mainAxisSize: MainAxisSize.min, children: [
-                              Flexible(child: Text('Outras opções',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.secondary))),
+                              Flexible(
+                                  child: Text('Outras opções',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.secondary))),
                               SizedBox(width: 6),
                               Icon(Icons.keyboard_arrow_down,
                                   size: 18, color: AppColors.secondary),

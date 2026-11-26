@@ -20,10 +20,14 @@ class LinkEntryPanel extends StatelessWidget {
     this.onChanged,
     this.secondaryActions = const [],
     this.status,
+    this.busy = false,
+    this.busyLabel,
   });
 
   final String title, fieldLabel, hintText, actionLabel;
   final String? status;
+  final bool busy;
+  final String? busyLabel;
   final TextEditingController controller;
   final FocusNode? focusNode;
   final Key inputKey;
@@ -105,6 +109,23 @@ class LinkEntryPanel extends StatelessWidget {
                                     label: Text(actionLabel)),
                                 ...secondaryActions,
                               ]))),
+                  if (busy) ...[
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                        minHeight: 3,
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.accentSoft,
+                        borderRadius: BorderRadius.circular(2),
+                        semanticsLabel: busyLabel ?? 'Carregando'),
+                    if (busyLabel?.trim().isNotEmpty ?? false) ...[
+                      const SizedBox(height: 6),
+                      Text(busyLabel!.trim(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.muted)),
+                    ],
+                  ],
                 ])),
         if (status != null) ...[
           const SizedBox(height: 10),

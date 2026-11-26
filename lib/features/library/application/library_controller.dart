@@ -370,14 +370,6 @@ class LibraryController extends ChangeNotifier {
     return _selectionWrites;
   }
 
-  Future<bool> clickTrack(Track track, {required bool extend}) async {
-    if (selectionBlocked || current?.id != track.collectionId) return false;
-    await repository.selectFromClick(track.collectionId, track.id,
-        extend: extend);
-    await refresh();
-    return true;
-  }
-
   Future<String?> moveTracks(int trackId,
       {required int collectionId,
       required int targetId,
@@ -720,8 +712,13 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
-  final _preparationQueue =
-      <int, ({Collection collection, bool onlyPending, String importNotice})>{};
+  final _preparationQueue = <int,
+      ({
+    Collection collection,
+    bool onlyPending,
+    bool requested,
+    String importNotice
+  })>{};
   Future<void>? _preparation;
   DownloadCancellation? _preparationCancellation;
   Collection? _preparingCollection;
@@ -765,15 +762,19 @@ class LibraryController extends ChangeNotifier {
           announceResults: false);
     }
     return _queuePreparation(collection,
-        onlyPending: onlyPending, importNotice: importNotice);
+        onlyPending: onlyPending, importNotice: importNotice, requested: true);
   }
 
   Track? get singleSelectedTrack => page.selectedCount == 1
       ? page.items.where((track) => track.selected).firstOrNull
       : null;
 
+  /// [requested] marks a conference the user started; only automatic resumes
+  /// honor a deferred Deezer login silently.
   Future<void> _queuePreparation(Collection collection,
-      {required bool onlyPending, String importNotice = ''}) {
+      {required bool onlyPending,
+      String importNotice = '',
+      bool requested = false}) {
     if (_disposed ||
         music?.available != true ||
         collection.source == 'Exemplo local' ||
@@ -784,6 +785,7 @@ class LibraryController extends ChangeNotifier {
     _preparationQueue[collection.id] = (
       collection: collection,
       onlyPending: onlyPending,
+      requested: requested,
       importNotice: importNotice,
     );
     _preparation ??= Future<void>.microtask(_runPreparations);
@@ -796,7 +798,9 @@ class LibraryController extends ChangeNotifier {
       while (!_disposed && _preparationQueue.isNotEmpty) {
         final job = _preparationQueue.remove(_preparationQueue.keys.first)!;
         await _prepareMusic(job.collection,
-            onlyPending: job.onlyPending, importNotice: job.importNotice);
+            onlyPending: job.onlyPending,
+            requested: job.requested,
+            importNotice: job.importNotice);
       }
     } finally {
       _preparation = null;
@@ -806,7 +810,9 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> _prepareMusic(Collection collection,
-      {required bool onlyPending, required String importNotice}) async {
+      {required bool onlyPending,
+      required bool requested,
+      required String importNotice}) async {
     final finished = _preparingFinished = Completer<void>();
     final token = _preparationCancellation = DownloadCancellation();
     _preparingOnlyPending = onlyPending;
@@ -820,7 +826,7 @@ class LibraryController extends ChangeNotifier {
               collection.source == ManagedSpotifyPlaylists.source) &&
           !accounts!.connected(MusicAccount.deezer) &&
           await repository.needsSourcePreparation(collection.id) &&
-          ((onlyPending && accounts!.deezerDeferred) ||
+          ((!requested && onlyPending && accounts!.deezerDeferred) ||
               !await _authorizePrimary())) {
         return;
       }

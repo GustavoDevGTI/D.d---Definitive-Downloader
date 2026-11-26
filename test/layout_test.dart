@@ -379,15 +379,25 @@ void main() {
       await tester.ensureVisible(find.text('Cancelar'));
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
+      await tester.runAsync(() => controller.selectCollection(false));
+      await tester.pumpAndSettle();
+      final firstCheck = find.descendant(
+          of: find.ancestor(
+              of: find.text('1. Abertura'),
+              matching: find.byWidgetPredicate((w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key as ValueKey<String>).value.startsWith('track-row-'))),
+          matching: find.byType(Checkbox));
+      await tester.ensureVisible(firstCheck);
+      await tester.tap(firstCheck);
+      await ioUntil(tester, () => controller.page.selectedCount == 1);
       await tester.ensureVisible(find.text('1. Abertura'));
       await tester.tap(find.text('1. Abertura'));
       await ioUntil(
-          tester,
-          () =>
-              controller.page.selectedCount == 1 &&
-              find.text('Conferência').evaluate().isNotEmpty);
+          tester, () => find.text('Conferência').evaluate().isNotEmpty);
       expect(find.text('Conferência'), findsOneWidget);
-      expect(controller.page.selectedCount, 1);
+      expect(controller.page.selectedCount, 1,
+          reason: 'Abrir a faixa pela linha não altera a seleção.');
       final conferenceHeader = find.byKey(const ValueKey('conference-header'));
       final headerBounds = tester.getRect(conferenceHeader);
       for (final label in ['Correspondência', 'Informações']) {
@@ -658,8 +668,8 @@ void main() {
       final midWidth = tester.getRect(startButton).width;
       expect(midWidth, closeTo(restingBounds.width, .01));
       await tester.pumpAndSettle();
-      expect(tester.getRect(startButton).width,
-          closeTo(restingBounds.width, .01));
+      expect(
+          tester.getRect(startButton).width, closeTo(restingBounds.width, .01));
       expect(tester.widget<Material>(startMaterial).color, isNot(restingColor));
       await capture(tester, captureKey, 'music-play-hover-${width.toInt()}');
       final addButton = find.descendant(

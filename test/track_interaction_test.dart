@@ -74,13 +74,26 @@ void main() {
       expect(find.byKey(const ValueKey('edit-track-position')), findsOneWidget);
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
+      Finder check(int id) =>
+          find.descendant(of: row(id), matching: find.byType(Checkbox));
       await tester.tap(row(original[0]));
+      await ioUntil(tester, () => c.focused?.id == original[0]);
+      expect(c.page.selectedCount, 0,
+          reason: 'Clicar na linha não marca a caixa.');
+      await tester.tap(check(original[0]));
       await ioUntil(tester, () => c.page.selectedCount == 1);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.tap(row(original[1]));
-      await ioUntil(tester, () => c.page.selectedCount == 2);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-      await tester.pump();
+      await ioUntil(tester, () => c.focused?.id == original[1]);
+      expect(c.page.selectedCount, 1,
+          reason: 'Ctrl+clique na linha também não altera a seleção.');
+      await tester.tap(check(original[1]));
+      await ioUntil(tester, () => c.page.selectedCount == 2);
+      await tester.tap(row(original[0]));
+      await ioUntil(tester, () => c.focused?.id == original[0]);
+      expect(c.page.selectedCount, 2,
+          reason: 'Clicar numa linha marcada não a desmarca.');
       expect(c.page.items.take(2).every((t) => t.selected), isTrue);
       final gesture = await tester.startGesture(
           tester.getCenter(row(original[0])),

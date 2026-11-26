@@ -238,17 +238,18 @@ class _TrackTableState extends State<TrackTable> {
                                                                 !controller
                                                                     .selectionBlocked,
                                                             onTap: () =>
-                                                                unawaited(
-                                                                    _click(t)),
+                                                                _click(t),
                                                             onContextMenu: (point) =>
                                                                 unawaited(
                                                                     _contextMenu(
                                                                         t,
                                                                         point)),
                                                             onSelect: (v) =>
-                                                                unawaited(controller
-                                                                    .select(t,
-                                                                        v)))));
+                                                                unawaited(
+                                                                    controller
+                                                                        .select(
+                                                                            t,
+                                                                            v)))));
                                               }))))))),
             ]);
           }));
@@ -276,20 +277,9 @@ class _TrackTableState extends State<TrackTable> {
                       color: playlistInk(widget.accent)),
               ]))));
 
-  Future<void> _click(Track track) async {
-    final extend = HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isMetaPressed;
-    if (await controller.clickTrack(track, extend: extend) && mounted) {
-      final focused =
-          controller.page.items.where((t) => t.id == track.id).firstOrNull ??
-              track;
-      if (extend) {
-        controller.focus(focused);
-      } else {
-        widget.onFocus(focused);
-      }
-    }
-  }
+  // A row click only opens the track; selection changes through its checkbox,
+  // the header checkbox or a Ctrl sweep.
+  void _click(Track track) => widget.onFocus(track);
 
   Future<void> _contextMenu(Track track, Offset point) async {
     controller.focus(track);

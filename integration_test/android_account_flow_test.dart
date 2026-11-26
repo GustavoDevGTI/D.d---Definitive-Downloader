@@ -93,7 +93,7 @@ void main() {
           initialPlaylist: 'https://open.spotify.com/playlist/$_playlistId'));
       final importing = controller
           .importSpotify('https://open.spotify.com/playlist/$_playlistId');
-      await tap(find.text('Deixar para depois'));
+      await tap(find.text('Deixar para mais tarde'));
       await importing;
       await _until(tester, () => controller.current != null && !controller.busy,
           'importação com Deezer adiado');
@@ -115,12 +115,12 @@ void main() {
         tester.state<NavigatorState>(find.byType(Navigator)).pop();
         await tester.pumpAndSettle();
       }
-      await tap(find.byTooltip('Rever correspondências'));
+      await tap(find.byKey(const ValueKey('start-playlist-conference')));
       await _until(
           tester,
           () => find.text('Conectar Deezer').evaluate().isNotEmpty,
           'pedido de conexão na conferência');
-      expect(find.text('Deixar para depois'), findsNothing);
+      expect(find.text('Deixar para mais tarde'), findsNothing);
       await deezer.login(() async => _deezerSession);
       await _until(
           tester,

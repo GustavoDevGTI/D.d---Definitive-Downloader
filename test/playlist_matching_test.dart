@@ -167,9 +167,9 @@ void main() {
     await resolver.started.future.timeout(const Duration(seconds: 5));
     expect(c.preparingCurrent, isTrue);
     expect(c.page.items.first.selected, isTrue);
-    expect(await c.clickTrack(c.page.items.last, extend: false), isTrue,
-        reason:
-            'Busca em segundo plano não pode prender a seleção restaurada.');
+    // Background matching must not hold the restored selection.
+    await c.select(c.page.items.first, false);
+    await c.select(c.page.items.last, true);
     expect(c.page.items.first.selected, isFalse);
     expect(c.page.items.last.selected, isTrue);
     await c.select(c.page.items.last, false);
@@ -311,9 +311,17 @@ void main() {
         reason:
             'A conferência automática não pode desabilitar as caixas de seleção.');
     await tester.tap(row);
-    await ioUntil(tester,
-        () => c.page.items.last.selected && !c.page.items.first.selected);
+    await ioUntil(tester, () => c.focused?.id == second);
+    expect(c.page.items.first.selected, isTrue,
+        reason: 'Clicar na linha abre a faixa sem alterar as caixas.');
+    expect(c.page.items.last.selected, isFalse);
     await tester.tap(check);
+    await ioUntil(tester, () => c.page.selectedCount == 2);
+    await tester.tap(check);
+    await ioUntil(tester, () => c.page.items.last.selected == false);
+    await tester.tap(find.descendant(
+        of: find.byKey(ValueKey('track-row-${c.page.items.first.id}')),
+        matching: find.byType(Checkbox)));
     await ioUntil(tester, () => c.page.selectedCount == 0);
     await tester.tap(find.byKey(const ValueKey('select-all-collection')));
     await ioUntil(tester, () => c.page.selectedCount == 2);

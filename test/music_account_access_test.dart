@@ -244,6 +244,11 @@ void main() {
           expect(allowLater, isFalse);
           return MusicAccountDecision.connected;
         }
+        if (calls.length > 2) {
+          expect(allowLater, isFalse,
+              reason: 'Conferência pedida não oferece adiar novamente.');
+          return MusicAccountDecision.cancelled;
+        }
         expect(allowLater, isTrue);
         expect(reads, 1);
         return decision;
@@ -274,6 +279,13 @@ void main() {
           expect(collection.trackCount, 1);
           expect(await access.ensure(playlist), isTrue);
           expect(calls, hasLength(2));
+          // The deferral only silences automatic resumes; a conference the
+          // user starts asks for the account again.
+          await controller.prepareMusic();
+          await controller.preparationDone;
+          expect(calls,
+              [MusicAccount.spotify, MusicAccount.deezer, MusicAccount.deezer]);
+          expect(engine.calls, 0);
         } else {
           expect(reads, 1);
           expect(await repository.collections(), isEmpty);
