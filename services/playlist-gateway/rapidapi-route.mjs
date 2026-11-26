@@ -29,6 +29,7 @@ export async function servePlaylist(request, env, fetchUpstream = fetch) {
     const playlist = await readCheckLeakedPlaylist(match[1], {
       key: env.DD_RAPIDAPI_KEY,
       reserve: calls => budget.reserve(calls),
+      observeReset: seconds => budget.observeReset(seconds),
       fetchUpstream,
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(80_000)]),
     });

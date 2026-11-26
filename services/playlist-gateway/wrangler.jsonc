@@ -4,6 +4,10 @@
   "compatibility_date": "2026-11-12",
   "workers_dev": true,
   "preview_urls": false,
+  "vars": {
+    "DD_QUOTA_LIMIT": "1000",
+    "DD_QUOTA_ANCHOR": "2026-11-12T00:00:00Z"
+  },
   "durable_objects": {
     "bindings": [{"name": "BUDGET", "class_name": "RapidApiBudget"}]
   },

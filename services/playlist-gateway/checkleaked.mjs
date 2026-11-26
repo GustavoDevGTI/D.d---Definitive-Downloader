@@ -1,8 +1,10 @@
+import { maxReservation, resetSeconds } from './quota-period.mjs';
+
 const host = 'spotify81.p.rapidapi.com';
 const pageSize = 100;
-// Keep the metadata call, two budget reservations and all pages within the
-// Workers Free limit of 50 subrequests per invocation.
-export const maxTracks = 4500;
+// Keep the metadata call, two budget reservations, one reset observation and
+// all pages within the Workers Free limit of 50 subrequests per invocation.
+export const maxTracks = maxReservation * pageSize;
 const spotifyId = /^[A-Za-z0-9]{22}$/;
 const imageUrl = /^https:\/\/i\.scdn\.co\/image\/[A-Za-z0-9]+$/;
 const maxPageBytes = 2 * 1024 * 1024;
@@ -72,7 +74,9 @@ async function readJson(response) {
   }
 }
 
-export async function readCheckLeakedPlaylist(id, { key, reserve, signal, fetchUpstream = fetch }) {
+export async function readCheckLeakedPlaylist(id, {
+  key, reserve, observeReset, signal, fetchUpstream = fetch,
+}) {
   const headers = { 'x-rapidapi-key': key, 'x-rapidapi-host': host, accept: 'application/json' };
   async function request(path, parameters) {
     const url = new URL('https://' + host + path);
@@ -94,11 +98,17 @@ export async function readCheckLeakedPlaylist(id, { key, reserve, signal, fetchU
       throw new PlaylistFailure(503, 'service_unavailable');
     }
     const remaining = response.headers.get('x-ratelimit-requests-remaining');
-    return { data: body.data ?? body, remaining: /^\d+$/.test(remaining ?? '') ? Number(remaining) : null };
+    return {
+      data: body.data ?? body,
+      remaining: /^\d+$/.test(remaining ?? '') ? Number(remaining) : null,
+      reset: resetSeconds(response.headers.get('x-ratelimit-requests-reset')),
+    };
   }
 
   if (!await reserve(1)) throw new PlaylistFailure(429, 'monthly_limit');
-  const { data: playlist, remaining } = await request('/playlist');
+  const { data: playlist, remaining, reset } = await request('/playlist');
+  // Align the project budget with the provider period before reserving pages.
+  if (reset != null && observeReset) await observeReset(reset);
   if (playlist?.id !== id || playlist?.public !== true) {
     throw new PlaylistFailure(404, 'public_playlist_required');
   }

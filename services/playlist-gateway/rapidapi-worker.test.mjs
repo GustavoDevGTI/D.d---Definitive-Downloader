@@ -9,11 +9,12 @@ const origin = 'https://dd.example.test';
 const path = '/v1/spotify/playlists/' + id;
 
 function fixture({
-  total = 232, publicPlaylist = true, allowance = 900, remaining = 1000,
-  errorAt, withEpisode, malformedPage, limited = false,
+  total = 232, publicPlaylist = true, allowance = 1000, remaining = 1000,
+  reset = '1382400', errorAt, withEpisode, malformedPage, limited = false,
 } = {}) {
   const calls = [];
   const reserved = [];
+  const observed = [];
   const env = {
     DD_RAPIDAPI_KEY: key,
     IMPORTS: { limit: async () => ({ success: !limited }) },
@@ -23,6 +24,9 @@ function fixture({
         if (allowance < count) return false;
         allowance -= count;
         return true;
+      },
+      async observeReset(seconds) {
+        observed.push({ seconds, afterReservations: reserved.length });
       },
     }) },
   };
@@ -38,7 +42,10 @@ function fixture({
     if (url.pathname === '/playlist') {
       return Response.json({ success: true, data: {
         id, name: 'Fifa de teste', public: publicPlaylist, tracks: { total },
-      } }, { headers: { 'x-ratelimit-requests-remaining': String(remaining) } });
+      } }, { headers: {
+        'x-ratelimit-requests-remaining': String(remaining),
+        ...(reset == null ? {} : { 'x-ratelimit-requests-reset': reset }),
+      } });
     }
     assert.equal(url.pathname, '/playlist_tracks');
     assert.equal(url.searchParams.get('limit'), '100');
@@ -55,11 +62,11 @@ function fixture({
     return Response.json({ offset, total, items });
   };
   const request = (url = path, init) => servePlaylist(new Request(origin + url, init), env, fetchUpstream);
-  return { request, calls, reserved, env };
+  return { request, calls, reserved, observed, env };
 }
 
 test('imports 232 occurrences in four RapidAPI calls with no caller credentials', async () => {
-  const { request, calls, reserved } = fixture();
+  const { request, calls, reserved, observed } = fixture();
   const result = await request();
   assert.equal(result.status, 200);
   assert.equal(result.headers.get('cache-control'), 'no-store');
@@ -77,6 +84,16 @@ test('imports 232 occurrences in four RapidAPI calls with no caller credentials'
     { path: '/playlist', offset: 0 }, ...[0, 100, 200].map(offset => ({ path: '/playlist_tracks', offset })),
   ]);
   assert.deepEqual(reserved, [1, 3]);
+  // The provider period is recorded before the page reservation.
+  assert.deepEqual(observed, [{ seconds: 1382400, afterReservations: 1 }]);
+});
+
+test('ignores a missing or malformed provider reset header', async () => {
+  for (const reset of [null, '0', '-5', '12.5', '99999999', 'soon']) {
+    const { request, observed } = fixture({ reset });
+    assert.equal((await request()).status, 200);
+    assert.deepEqual(observed, []);
+  }
 });
 
 test('counts episodes skipped and preserves music occurrences', async () => {
