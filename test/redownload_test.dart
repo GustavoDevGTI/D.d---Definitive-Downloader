@@ -167,7 +167,7 @@ void main() {
     expect(
         await repo.database
             .run((db) => db.select('PRAGMA user_version').first.values.first),
-        17);
+        18);
   });
   test('link manual aprova a reposição sem iniciar e persiste após reinício',
       () async {

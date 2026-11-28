@@ -230,7 +230,7 @@ void main() {
           db.select('PRAGMA quick_check').single.values.single,
           db.select('PRAGMA foreign_key_check').length
         ]);
-    expect(check, [17, 'ok', 0]);
+    expect(check, [18, 'ok', 0]);
     final data = ContinuousTrackRepository(repo.database);
     final snapshot = await data.read(id, since: -1);
     await repo.database.run((db) {

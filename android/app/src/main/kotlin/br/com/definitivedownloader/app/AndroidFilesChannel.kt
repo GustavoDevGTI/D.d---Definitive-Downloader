@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -14,6 +15,7 @@ import java.util.concurrent.Executors
 class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMessenger, private val documents: ManagedDocumentsChannel) {
     private val folders = AndroidMediaFolders(activity)
     private val audioFolders = AndroidAudioFolderCopies(activity.applicationContext)
+    private val statuses = AndroidStatusCopies(activity.applicationContext)
     @Volatile private var folderCancelled = false
     private val destinationPicker = ManagedDocumentsPicker(activity, documents)
     private val channel = MethodChannel(messenger, "br.com.definitivedownloader/files")
@@ -43,6 +45,13 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
                         val path = requireNotNull(call.argument<String>("path"))
                         executor.execute {
                             runCatching { audioFolders.release(path) }
+                            result.success(null)
+                        }
+                    }
+                    "releaseStatuses" -> {
+                        val path = requireNotNull(call.argument<String>("path"))
+                        executor.execute {
+                            runCatching { statuses.release(path) }
                             result.success(null)
                         }
                     }
@@ -80,9 +89,14 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
     }
 
     private fun pick(value: String, result: MethodChannel.Result) {
-        require(value in listOf("mp3", "playlist", "cover", "audioFolder"))
+        require(value in listOf("mp3", "playlist", "cover", "audioFolder", "whatsappStatuses"))
         if (pending != null || copying) { result.error("busy", "Aguarde a seleção anterior.", null); return }
-        val intent = if (value == "audioFolder") {
+        val intent = if (value == "whatsappStatuses") {
+            folderCancelled = false
+            Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .putExtra(DocumentsContract.EXTRA_INITIAL_URI, AndroidStatusCopies.initialUri())
+        } else if (value == "audioFolder") {
             folderCancelled = false
             Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
@@ -108,6 +122,10 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
         copying = true
         if (selectedKind == "audioFolder") {
             copyAudioFolder(data.data, result)
+            return true
+        }
+        if (selectedKind == "whatsappStatuses") {
+            copyStatuses(data.data, result)
             return true
         }
         val uris = data.clipData?.let { clip -> (0 until clip.itemCount).map { clip.getItemAt(it).uri } }
@@ -155,6 +173,36 @@ class AndroidFilesChannel(private val activity: Activity, messenger: BinaryMesse
             }
         }
     }
+
+    private fun copyStatuses(tree: Uri?, result: MethodChannel.Result) {
+        executor.execute {
+            val prepared = runCatching {
+                statuses.copy(requireNotNull(tree)) { disposed || folderCancelled }
+            }
+            val path = prepared.getOrNull()
+            activity.runOnUiThread {
+                copying = false
+                if (path != null) {
+                    result.success(listOf(path))
+                } else if (folderCancelled || disposed) {
+                    result.success(emptyList<String>())
+                } else {
+                    val message = prepared.exceptionOrNull()?.message?.takeIf { it in statusMessages }
+                        ?: "Não foi possível ler os status da pasta selecionada."
+                    result.error("import", message, null)
+                }
+            }
+        }
+    }
+
+    private val statusMessages = setOf(
+        "Nenhum status de vídeo ou áudio nesta pasta.",
+        "A pasta contém itens demais.",
+        "Os status ultrapassam 2 GB.",
+        "Há status demais nesta pasta.",
+        "Um status mudou durante a leitura ou está incompleto.",
+        "O limite de tamanho da importação foi ultrapassado.",
+    )
 
     private val audioFolderMessages = setOf(
         "Nenhum áudio compatível nesta pasta.",

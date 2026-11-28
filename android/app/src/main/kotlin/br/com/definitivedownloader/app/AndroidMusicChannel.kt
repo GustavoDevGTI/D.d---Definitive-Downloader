@@ -35,7 +35,7 @@ class AndroidMusicChannel(context: Context, messenger: BinaryMessenger) {
                     }
                     try {
                         val operation = JSONObject(payload).getString("operation")
-                        require(operation in listOf("health", "search", "download", "deezerConnect", "captureAnalyze"))
+                        require(operation in listOf("health", "search", "download", "deezerConnect", "captureAnalyze", "extractAudio"))
                     } catch (_: Exception) {
                         result.error("request", "Operação musical inválida.", null)
                         return@setMethodCallHandler

@@ -20,6 +20,11 @@ class ReplacementMediaFiles {
   Future<String> stage(
       Collection owner, List<Track> tracks, DownloadCancellation token) async {
     final operation = '${DateTime.now().microsecondsSinceEpoch}';
+    // Playlists created since schema 18 reserve a folder named after them.
+    final reserved = await repository.database.run((db) =>
+        db.select('SELECT output_folder FROM collections WHERE id=?',
+            [owner.id]).firstOrNull?['output_folder'] as String? ??
+        '');
     try {
       for (final t in tracks) {
         token.check();
@@ -27,7 +32,8 @@ class ReplacementMediaFiles {
         final file = File(t.localPath);
         final expected = '${safeSegment(owner.outputFolderName)} [${owner.id}]';
         if (!p.isAbsolute(file.path) ||
-            p.basename(file.parent.path) != expected ||
+            (p.basename(file.parent.path) != expected &&
+                (reserved.isEmpty || !p.equals(file.parent.path, reserved))) ||
             !localAudioExtensions
                 .contains(p.extension(file.path).toLowerCase())) {
           throw const FormatException(

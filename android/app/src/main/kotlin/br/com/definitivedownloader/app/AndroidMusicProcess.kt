@@ -48,6 +48,10 @@ class AndroidMusicProcess(private val context: Context, private val payload: Str
         val request = JSONObject(payload)
         val download = request.optString("operation") == "download"
         if (download) verifyStaging(request.getString("directory"))
+        if (request.optString("operation") == "extractAudio") {
+            verifyStaging(request.getString("directory"))
+            verifyStatusCopy(request.getString("path"))
+        }
         val temp = File(context.cacheDir, "dd-native-jobs/$nonce").apply { check(mkdirs()) }
         var reader: Thread? = null
         try {
@@ -119,6 +123,14 @@ class AndroidMusicProcess(private val context: Context, private val payload: Str
     }
 
     private fun checkCancelled() { if (cancelled) throw MusicRuntimeFailure("Operação musical interrompida.") }
+
+    // Status Saver extracts audio only from the app's own copies of the statuses.
+    private fun verifyStatusCopy(path: String) {
+        val file = File(path).canonicalFile
+        val root = File(context.cacheDir, "imports/whatsapp-statuses").canonicalFile
+        require(file.isFile && file.path.startsWith(root.path + File.separator))
+        require(file.length() in 1024..AndroidStatusCopies.maxItemBytes)
+    }
 
     private fun verifyStaging(path: String) {
         val directory = File(path).canonicalFile

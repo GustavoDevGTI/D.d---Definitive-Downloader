@@ -1,3 +1,4 @@
+import 'package:sqlite3/sqlite3.dart' show Database;
 import '../../../core/storage/database.dart';
 import '../../../core/network/bounded_http.dart';
 import 'package:path/path.dart' as p;
@@ -89,55 +90,93 @@ class LibraryRepository {
   Future<void> _insertBatch(int id, int start, List<TrackDraft> batch) =>
       database.run((db) {
         db.execute('BEGIN IMMEDIATE');
-        final statement = db.prepare(
-            '''INSERT INTO tracks(collection_id,position,title,artist,album,
-      duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,explicit,match_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''');
         try {
-          for (var i = 0; i < batch.length; i++) {
-            final t = batch[i];
-            statement.execute([
-              id,
-              start + i + 1,
-              t.title,
-              t.artist,
-              t.album,
-              t.durationMs,
-              t.isrc,
-              t.coverUrl,
-              t.sourceUrl,
-              t.mediaUrl,
-              t.sourceKind.name,
-              t.sourceKind == SourceKind.none || !t.sourceReady
-                  ? 'pending'
-                  : 'ready',
-              t.explicit == null ? null : (t.explicit! ? 1 : 0),
-              t.sourceKind == SourceKind.none ? 'pending' : 'confirmed'
-            ]);
-            db.execute(
-                '''UPDATE tracks SET source_id=?,recording_type=?,manual_url=?,
-                source_authorization=?,match_status=?,error=? WHERE id=?''',
-                [
-                  t.sourceId,
-                  t.recordingType,
-                  t.manualUrl,
-                  t.manualUrl.isNotEmpty ? 'manualLink' : 'catalog',
-                  t.manualUrl.isNotEmpty
-                      ? 'manual'
-                      : t.sourceKind == SourceKind.none
-                          ? 'pending'
-                          : 'confirmed',
-                  t.pendingReason,
-                  db.lastInsertRowId
-                ]);
-          }
+          _insertDrafts(db, id, start, batch);
           db.execute('COMMIT');
         } catch (_) {
           rollbackAfterFailure(db);
           rethrow;
-        } finally {
-          statement.dispose();
         }
       });
+
+  /// Appends drafts after the last occurrence, without touching the others.
+  /// The new occurrences are not part of a running download queue.
+  Future<List<int>> appendDrafts(int id, List<TrackDraft> drafts) =>
+      database.run((db) {
+        if (drafts.isEmpty || drafts.length > 100) {
+          throw const FormatException('Adicione de 1 a 100 faixas por vez.');
+        }
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          if (db.select('SELECT 1 FROM collections WHERE id=?', [id]).isEmpty) {
+            throw const FormatException('Playlist não encontrada.');
+          }
+          final size = db.select(
+              'SELECT COUNT(*) AS n,COALESCE(MAX(position),0) AS last FROM tracks WHERE collection_id=?',
+              [id]).single;
+          if ((size['n'] as int) + drafts.length > 10000) {
+            throw const FormatException(
+                'Limite de 10.000 faixas por playlist.');
+          }
+          final ids = _insertDrafts(db, id, size['last'] as int, drafts);
+          db.execute('COMMIT');
+          return ids;
+        } catch (_) {
+          rollbackAfterFailure(db);
+          rethrow;
+        }
+      });
+
+  List<int> _insertDrafts(
+      Database db, int id, int start, List<TrackDraft> batch) {
+    final ids = <int>[];
+    final statement = db.prepare(
+        '''INSERT INTO tracks(collection_id,position,title,artist,album,
+      duration_ms,isrc,cover_url,source_url,media_url,source_kind,status,explicit,match_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''');
+    try {
+      for (var i = 0; i < batch.length; i++) {
+        final t = batch[i];
+        statement.execute([
+          id,
+          start + i + 1,
+          t.title,
+          t.artist,
+          t.album,
+          t.durationMs,
+          t.isrc,
+          t.coverUrl,
+          t.sourceUrl,
+          t.mediaUrl,
+          t.sourceKind.name,
+          t.sourceKind == SourceKind.none || !t.sourceReady
+              ? 'pending'
+              : 'ready',
+          t.explicit == null ? null : (t.explicit! ? 1 : 0),
+          t.sourceKind == SourceKind.none ? 'pending' : 'confirmed'
+        ]);
+        db.execute(
+            '''UPDATE tracks SET source_id=?,recording_type=?,manual_url=?,
+                source_authorization=?,match_status=?,error=? WHERE id=?''',
+            [
+              t.sourceId,
+              t.recordingType,
+              t.manualUrl,
+              t.manualUrl.isNotEmpty ? 'manualLink' : 'catalog',
+              t.manualUrl.isNotEmpty
+                  ? 'manual'
+                  : t.sourceKind == SourceKind.none
+                      ? 'pending'
+                      : 'confirmed',
+              t.pendingReason,
+              db.lastInsertRowId
+            ]);
+        ids.add(db.lastInsertRowId);
+      }
+      return ids;
+    } finally {
+      statement.dispose();
+    }
+  }
 
   static const _manualPreparation =
       '''status='pending' AND match_status='manual'

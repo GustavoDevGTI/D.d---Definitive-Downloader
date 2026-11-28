@@ -1,7 +1,9 @@
 """Discover media on a requested page and download only the selected entry."""
 import hashlib
+from http.cookiejar import Cookie
 import json
 from pathlib import Path
+import re
 from urllib.parse import urlparse
 
 from yt_dlp import YoutubeDL
@@ -12,6 +14,65 @@ from transfer_progress import TransferProgress
 MAX_ITEMS = 50
 MAX_BYTES = 500 * 1024 * 1024
 MAX_DURATION = 24 * 60 * 60 * 1000
+
+# Platforms whose media may need the user's own session. The session comes only
+# from the app's private login window; browser profiles are never read.
+# Public posts of these platforms work without a session; private, restricted
+# or age-gated ones ask for it (verified with yt-dlp 2026.11.23).
+LOGIN_PLATFORMS = {
+    'instagram': ('instagram.com',),
+    'twitter': ('x.com', 'twitter.com'),
+    'tiktok': ('tiktok.com',),
+    'facebook': ('facebook.com', 'fb.watch'),
+}
+LOGIN_HINTS = ('empty media response', 'login required', 'logged-in', 'logged in',
+               'locked behind the login', '--cookies', 'log in', 'requires authentication',
+               'authentication required', 'sign in to')
+MAX_COOKIES = 60
+
+
+def login_platform(url):
+    host = (urlparse(url).hostname or '').lower()
+    for name, domains in LOGIN_PLATFORMS.items():
+        if any(host == domain or host.endswith('.' + domain) for domain in domains):
+            return name
+    return None
+
+
+def session_cookies(platform, session):
+    """Validates cookies captured by the app for this platform only."""
+    if session is None:
+        return []
+    if platform is None or not isinstance(session, list) or not 0 < len(session) <= MAX_COOKIES:
+        raise MusicError('Sessão de login inválida para este endereço.')
+    domains = LOGIN_PLATFORMS[platform]
+    cookies = []
+    for row in session:
+        if not isinstance(row, dict):
+            raise MusicError('Sessão de login inválida para este endereço.')
+        name, value = row.get('name'), row.get('value')
+        domain = str(row.get('domain') or '').lower()
+        path = row.get('path') or '/'
+        expires = row.get('expires')
+        bare = domain.lstrip('.')
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', name)
+                or not isinstance(value, str) or len(value) > 4096
+                or not re.fullmatch(r'[!-:<-~]*', value)
+                or not any(bare == d or bare.endswith('.' + d) for d in domains)
+                or not isinstance(path, str) or not path.startswith('/') or len(path) > 256
+                or (expires is not None and (not isinstance(expires, int) or expires < 0))):
+            raise MusicError('Sessão de login inválida para este endereço.')
+        cookies.append(Cookie(
+            version=0, name=name, value=value, port=None, port_specified=False,
+            domain=domain, domain_specified=True, domain_initial_dot=domain.startswith('.'),
+            path=path, path_specified=True, secure=True, expires=expires,
+            discard=expires is None, comment=None, comment_url=None, rest={}))
+    return cookies
+
+
+def needs_login(platform, error):
+    text = str(error).lower()
+    return platform is not None and any(hint in text for hint in LOGIN_HINTS)
 
 
 def page_url(value):
@@ -38,8 +99,14 @@ def options(flat=True):
         'extract_flat': 'in_playlist' if flat else False,
         'format': 'bestaudio/best', 'enable_file_urls': False,
         'allow_unplayable_formats': False,
+        'cookiefile': None,
         **extractor_options(),
     }
+
+
+def use_session(extractor, cookies):
+    for cookie in cookies:
+        extractor.cookiejar.set_cookie(cookie)
 
 
 def entries(info):
@@ -83,12 +150,22 @@ def candidate(info, fallback):
     }
 
 
-def analyze(url):
+def analyze(url, session=None):
     url = page_url(url)
+    platform = login_platform(url)
+    cookies = session_cookies(platform, session)
     emit('stage', message='Procurando áudios na página')
     try:
         with YoutubeDL(options()) as extractor:
-            info = extractor.extract_info(url, download=False)
+            use_session(extractor, cookies)
+            try:
+                info = extractor.extract_info(url, download=False)
+            except Exception as error:
+                if needs_login(platform, error):
+                    # A normal result: the app opens its login window and retries.
+                    return {'loginRequired': platform, 'sessionRejected': bool(cookies),
+                            'pageUrl': url}
+                raise
             result, seen = [], set()
             truncated = False
             unavailable = 0
@@ -119,8 +196,10 @@ def analyze(url):
         raise MusicError('Não foi possível analisar este endereço. Confira o link e o acesso ao conteúdo.') from None
 
 
-def download(source, directory, control):
+def download(source, directory, control, session=None):
     url = page_url(source.get('pageUrl'))
+    platform = login_platform(url)
+    cookies = session_cookies(platform, session)
     meter = TransferProgress()
 
     def progress(event):
@@ -146,7 +225,14 @@ def download(source, directory, control):
     emit('stage', message='Recebendo o áudio escolhido')
     try:
         with YoutubeDL(config) as extractor:
-            info = extractor.extract_info(url, download=False)
+            use_session(extractor, cookies)
+            try:
+                info = extractor.extract_info(url, download=False)
+            except Exception as error:
+                if needs_login(platform, error):
+                    raise MusicError('A plataforma pediu login novamente. Analise o link em '
+                                     'Capturar áudio para entrar.') from None
+                raise
             chosen = None
             for item in entries(info):
                 actual = candidate(item, url)

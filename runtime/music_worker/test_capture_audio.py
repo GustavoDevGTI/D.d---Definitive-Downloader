@@ -150,3 +150,115 @@ class CaptureAudioTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=3)
+
+
+class CaptureLoginTests(unittest.TestCase):
+    URL = 'https://www.instagram.com/reel/AbC123/'
+    SESSION = [
+        {'name': 'sessionid', 'value': '123%3Aabc%3A4', 'domain': '.instagram.com',
+         'path': '/', 'expires': 2000000000},
+        {'name': 'rur', 'value': '"CLN\054123:01f"', 'domain': '.instagram.com',
+         'path': '/', 'expires': None},
+    ]
+
+    def extractor(self, error=None, info=None):
+        extractor = MagicMock()
+        extractor.__enter__.return_value = extractor
+        if error is not None:
+            extractor.extract_info.side_effect = error
+        else:
+            extractor.extract_info.return_value = info
+        return extractor
+
+    def test_only_known_platforms_need_login(self):
+        self.assertEqual(capture_audio.login_platform(self.URL), 'instagram')
+        self.assertEqual(capture_audio.login_platform('https://instagram.com/p/x/'), 'instagram')
+        self.assertIsNone(capture_audio.login_platform('https://notinstagram.com/p/x/'))
+        self.assertIsNone(capture_audio.login_platform('https://example.org/a'))
+
+    def test_login_error_is_a_result_not_a_failure(self):
+        error = Exception('ERROR: [Instagram] AbC123: Instagram sent an empty media '
+                          'response. Check if this post is accessible ... use --cookies')
+        with patch('capture_audio.YoutubeDL', return_value=self.extractor(error)):
+            result = capture_audio.analyze(self.URL)
+        self.assertEqual(result, {'loginRequired': 'instagram', 'sessionRejected': False,
+                                  'pageUrl': self.URL})
+
+    def test_session_is_used_and_rejection_reported(self):
+        error = Exception('Instagram sent an empty media response')
+        extractor = self.extractor(error)
+        with patch('capture_audio.YoutubeDL', return_value=extractor):
+            result = capture_audio.analyze(self.URL, self.SESSION)
+        self.assertTrue(result['sessionRejected'])
+        names = [call.args[0].name for call in extractor.cookiejar.set_cookie.call_args_list]
+        self.assertEqual(names, ['sessionid', 'rur'])
+
+    def test_session_cookies_stay_on_their_platform(self):
+        for bad in (
+            [{'name': 'sessionid', 'value': 'x', 'domain': '.example.org'}],
+            [{'name': 'sessionid', 'value': 'a;b', 'domain': '.instagram.com'}],
+            [{'name': 'bad name', 'value': 'x', 'domain': '.instagram.com'}],
+            [{'name': 'a', 'value': 'x', 'domain': '.instagram.com'}] * 61,
+            'sessionid=x',
+        ):
+            with self.assertRaises(MusicError):
+                capture_audio.session_cookies('instagram', bad)
+        with self.assertRaises(MusicError):
+            capture_audio.session_cookies(None, self.SESSION)
+        with self.assertRaises(MusicError):
+            capture_audio.analyze('https://example.org/a', self.SESSION)
+
+    def test_other_errors_keep_the_generic_message(self):
+        with patch('capture_audio.YoutubeDL',
+                   return_value=self.extractor(Exception('HTTP Error 404'))):
+            with self.assertRaises(MusicError):
+                capture_audio.analyze(self.URL)
+        with patch('capture_audio.YoutubeDL',
+                   return_value=self.extractor(Exception('login required'))):
+            with self.assertRaises(MusicError):
+                capture_audio.analyze('https://example.org/a')
+
+    def test_successful_session_returns_items(self):
+        info = {'id': 'AbC123', 'title': 'Reel', 'webpage_url': self.URL, 'duration': 12}
+        with patch('capture_audio.YoutubeDL', return_value=self.extractor(info=info)):
+            result = capture_audio.analyze(self.URL, self.SESSION)
+        self.assertEqual(result['items'][0]['durationMs'], 12000)
+        self.assertNotIn('loginRequired', result)
+
+
+class PlatformLoginTests(unittest.TestCase):
+    def test_platform_domains(self):
+        cases = {
+            'https://x.com/a/status/1': 'twitter', 'https://twitter.com/a/status/1': 'twitter',
+            'https://www.tiktok.com/@a/video/1': 'tiktok', 'https://vm.tiktok.com/x/': 'tiktok',
+            'https://www.facebook.com/reel/1': 'facebook', 'https://fb.watch/abc/': 'facebook',
+            'https://bsky.app/profile/a/post/b': None, 'https://www.pinterest.com/pin/1/': None,
+            'https://xx.com/a': None, 'https://facebook.com.evil.test/a': None,
+        }
+        for url, platform in cases.items():
+            self.assertEqual(capture_audio.login_platform(url), platform, url)
+
+    def test_messages_that_ask_for_login(self):
+        asks = {
+            'twitter': 'NSFW tweet requires authentication. Use --cookies',
+            'tiktok': 'This post may not be comfortable for some audiences. Log in for access.',
+            'facebook': 'No video found. Check if this post is accessible in your browser '
+                        'without being logged-in.',
+        }
+        for platform, message in asks.items():
+            self.assertTrue(capture_audio.needs_login(platform, Exception(message)), platform)
+        self.assertFalse(capture_audio.needs_login(
+            'tiktok', Exception('Your IP address is blocked from accessing this post')))
+        self.assertFalse(capture_audio.needs_login(
+            'twitter', Exception('No video could be found in this tweet')))
+        self.assertFalse(capture_audio.needs_login(None, Exception('login required')))
+
+    def test_cookies_of_another_platform_are_refused(self):
+        x = [{'name': 'auth_token', 'value': 'a', 'domain': '.x.com'}]
+        self.assertEqual(len(capture_audio.session_cookies('twitter', x)), 1)
+        with self.assertRaises(MusicError):
+            capture_audio.session_cookies('facebook', x)
+
+
+if __name__ == '__main__':
+    unittest.main()

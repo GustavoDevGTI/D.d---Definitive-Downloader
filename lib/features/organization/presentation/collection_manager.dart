@@ -13,6 +13,7 @@ import 'organization_name_dialog.dart';
 import 'collection_group_strip.dart';
 import '../../library/presentation/playlist_cover_picker.dart';
 import '../../library/presentation/collection_local_drop_target.dart';
+import '../../library/presentation/playlist_destination.dart';
 
 class CollectionManager extends StatefulWidget {
   const CollectionManager(
@@ -269,6 +270,9 @@ class _CollectionManagerState extends State<CollectionManager> {
                 unawaited(_editGroup(null, item));
               case 'move':
                 unawaited(_move(item));
+              case 'destination':
+                unawaited(
+                    showPlaylistDestination(context, widget.library, item));
               case 'delete':
                 unawaited(_removePlaylist(item));
             }
@@ -282,12 +286,15 @@ class _CollectionManagerState extends State<CollectionManager> {
                     'Nova pasta com esta playlist'
                   ),
                   ('move', Icons.drive_file_move_outline, 'Mover para pasta'),
+                  ('destination', Icons.folder_outlined, 'Pasta de destino'),
                   ('delete', Icons.delete_outline, 'Excluir playlist'),
                 ])
                   PopupMenuItem(
                       key: ValueKey('collection-${action.$1}-${item.id}'),
                       value: action.$1,
-                      enabled: action.$1 == 'delete' || enabled,
+                      enabled: action.$1 == 'delete' ||
+                          action.$1 == 'destination' ||
+                          enabled,
                       child: ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(action.$2,

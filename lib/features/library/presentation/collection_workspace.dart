@@ -9,6 +9,7 @@ import '../../organization/presentation/collection_manager.dart';
 import 'track_inspector.dart';
 import 'track_table.dart';
 import 'playlist_cover_picker.dart';
+import 'playlist_destination.dart';
 import 'playlist_palette.dart';
 import 'collection_track_toolbar.dart';
 import 'collection_local_drop_target.dart';
@@ -28,6 +29,7 @@ class CollectionWorkspace extends StatefulWidget {
       required this.onDownloads,
       this.buildTabs,
       this.importRequest = 0,
+      this.openRequest = 0,
       this.active = true,
       this.keyboardOpen = false,
       this.initialPlaylist = ''});
@@ -38,6 +40,9 @@ class CollectionWorkspace extends StatefulWidget {
   final Widget Function(VoidCallback? onBack)? buildTabs;
   final String initialPlaylist;
   final int importRequest;
+
+  /// Shows the controller's current playlist, opened from another tab.
+  final int openRequest;
   @override
   State<CollectionWorkspace> createState() => _CollectionWorkspaceState();
 }
@@ -74,6 +79,10 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
   @override
   void didUpdateWidget(covariant CollectionWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.openRequest != widget.openRequest &&
+        widget.controller.current != null) {
+      _detail = true;
+    }
     if (oldWidget.importRequest == widget.importRequest) return;
     _detail = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -338,6 +347,7 @@ class _CollectionWorkspaceState extends State<CollectionWorkspace> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w600))),
+                  PlaylistDestinationButton(library: c, playlist: c.current!),
                   if (selectionLabel.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     ConstrainedBox(

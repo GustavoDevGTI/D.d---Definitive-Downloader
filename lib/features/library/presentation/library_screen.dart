@@ -52,6 +52,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   int _musicTab = 0, _mediaTab = 0;
   int _inspectorRequest = 0;
   int _playlistImportRequest = 0;
+  int _playlistOpenRequest = 0;
   VoidCallback? _returnFromPlaylist;
   @override
   void initState() {
@@ -101,6 +102,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         builder: (_) => ConnectionsDialog(
           controller: widget.connections!,
           deezer: widget.controller.music?.connection,
+          captureSessions: widget.controller.captureSessions,
           allowChanges: !widget.controller.busy,
         ),
       ),
@@ -342,6 +344,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
                       initialPlaylist: widget.initialPlaylist,
                       importRequest: _playlistImportRequest,
+                      openRequest: _playlistOpenRequest,
                       buildTabs: (onBack) {
                         _returnFromPlaylist = onBack;
                         return _musicTabs(onBack: onBack);
@@ -354,6 +357,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       category: ContentCategory.music,
                       library: widget.controller,
                       onDownloads: () => _navigate(AppSection.music, 2),
+                      onOpen: (_) {
+                        setState(() => _playlistOpenRequest++);
+                        _navigate(AppSection.music);
+                      },
                     ),
                     DownloadWorkspace(
                       controller: _workspace,

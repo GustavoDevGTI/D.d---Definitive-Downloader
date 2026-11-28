@@ -4,6 +4,7 @@ import '../downloads/download_cancellation.dart';
 import '../downloads/download_file_name.dart';
 import '../downloads/playlist_exporter.dart';
 import '../library/data/library_repository.dart';
+import '../library/domain/models.dart';
 import '../organization/data/collection_organization_repository.dart';
 import 'local_media_repository.dart';
 import 'local_mp3_inspector.dart';
@@ -21,14 +22,18 @@ class LocalMediaImporter {
   Future<String> add(
           int collectionId, List<String> paths, String outputDirectory,
           {required DownloadCancellation cancellation,
+          Future<String> Function(Collection owner)? directoryFor,
           void Function(String)? onProgress}) =>
       _add(collectionId, paths, outputDirectory,
-          cancellation: cancellation, onProgress: onProgress);
+          directoryFor: directoryFor,
+          cancellation: cancellation,
+          onProgress: onProgress);
 
   Future<({int id, String message})> importFolder(
       String path, String outputDirectory,
       {int? groupId,
       required DownloadCancellation cancellation,
+      Future<String> Function(Collection owner)? directoryFor,
       void Function(String)? onProgress}) async {
     final name = p.basename(p.normalize(path));
     if (!p.isAbsolute(path) || name.isEmpty) {
@@ -59,6 +64,7 @@ class LocalMediaImporter {
     try {
       final message = await _add(id, paths, outputDirectory,
           sourceRoot: source.path,
+          directoryFor: directoryFor,
           cancellation: cancellation,
           onProgress: onProgress);
       return (id: id, message: message);
@@ -71,6 +77,7 @@ class LocalMediaImporter {
   Future<String> _add(
       int collectionId, List<String> paths, String outputDirectory,
       {String? sourceRoot,
+      Future<String> Function(Collection owner)? directoryFor,
       required DownloadCancellation cancellation,
       void Function(String)? onProgress}) async {
     final folderImport = sourceRoot != null;
@@ -102,11 +109,12 @@ class LocalMediaImporter {
     }
     final storage = LocalMediaRepository(repository.database);
     final initial = await storage.target(collectionId, paths.length);
-    final root = await Directory(outputDirectory).create(recursive: true);
+    final directory = await directoryFor?.call(initial.owner) ??
+        p.join(outputDirectory,
+            '${safeSegment(initial.owner.outputFolderName)} [${initial.owner.id}]');
+    final root = await Directory(p.dirname(directory)).create(recursive: true);
     final rootPath = await root.resolveSymbolicLinks();
-    final folder = await Directory(p.join(root.path,
-            '${safeSegment(initial.owner.outputFolderName)} [${initial.owner.id}]'))
-        .create(recursive: true);
+    final folder = await Directory(directory).create(recursive: true);
     final folderPath = await folder.resolveSymbolicLinks();
     if (!p.isWithin(rootPath, folderPath)) {
       throw const FormatException(

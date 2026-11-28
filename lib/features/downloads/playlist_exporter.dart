@@ -25,7 +25,9 @@ class PlaylistExporter {
                   .replaceAll(RegExp(r'[\r\n]'), ' ');
           sink.writeln(
               '#EXTINF:${(track.outputDurationMs ?? -1000) ~/ 1000},$title${track.sourceKind.musicProviderSuffix}');
-          sink.writeln(p.basename(track.localPath));
+          // Files saved before the playlist changed location stay in the
+          // old folder; the entry then points there instead of breaking.
+          sink.writeln(_entry(track.localPath, directory));
         }
         after = tracks.last.position;
       }
@@ -38,5 +40,14 @@ class PlaylistExporter {
     await temporary.rename(file.path);
     await (files ?? createPlatformFiles()).publishPlaylist(file.path);
     return file.path;
+  }
+}
+
+String _entry(String path, String directory) {
+  if (p.equals(p.dirname(path), directory)) return p.basename(path);
+  try {
+    return p.relative(path, from: directory);
+  } on p.PathException {
+    return path; // Another drive: only an absolute path reaches it.
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:definitive_downloader/core/network/bounded_http.dart';
 import 'package:definitive_downloader/core/platform/desktop_files.dart';
@@ -8,6 +9,8 @@ import 'package:definitive_downloader/core/storage/database.dart';
 import 'package:definitive_downloader/features/audio_capture/application/audio_capture_controller.dart';
 import 'package:definitive_downloader/features/audio_capture/data/audio_capture_service.dart';
 import 'package:definitive_downloader/features/audio_capture/domain/audio_capture.dart';
+import 'package:definitive_downloader/features/audio_capture/data/capture_sessions.dart';
+import 'package:definitive_downloader/features/audio_capture/domain/capture_login.dart';
 import 'package:definitive_downloader/features/connections/application/deezer_connection_controller.dart';
 import 'package:definitive_downloader/features/downloads/download_service.dart';
 import 'package:definitive_downloader/features/downloads/music_download_service.dart';
@@ -46,6 +49,27 @@ class CaptureFixtureEngine implements MusicEngine {
     calls.add(request);
     if (request['operation'] == 'captureAnalyze') {
       if (pending != null) return pending!.future;
+      final url = request['url'] as String;
+      if (url.contains('instagram.com')) {
+        final session = request['session'] as List?;
+        final valid = session?.any((c) =>
+                (c as Map)['name'] == 'sessionid' && c['value'] == 'ok') ==
+            true;
+        if (!valid) {
+          return {
+            'loginRequired': 'instagram',
+            'sessionRejected': session != null,
+            'pageUrl': url
+          };
+        }
+        return {
+          'title': 'Reel',
+          'pageUrl': url,
+          'items': [
+            {...captureFixture(1), 'pageUrl': url}
+          ],
+        };
+      }
       return {
         'title': 'Página de ensaio',
         'pageUrl': request['url'],
@@ -77,7 +101,8 @@ class _CaptureFiles extends DesktopFiles {
 }
 
 Future<LibraryController> captureFixtureLibrary(
-    Directory directory, CaptureFixtureEngine engine) async {
+    Directory directory, CaptureFixtureEngine engine,
+    {CaptureSessionStore? sessions}) async {
   final connection = DeezerConnectionController(EmptySession(), engine);
   final library = LibraryController(
       repository: LibraryRepository(AppDatabase('${directory.path}/test.db')),
@@ -86,8 +111,10 @@ Future<LibraryController> captureFixtureLibrary(
       csv: const CsvImporter(),
       catalog: const DeezerCatalog(BoundedHttp()),
       music: MusicResolver(engine, connection),
+      captureSessions: sessions,
       downloader: DownloadService(const BoundedHttp(), rootBundle,
-          music: MusicDownloadService(engine, connection)));
+          music: MusicDownloadService(engine, connection,
+              captureSessions: sessions)));
   await library.initialize();
   return library;
 }
@@ -150,6 +177,9 @@ void main() {
       expect(track.hasManualSource, isTrue);
       expect(track.status, TrackStatus.completed, reason: track.error);
       expect(await File(track.localPath).exists(), isTrue);
+      // A single audio gets a folder named after itself in Downloads.
+      expect(owner.name, 'Áudio 2');
+      expect(p.dirname(track.localPath), p.join(directory.path, 'Áudio 2'));
       expect(PlayerLibrary(library.repository.database).referenceFor(track),
           'https://example.org/audio-2');
       expect(engine.calls.map((call) => call['operation']),
@@ -217,4 +247,219 @@ void main() {
     });
     await expectLater(analysis, throwsFormatException);
   });
+
+  test('descartar remove da análise sem salvar nada', () async {
+    final directory = await Directory.systemTemp.createTemp('dd-capture-');
+    final library =
+        await captureFixtureLibrary(directory, CaptureFixtureEngine());
+    final controller = AudioCaptureController(library);
+    try {
+      await controller.analyze('https://example.org/page');
+      controller.discard(captureFixture(1)['sourceId'] as String);
+      expect(controller.result!.items.map((item) => item.title), ['Áudio 2']);
+      expect(controller.selected, {captureFixture(2)['sourceId']});
+      controller.discardSelected();
+      expect(controller.result, isNull);
+      expect(controller.selected, isEmpty);
+      expect(library.collections, isEmpty);
+    } finally {
+      controller.dispose();
+      library.dispose();
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test(
+      'salvar como playlist usa a pasta escolhida e não baixa; '
+      'adicionar a playlist acrescenta no fim', () async {
+    final directory = await Directory.systemTemp.createTemp('dd-capture-');
+    final engine = CaptureFixtureEngine();
+    final library = await captureFixtureLibrary(directory, engine);
+    final controller = AudioCaptureController(library);
+    try {
+      final existing = await library.repository.importCollection(
+          ImportedCollection(
+              name: 'Minha lista',
+              source: 'Ensaio',
+              sourceUrl: '',
+              tracks: Stream.value(const TrackDraft(
+                  title: 'Primeira',
+                  artist: '',
+                  sourceKind: SourceKind.directMp3,
+                  mediaUrl: 'https://example.org/original.mp3'))));
+      await library.refresh();
+      await controller.analyze('https://example.org/page');
+      final chosen = p.join(directory.path, 'Escolhida');
+      controller.destinationRoot = chosen;
+      expect(controller.destinationPreview, p.join(chosen, 'Página de ensaio'));
+
+      final saved = await controller.saveAsPlaylist();
+      expect(saved, isNotNull, reason: controller.message);
+      expect(saved!.name, 'Página de ensaio');
+      expect(library.downloading, isFalse);
+      expect(engine.calls.map((call) => call['operation']), ['captureAnalyze']);
+      final destination = await library.destinationOf(saved.id);
+      expect(destination.customRoot, isTrue);
+      expect(destination.directory, p.join(chosen, 'Página de ensaio'));
+      expect(await Directory(destination.directory).exists(), isFalse);
+
+      controller.selectAll(true);
+      final target = (await library.repository.collectionById(existing))!;
+      expect(await controller.addToPlaylist(target), isTrue,
+          reason: controller.message);
+      final tracks = (await library.repository.page(existing)).items;
+      expect(tracks.map((t) => (t.position, t.title)),
+          [(1, 'Primeira'), (2, 'Áudio 1'), (3, 'Áudio 2')]);
+      expect(tracks.last.sourceKind, SourceKind.webAudio);
+      expect(tracks.last.hasManualSource, isTrue);
+      expect(tracks.last.status, TrackStatus.ready);
+      expect(engine.calls.map((call) => call['operation']), ['captureAnalyze']);
+    } finally {
+      controller.dispose();
+      library.dispose();
+      await directory.delete(recursive: true);
+    }
+  });
+
+  group('login de plataforma na captura', () {
+    const reel = 'https://www.instagram.com/reel/AbC123/';
+    SessionCookie cookie(String value) => SessionCookie(
+        name: 'sessionid', value: value, domain: '.instagram.com');
+
+    test('pede login, repete a análise, guarda e reaproveita a sessão',
+        () async {
+      final directory = await Directory.systemTemp.createTemp('dd-capture-');
+      final engine = CaptureFixtureEngine();
+      final sessions = MemoryCaptureSessionStore();
+      final library =
+          await captureFixtureLibrary(directory, engine, sessions: sessions);
+      final controller = AudioCaptureController(library);
+      var asked = 0;
+      controller.requestLogin = (platform, verify) async {
+        asked++;
+        expect(platform, CapturePlatform.instagram);
+        // A wrong session keeps the window open; the right one closes it.
+        expect(await verify([cookie('wrong')]), isFalse);
+        final session = [cookie('ok')];
+        expect(await verify(session), isTrue);
+        return session;
+      };
+      try {
+        await controller.analyze(reel);
+        expect(controller.result?.items.single.pageUrl, reel,
+            reason: controller.message);
+        expect(asked, 1);
+        expect(controller.signedIn, {CapturePlatform.instagram});
+        expect((await sessions.read(CapturePlatform.instagram))!.single.value,
+            'ok');
+
+        await controller.analyze(reel);
+        expect(asked, 1, reason: 'A sessão salva é usada sem novo login.');
+        expect(controller.result, isNotNull);
+        // Other sites never receive the Instagram session.
+        await controller.analyze('https://example.org/page');
+        expect(engine.calls.last.containsKey('session'), isFalse);
+      } finally {
+        controller.dispose();
+        library.dispose();
+        await _deleteTemp(directory);
+      }
+    });
+
+    test('download de áudio do Instagram leva a sessão salva', () async {
+      final directory = await Directory.systemTemp.createTemp('dd-capture-');
+      final engine = CaptureFixtureEngine();
+      final sessions = MemoryCaptureSessionStore();
+      await sessions.write(CapturePlatform.instagram, [cookie('ok')]);
+      final library =
+          await captureFixtureLibrary(directory, engine, sessions: sessions);
+      final controller = AudioCaptureController(library);
+      try {
+        await controller.analyze(reel);
+        expect(await controller.download(), isTrue, reason: controller.message);
+        for (var i = 0;
+            i < 750 &&
+                (library.downloading ||
+                    !engine.calls
+                        .any((call) => call['operation'] == 'download'));
+            i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        final download =
+            engine.calls.lastWhere((call) => call['operation'] == 'download');
+        expect((download['session'] as List).single['value'], 'ok');
+      } finally {
+        controller.dispose();
+        library.dispose();
+        await _deleteTemp(directory);
+      }
+    });
+
+    test('sessão recusada é apagada; login cancelado não captura nada',
+        () async {
+      final directory = await Directory.systemTemp.createTemp('dd-capture-');
+      final sessions = MemoryCaptureSessionStore();
+      await sessions.write(CapturePlatform.instagram, [cookie('expired')]);
+      final library = await captureFixtureLibrary(
+          directory, CaptureFixtureEngine(),
+          sessions: sessions);
+      final controller = AudioCaptureController(library)
+        ..requestLogin = (_, __) async => null;
+      try {
+        await controller.loadSessions();
+        expect(controller.signedIn, {CapturePlatform.instagram});
+        await controller.analyze(reel);
+        expect(controller.result, isNull);
+        expect(controller.message, contains('Login no Instagram cancelado'));
+        expect(await sessions.read(CapturePlatform.instagram), isNull);
+        expect(controller.signedIn, isEmpty);
+        expect(library.collections, isEmpty);
+      } finally {
+        controller.dispose();
+        library.dispose();
+        await _deleteTemp(directory);
+      }
+    });
+
+    test('sessão só aceita cookies da própria plataforma', () {
+      expect(CapturePlatform.forUrl(reel), CapturePlatform.instagram);
+      expect(CapturePlatform.forUrl('https://notinstagram.com/p/x'), isNull);
+      expect(
+          platformSession(CapturePlatform.instagram, [
+            const SessionCookie(
+                name: 'sessionid', value: 'x', domain: '.example.org')
+          ]),
+          isNull);
+      expect(
+          platformSession(CapturePlatform.instagram, [
+            const SessionCookie(
+                name: 'csrftoken', value: 'x', domain: '.instagram.com')
+          ]),
+          isNull,
+          reason: 'Sem sessionid não há login.');
+      expect(
+          platformSession(CapturePlatform.instagram, [cookie('a;b')]), isNull);
+      expect(
+          CapturePlatform.instagram
+              .allowsNavigation(Uri.parse('https://www.facebook.com/login')),
+          isFalse);
+      expect(
+          CapturePlatform.instagram.allowsNavigation(
+              Uri.parse('https://www.instagram.com/accounts/login/')),
+          isTrue);
+    });
+  });
+}
+
+// Windows can hold a just-written file for a moment after the run finishes.
+Future<void> _deleteTemp(Directory directory) async {
+  for (var attempt = 0;; attempt++) {
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt >= 20) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+  }
 }

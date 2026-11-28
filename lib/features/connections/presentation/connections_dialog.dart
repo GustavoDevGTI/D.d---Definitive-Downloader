@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../application/trackhop_connection.dart';
 import '../application/deezer_connection_controller.dart';
+import '../../audio_capture/data/capture_sessions.dart';
+import '../../audio_capture/presentation/capture_connections_pane.dart';
 import 'deezer_connection_pane.dart';
 import 'trackhop_connection_pane.dart';
 
@@ -10,8 +12,10 @@ class ConnectionsDialog extends StatelessWidget {
       {super.key,
       required this.controller,
       this.allowChanges = true,
-      this.deezer});
+      this.deezer,
+      this.captureSessions});
   final DeezerConnectionController? deezer;
+  final CaptureSessionStore? captureSessions;
   final TrackhopConnection controller;
   final bool allowChanges;
   @override
@@ -45,6 +49,14 @@ class ConnectionsDialog extends StatelessWidget {
                     const Text(
                         'Alternativa à Deezer quando houver áudio disponível. Login Google ainda não está configurado.',
                         style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                    if (captureSessions != null) ...[
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      CaptureConnectionsPane(
+                          sessions: captureSessions!,
+                          allowChanges: allowChanges),
+                    ],
                   ],
                 ))),
             actions: [

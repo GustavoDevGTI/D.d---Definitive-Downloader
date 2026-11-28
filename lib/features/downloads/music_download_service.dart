@@ -7,12 +7,17 @@ import '../matching/music_candidates.dart';
 import '../matching/music_engine.dart';
 import 'download_cancellation.dart';
 import 'download_file_name.dart';
+import '../audio_capture/data/capture_sessions.dart';
 import '../audio_capture/domain/audio_capture.dart';
+import '../audio_capture/domain/capture_login.dart';
 
 class MusicDownloadService {
-  MusicDownloadService(this.engine, this.connection);
+  MusicDownloadService(this.engine, this.connection, {this.captureSessions});
   final MusicEngine engine;
   final DeezerConnectionController connection;
+
+  /// Sessions from the capture login window, sent only to their platform.
+  final CaptureSessionStore? captureSessions;
 
   Future<String> save(Track track, String directory, DownloadCancellation token,
       void Function(String) onStage,
@@ -57,6 +62,12 @@ class MusicDownloadService {
       };
       if (track.sourceKind == SourceKind.deezerFull) {
         request['arl'] = await connection.sessionForDownload();
+      }
+      final platform = captured ? CapturePlatform.forUrl(track.mediaUrl) : null;
+      final session =
+          platform == null ? null : await captureSessions?.read(platform);
+      if (session != null) {
+        request['session'] = session.map((cookie) => cookie.toJson()).toList();
       }
       TransferProgress? latest;
       final result =

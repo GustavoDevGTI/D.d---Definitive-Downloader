@@ -29,6 +29,7 @@ import 'features/connections/application/music_account_access.dart';
 import 'features/downloads/music_download_service.dart';
 import 'features/matching/music_engine.dart';
 import 'features/matching/music_resolver.dart';
+import 'features/audio_capture/data/capture_sessions.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,7 @@ Future<void> main(List<String> arguments) async {
   final engine = await createMusicEngine();
   final deezer = DeezerConnectionController(
       const SecureDeezerSessionStore(FlutterSecureStorage()), engine);
+  const captureSessions = SecureCaptureSessionStore(FlutterSecureStorage());
   final navigator = GlobalKey<NavigatorState>();
   final connections = TrackhopConnection(const FlutterSecureStorage(),
       localDesktop: !Platform.isAndroid);
@@ -73,8 +75,10 @@ Future<void> main(List<String> arguments) async {
       csv: const CsvImporter(),
       catalog: const DeezerCatalog(http),
       music: MusicResolver(engine, deezer),
+      captureSessions: captureSessions,
       downloader: DownloadService(http, rootBundle,
-          music: MusicDownloadService(engine, deezer)));
+          music: MusicDownloadService(engine, deezer,
+              captureSessions: captureSessions)));
   await controller.initialize(example: arguments.contains('--example'));
   final player = MusicPlayerController(
       PlayerLibrary(database, files: files), createAudioEngine(), files);

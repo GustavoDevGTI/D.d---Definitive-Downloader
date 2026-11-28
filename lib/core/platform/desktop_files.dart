@@ -83,6 +83,16 @@ class DesktopFiles {
     return p.join(directory.path, AppIdentity.name);
   }
 
+  /// Default location of new playlists: a folder named after each playlist
+  /// is created inside it. On Windows that is the Downloads folder itself,
+  /// the parent of the former app folder.
+  Future<String> defaultDownloadsRoot() async =>
+      p.dirname(await defaultOutputDirectory());
+
+  Future<bool> pathExists(String path) async =>
+      await FileSystemEntity.type(path, followLinks: false) !=
+      FileSystemEntityType.notFound;
+
   Future<String?> choosePlaylistFile() async =>
       (await openFile(acceptedTypeGroups: [
         const XTypeGroup(
@@ -93,6 +103,11 @@ class DesktopFiles {
   Future<String?> chooseAudioFolder() =>
       getDirectoryPath(confirmButtonText: 'Importar pasta');
   Future<void> cancelAudioFolder() async {}
+
+  /// Status Saver needs WhatsApp's status folder, which exists only on Android.
+  bool get supportsStatusSaver => false;
+  Future<String?> chooseWhatsAppStatuses() async => null;
+  Future<void> releaseWhatsAppStatuses(String path) async {}
   Future<void> releaseAudioFolder(String path) async {}
   Future<List<String>> chooseMp3Files() async =>
       (await openFiles(acceptedTypeGroups: [

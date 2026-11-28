@@ -22,6 +22,8 @@ import '../../importing/managed_spotify_playlists.dart';
 import '../../importing/spotify_playlist_export.dart';
 import '../../matching/deezer_catalog.dart';
 import '../../matching/music_resolver.dart';
+import '../../audio_capture/data/capture_sessions.dart';
+import '../data/collection_destinations.dart';
 import '../data/library_repository.dart';
 import '../data/playlist_editor.dart';
 import '../data/redownload_repository.dart';
@@ -63,9 +65,14 @@ class LibraryController extends ChangeNotifier {
       this.youtubePlaylists = const YouTubePlaylistCatalog(),
       this.linkCatalog,
       this.localInspector = const MediaKitLocalAudioInspector(),
+      CaptureSessionStore? captureSessions,
       this.music})
-      : soundcloud = soundcloud ?? SoundCloudCatalog();
+      : soundcloud = soundcloud ?? SoundCloudCatalog(),
+        captureSessions = captureSessions ?? MemoryCaptureSessionStore();
   final SoundCloudCatalog soundcloud;
+
+  /// Sessions created in the capture login window (for example, Instagram).
+  final CaptureSessionStore captureSessions;
   final MusicAccountAccess? accounts;
   final ManagedSpotifyPlaylists? managedSpotify;
 
@@ -213,7 +220,9 @@ class LibraryController extends ChangeNotifier {
       _addition((token) => LocalMediaImporter(repository,
               inspector: localInspector, files: files)
           .add(collectionId, paths, outputDirectory,
-              cancellation: token, onProgress: _additionProgress));
+              directoryFor: _directoryFor,
+              cancellation: token,
+              onProgress: _additionProgress));
 
   Future<void> addDroppedMp3(int collectionId, List<String> paths) async {
     for (final path in paths) {
@@ -270,7 +279,9 @@ class LibraryController extends ChangeNotifier {
         message = '$name · Lendo pasta…';
         notifyListeners();
         final result = await importer.importFolder(folder, outputDirectory,
-            groupId: groupId, cancellation: token, onProgress: (progress) {
+            groupId: groupId,
+            directoryFor: _directoryFor,
+            cancellation: token, onProgress: (progress) {
           if (token.cancelled) return;
           message = '$name · $progress';
           notifyListeners();
@@ -452,7 +463,16 @@ class LibraryController extends ChangeNotifier {
   Candidate? selectedCandidate;
   TrackSort trackSort = TrackSort.position;
   bool trackDescending = false;
+
+  /// Default location of new playlists (Settings).
   String outputDirectory = '';
+  // Root of the "<name> [id]" folders of playlists created before 0.1.106.
+  String _legacyOutput = '';
+  late final destinations = CollectionDestinations(repository.database,
+      exists: files.pathExists,
+      root: () => outputDirectory,
+      legacyRoot: () =>
+          _legacyOutput.isEmpty ? outputDirectory : _legacyOutput);
   String message = '';
   String view = 'collections';
   String collectionQuery = '';
@@ -529,8 +549,9 @@ class LibraryController extends ChangeNotifier {
     final publications =
         await MediaPublicationRecovery(repository, files).recover();
     if (publications != null) message = publications;
-    outputDirectory = await repository.preference('output_directory') ??
-        await files.defaultOutputDirectory();
+    final preferred = await repository.preference('output_directory');
+    outputDirectory = preferred ?? await files.defaultDownloadsRoot();
+    _legacyOutput = preferred ?? await files.defaultOutputDirectory();
     collections = await repository.collections(offset: collectionOffset);
     if (collections.isNotEmpty) {
       current = collections.first;
@@ -1022,6 +1043,20 @@ class LibraryController extends ChangeNotifier {
       _import(() async => collection,
           prepareAfterImport: false, announceSuccess: false);
 
+  Future<CollectionListing> searchPlaylists(String query) =>
+      CollectionOrganizationRepository(repository.database).list(query: query);
+
+  /// Adds captured audio after the playlist's last track. Nothing downloads
+  /// until the user starts it from the playlist.
+  Future<bool> appendCapturedAudio(int collectionId, List<TrackDraft> drafts) =>
+      _addition((token) async {
+        token.check();
+        final ids = await repository.appendDrafts(collectionId, drafts);
+        return ids.length == 1
+            ? 'Áudio adicionado ao fim da playlist.'
+            : '${ids.length} áudios adicionados ao fim da playlist.';
+      });
+
   Future<int> createPlaylist(String name,
       {int? groupId, String link = ''}) async {
     if (importBlocked) {
@@ -1246,11 +1281,55 @@ class LibraryController extends ChangeNotifier {
       if (path != null) {
         await repository.setPreference('output_directory', path);
         outputDirectory = path;
+        _legacyOutput = path;
       }
     } catch (error) {
       message = operationMessage(error);
     }
     notifyListeners();
+  }
+
+  Future<String> _directoryFor(Collection owner) =>
+      destinations.directory(owner.id);
+
+  Future<CollectionDestination> destinationOf(int collectionId) =>
+      destinations.describe(collectionId);
+
+  String displayPath(String path) => files.displayPath(path);
+
+  /// Asks for a folder without assigning it, for a playlist not created yet.
+  Future<String?> pickDestinationRoot() => files.chooseOutput();
+
+  /// Chooses where the playlist's next files go ([root] empty: the default
+  /// location). Saved files stay where they are.
+  Future<void> setCollectionRoot(int collectionId, String root) async {
+    if (importBlocked) {
+      throw const FormatException(
+          'Aguarde os downloads e importações em andamento para mudar a pasta.');
+    }
+    await destinations.setRoot(collectionId, root);
+    notifyListeners();
+  }
+
+  Future<void> openCollectionFolder(int collectionId) async {
+    try {
+      // Opening creates the folder, so reserve it first: otherwise the next
+      // download would treat it as somebody else's and number the name.
+      await files.openFolder(await destinations.directory(collectionId));
+    } catch (error) {
+      message = operationMessage(error);
+      notifyListeners();
+    }
+  }
+
+  /// Opens a public HTTPS page in the browser; it never selects or downloads.
+  Future<void> openPage(Uri uri) async {
+    try {
+      await files.openUrl(uri);
+    } catch (error) {
+      message = operationMessage(error);
+      notifyListeners();
+    }
   }
 
   Future<void> openOutput() async {
@@ -1357,6 +1436,7 @@ class LibraryController extends ChangeNotifier {
               files: files, inspector: localInspector)
           .execute(
               outputDirectory: outputDirectory,
+              directoryFor: _directoryFor,
               collectionId: collection?.id,
               queueIds: queueIds,
               failedOnly: failedOnly,

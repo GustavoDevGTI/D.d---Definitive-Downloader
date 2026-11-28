@@ -74,6 +74,11 @@ class AndroidFiles extends DesktopFiles {
   Future<String> defaultOutputDirectory() async =>
       (await channel.invokeMethod<String>('defaultOutput'))!;
 
+  // Android keeps new playlists in the app's media folder until another
+  // location is chosen; public folders need the system picker.
+  @override
+  Future<String> defaultDownloadsRoot() => defaultOutputDirectory();
+
   Future<List<String>> _pick(String kind) async =>
       await channel.invokeListMethod<String>('pickFiles', {'kind': kind}) ?? [];
 
@@ -95,6 +100,31 @@ class AndroidFiles extends DesktopFiles {
       return (await _pick('audioFolder')).firstOrNull;
     } on PlatformException catch (error) {
       throw FormatException(error.message ?? 'Não foi possível ler a pasta.');
+    }
+  }
+
+  @override
+  bool get supportsStatusSaver => true;
+
+  /// The system picker opens in WhatsApp's status folder; the adapter copies
+  /// the video and audio statuses to the app cache and returns that folder.
+  @override
+  Future<String?> chooseWhatsAppStatuses() async {
+    try {
+      return (await _pick('whatsappStatuses')).firstOrNull;
+    } on PlatformException catch (error) {
+      throw FormatException(error.message ?? 'Não foi possível ler os status.');
+    }
+  }
+
+  @override
+  Future<void> releaseWhatsAppStatuses(String path) async {
+    try {
+      await channel.invokeMethod<void>('releaseStatuses', {'path': path});
+    } on PlatformException {
+      // A cache cleanup failure does not change the saved playlist.
+    } on MissingPluginException {
+      // The copies are in the app-owned cache.
     }
   }
 

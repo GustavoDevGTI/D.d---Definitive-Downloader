@@ -33,7 +33,15 @@ void removeContinuousSchema(Database db) {
   db.execute('DROP TABLE library_revision');
 }
 
+// Schema 18: playlist location and reserved folder.
+void removePlaylistDestinationSchema(Database db) {
+  for (final column in ['output_root', 'output_folder', 'legacy_folder']) {
+    db.execute('ALTER TABLE collections DROP COLUMN $column');
+  }
+}
+
 void removePlaylistThemeSchema(Database db) {
+  removePlaylistDestinationSchema(db);
   db.execute('DROP TRIGGER collections_assign_color');
   db.execute('DROP TRIGGER collection_list_name');
   db.execute('DROP INDEX collections_theme_color');

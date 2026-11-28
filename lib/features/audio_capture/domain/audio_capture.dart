@@ -63,25 +63,51 @@ class AudioCaptureResult {
   final bool truncated;
   final int unavailableCount;
 
-  ImportedCollection selection(Set<String> ids) {
+  List<Candidate> chosen(Set<String> ids) {
     final chosen = items.where((item) => ids.contains(item.sourceId)).toList();
     if (chosen.isEmpty) {
       throw const FormatException('Selecione pelo menos um áudio.');
     }
-    return ImportedCollection(
-        name: title,
-        source: 'Captura de áudio',
-        sourceUrl: url,
-        tracks: Stream.fromIterable(chosen.map((item) => TrackDraft(
-            title: item.title,
-            artist: item.artist,
-            album: item.album,
-            durationMs: item.durationMs == 0 ? null : item.durationMs,
-            sourceUrl: item.pageUrl,
-            mediaUrl: item.pageUrl,
-            manualUrl: item.pageUrl,
-            sourceKind: SourceKind.webAudio,
-            sourceId: item.sourceId,
-            recordingType: 'WEB_AUDIO'))));
+    return chosen;
   }
+
+  /// Name of the playlist (and its folder) created from [ids]: a single audio
+  /// is named after itself, several after the page.
+  String nameFor(Set<String> ids) {
+    final selected = chosen(ids);
+    final name = (selected.length == 1 ? selected.single.title : title).trim();
+    return name.length > 120 ? name.substring(0, 120).trim() : name;
+  }
+
+  List<TrackDraft> drafts(Set<String> ids) =>
+      chosen(ids).map(_draft).toList(growable: false);
+
+  ImportedCollection selection(Set<String> ids) => ImportedCollection(
+      name: nameFor(ids),
+      source: 'Captura de áudio',
+      sourceUrl: url,
+      tracks: Stream.fromIterable(drafts(ids)));
+
+  /// The same analysis without the discarded audios.
+  AudioCaptureResult without(Set<String> ids) => AudioCaptureResult(
+      title: title,
+      url: url,
+      items: List.unmodifiable(
+          items.where((item) => !ids.contains(item.sourceId))),
+      truncated: truncated,
+      unavailableCount: unavailableCount);
+
+  int get durationMs => items.fold(0, (total, item) => total + item.durationMs);
+
+  static TrackDraft _draft(Candidate item) => TrackDraft(
+      title: item.title,
+      artist: item.artist,
+      album: item.album,
+      durationMs: item.durationMs == 0 ? null : item.durationMs,
+      sourceUrl: item.pageUrl,
+      mediaUrl: item.pageUrl,
+      manualUrl: item.pageUrl,
+      sourceKind: SourceKind.webAudio,
+      sourceId: item.sourceId,
+      recordingType: 'WEB_AUDIO');
 }

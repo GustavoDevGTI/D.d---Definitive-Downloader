@@ -10,7 +10,7 @@ if($LASTEXITCODE -ne 0){throw 'Instale runtime/music_worker/requirements.txt no 
 Copy-Item -LiteralPath $ffmpeg -Destination (Join-Path $stage 'ffmpeg.exe') -Force
 Push-Location $stage
 try {
-  & $Python -m PyInstaller --noconfirm --clean --onedir --noupx --name dd_music_worker --distpath dist --workpath build --specpath . --add-binary 'ffmpeg.exe;.' --collect-data ytmusicapi --collect-submodules yt_dlp --exclude-module spotdl source/main.py
+  & $Python -m PyInstaller --noconfirm --clean --onedir --noupx --name dd_music_worker --distpath dist --workpath build --specpath . --add-binary 'ffmpeg.exe;.' --collect-data ytmusicapi --collect-submodules yt_dlp --collect-all curl_cffi --exclude-module spotdl source/main.py
   if($LASTEXITCODE -ne 0){throw 'Falha na compilação do motor musical.'}
   # The bundled build Python enforces certificate distrust using this public
   # PEM beside ssl.py. Preserve that policy when freezing; do not patch TLS out.
@@ -20,7 +20,7 @@ try {
   }
   $target=Join-Path $workspace 'dist\DefinitiveDownloader\music_engine'
   New-Item -ItemType Directory -Path $target -Force | Out-Null
-  & robocopy 'dist\dd_music_worker' $target /E /NFL /NDL /NJH /NJS /NP | Out-Null
+  & robocopy 'dist\dd_music_worker' $target /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
   if($LASTEXITCODE -ge 8){throw 'Falha ao publicar o motor local.'}
   Copy-Item -LiteralPath (Join-Path $workspace 'runtime\music_worker\requirements.txt') -Destination $target -Force
   Write-Output "Motor gerado: $(Join-Path $target 'dd_music_worker.exe')"

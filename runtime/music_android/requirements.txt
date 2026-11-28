@@ -1,6 +1,6 @@
 # Pure Python only. Native CPython/FFmpeg/QuickJS come from the Android SDK AARs.
 ytmusicapi==1.12.1
-yt-dlp==2026.10.26
+yt-dlp==2026.11.23
 yt-dlp-ejs==0.8.0
 requests==2.34.2
 mutagen==1.48.1

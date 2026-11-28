@@ -3,13 +3,19 @@ import '../domain/workspace_models.dart';
 import 'link_entry_panel.dart';
 import '../../audio_capture/presentation/audio_capture_panel.dart';
 import '../../library/application/library_controller.dart';
+import '../../library/domain/models.dart';
 
 class CaptureWorkspace extends StatefulWidget {
   const CaptureWorkspace(
-      {super.key, required this.category, this.library, this.onDownloads});
+      {super.key,
+      required this.category,
+      this.library,
+      this.onDownloads,
+      this.onOpen});
   final ContentCategory category;
   final LibraryController? library;
   final VoidCallback? onDownloads;
+  final ValueChanged<Collection>? onOpen;
   @override
   State<CaptureWorkspace> createState() => _CaptureWorkspaceState();
 }
@@ -27,7 +33,9 @@ class _CaptureWorkspaceState extends State<CaptureWorkspace> {
     final audio = widget.category == ContentCategory.music;
     if (audio && widget.library != null) {
       return AudioCapturePanel(
-          library: widget.library!, onDownloads: widget.onDownloads);
+          library: widget.library!,
+          onDownloads: widget.onDownloads,
+          onOpen: widget.onOpen);
     }
     return ListView(primary: false, padding: EdgeInsets.zero, children: [
       LinkEntryPanel(

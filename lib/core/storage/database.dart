@@ -29,7 +29,7 @@ class AppDatabase {
     await run((db) {
       final version =
           db.select('PRAGMA user_version').first.values.first as int;
-      if (version > 17) {
+      if (version > 18) {
         throw StateError('Este banco foi criado por uma versão mais recente.');
       }
       if (version == 0) {
@@ -394,6 +394,26 @@ class AppDatabase {
               UPDATE tracks SET list_revision=(SELECT revision FROM library_revision WHERE id=1) WHERE collection_id=NEW.id;
             END''');
           db.execute('PRAGMA user_version=17');
+          db.execute('COMMIT');
+        } catch (_) {
+          rollbackAfterFailure(db);
+          rethrow;
+        }
+      }
+      if (version <= 17) {
+        db.execute('BEGIN IMMEDIATE');
+        try {
+          // Existing playlists keep their "<name> [id]" folder under the old
+          // root. New ones use output_root (empty: the default root) plus a
+          // folder named after the playlist, reserved in output_folder.
+          db.execute(
+              "ALTER TABLE collections ADD COLUMN output_root TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              "ALTER TABLE collections ADD COLUMN output_folder TEXT NOT NULL DEFAULT ''");
+          db.execute(
+              'ALTER TABLE collections ADD COLUMN legacy_folder INTEGER NOT NULL DEFAULT 0');
+          db.execute('UPDATE collections SET legacy_folder=1');
+          db.execute('PRAGMA user_version=18');
           db.execute('COMMIT');
         } catch (_) {
           rollbackAfterFailure(db);

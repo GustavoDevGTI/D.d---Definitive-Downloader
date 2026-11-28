@@ -48,6 +48,7 @@ class DownloadQueueRun {
   final MusicResolver? music;
   Future<String> execute(
       {required String outputDirectory,
+      Future<String> Function(Collection owner)? directoryFor,
       int? collectionId,
       List<int>? queueIds,
       bool failedOnly = false,
@@ -109,8 +110,9 @@ class DownloadQueueRun {
         }
         final owner = await repository.collectionById(track.collectionId);
         if (owner == null) continue;
-        final directory = p.join(outputDirectory,
-            '${safeSegment(owner.outputFolderName)} [${owner.id}]');
+        final directory = await directoryFor?.call(owner) ??
+            p.join(outputDirectory,
+                '${safeSegment(owner.outputFolderName)} [${owner.id}]');
         destinations[owner.id] = directory;
         onEvent(DownloadRunTrack(track));
         progress = null;

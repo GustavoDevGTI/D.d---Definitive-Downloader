@@ -58,9 +58,21 @@ void main() {
             .byKey(ValueKey('captured-audio-${captureFixture(1)['sourceId']}'));
         await ioUntil(tester, () => first.evaluate().isNotEmpty);
         expect(library.collections, isEmpty);
-        await tester.tap(first);
+        // The row does not toggle; only its checkbox does.
+        await tester.ensureVisible(first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Áudio 1'));
+        await tester.pumpAndSettle();
+        expect(find.text('2 de 2 selecionados'), findsOneWidget);
+        await tester
+            .tap(find.descendant(of: first, matching: find.byType(Checkbox)));
         await tester.pumpAndSettle();
         expect(find.text('1 de 2 selecionados'), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-path')), findsOneWidget);
+        expect(find.byKey(const ValueKey('capture-save-playlist')),
+            findsOneWidget);
+        expect(
+            find.byKey(const ValueKey('capture-add-playlist')), findsOneWidget);
         if (output != null) {
           await tester.runAsync(() async {
             final boundary =
@@ -74,6 +86,9 @@ void main() {
             image.dispose();
           });
         }
+        await tester.ensureVisible(
+            find.byKey(const ValueKey('capture-download-selected')));
+        await tester.pumpAndSettle();
         await tester.runAsync(() => tester
             .tap(find.byKey(const ValueKey('capture-download-selected'))));
         await ioUntil(tester, () => openedDownloads && !library.downloading);
@@ -83,6 +98,8 @@ void main() {
           expect(tracks, hasLength(1));
           expect(tracks.single.title, 'Áudio 2');
           expect(await File(tracks.single.localPath).exists(), isTrue);
+          expect(File(tracks.single.localPath).parent.path,
+              endsWith('${Platform.pathSeparator}Áudio 2'));
         });
         expect(tester.takeException(), isNull);
       } finally {

@@ -1,6 +1,6 @@
 # Definitive Downloader 0.1.105 — Windows e Android
 
-O Android volta a ser publicado junto com o Windows: instalador x64 e APKs ARM64/x86_64 da mesma versão. Esta versão também traz duas mudanças na tela de playlists e corrige um pedido de conta Deezer que tinha sumido.
+O Android volta a ser publicado junto com o Windows: instalador x64 e APK Android ARM64 da mesma versão, para celulares. Esta versão também traz duas mudanças na tela de playlists e corrige um pedido de conta Deezer que tinha sumido.
 
 ## Playlists
 
@@ -27,6 +27,6 @@ Quem escolhia **Deixar para mais tarde** no pedido de conta Deezer durante a imp
 
 ## Pacotes
 
-Instalador Windows x64 e APKs Android ARM64 e x86_64, com assinatura de teste. As somas SHA-256 dos três pacotes estão em `SHA256SUMS.txt`.
+Instalador Windows x64 e APK Android ARM64, com assinatura de teste. As somas SHA-256 estão em `SHA256SUMS.txt`. A linha do APK x86_64 nesse arquivo se refere à compilação para emuladores, que ficou só para uso interno e não é publicada.
 
 O serviço de playlists (cota mensal de 1.000 chamadas, renovada no dia 12) é o mesmo da [0.1.104](RELEASE_0_1_104.md).
